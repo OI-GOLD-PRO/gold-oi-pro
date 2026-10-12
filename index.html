@@ -65,7 +65,7 @@
 <body>
   <header>
     <span class="dot" id="dot"></span>
-    <div class="sym"><b>XAUUSD</b><span id="src">XAUUSDT · OI CME</span></div>
+    <div class="sym"><b>XAUUSD</b><span id="src">OI</span></div>
     <div class="px"><div id="price">–</div><div id="chg">กำลังโหลด</div></div>
     <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือนโซน OI">🔕</button>
     <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่">⟳</button>
@@ -106,6 +106,8 @@
   let tf = '5m';
   try { tf = localStorage.getItem('oi_tf') || '5m'; } catch (e) { /* ใช้ค่าเริ่มต้น */ }
   let ws = null, wsTimer = null, lastClose = null, dayOpen = null;
+  // ปรับราคากราฟ perpetual ให้เท่าราคาทอง spot (forex): ราคาที่แสดง = ราคา perp − adj
+  let adj = 0, basisEma = null, rawBars = [], rawClose = null, offRaw = null;
 
   // ---------- กราฟ ----------
   const chartEl = $('chart');
@@ -138,7 +140,7 @@
     });
     const rows = [...map.values()].sort((a, b) => a.strike - b.strike);
     const ok = isFinite(off);
-    rows.forEach(r => { r.price = ok ? r.strike - off : null; });
+    rows.forEach(r => { r.price = ok ? r.strike - off - adj : null; });
     const maxOI = Math.max(1, ...rows.map(r => Math.max(r.p, r.c)));
     const maxChg = Math.max(1, ...rows.map(r => Math.max(Math.abs(r.dp || 0), Math.abs(r.dc || 0))));
     const hasChg = rows.some(r => r.dp !== null || r.dc !== null);
@@ -152,17 +154,13 @@
     const topC = [...rows].sort((a, b) => b.c - a.c).slice(0, 3).map(r => r.strike);
     const topV = [...rows].filter(r => (r.vc || 0) + (r.vp || 0) > 0)
       .sort((a, b) => ((b.vc || 0) + (b.vp || 0)) - ((a.vc || 0) + (a.vp || 0))).slice(0, 5).map(r => r.strike);
+    offRaw = ok ? off : null;
     oi = { rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC, topV };
 
     const cfg = d.cfg || {};
     const chips = [];
     chips.push(`<span class="chip">สัญญา <b>${esc(cfg.contract || '–')}</b></span>`);
-    chips.push(`<span class="chip">OI <b>${esc(d.stamp || '–')}</b></span>`);
     chips.push(ok ? `<span class="chip">offset <b>${off.toFixed(2)}</b></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
-    if (cfg.offset_time) chips.push(`<span class="chip">วัด offset <b>${esc(cfg.offset_time)}</b></span>`);
-    if (d.gc) chips.push(`<span class="chip">GC ตอนดึง OI <b>${Number(d.gc).toFixed(2)}</b></span>`);
-    if (cfg.volume_time) chips.push(`<span class="chip">Vol <b>${esc(cfg.volume_time)}</b></span>`);
-    chips.push(`<span class="chip">${rows.length} strike</span>`);
     $('chips').innerHTML = chips.join('');
     dirty = true;
     if (typeof resetArming === 'function') resetArming(lastClose);
@@ -221,10 +219,10 @@
       // เส้นระดับจาง ๆ ทุก strike
       const yy = Math.round(y) + .5, mid = plotW / 2;
       const hline = (x0, x1) => { ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke(); };
-      ctx.globalAlpha = 0.12 + strength * 0.35;
+      ctx.globalAlpha = 0.4 + strength * 0.4;
       ctx.strokeStyle = r.c >= r.p ? callC : putC;
       ctx.lineWidth = 1;
-      ctx.setLineDash([3, 4]); hline(0, plotW); ctx.setLineDash([]);
+      ctx.setLineDash([4, 3]); hline(0, plotW); ctx.setLineDash([]);
       // กำแพง OI ใหญ่ 3 อันดับ (Call แดง / Put เขียว): เส้นทึบจากขอบขวาถึงกลางกราฟ
       const isTopC = oi.topC.includes(r.strike) && r.c > 0, isTopP = oi.topP.includes(r.strike) && r.p > 0;
       if (isTopC || isTopP) {
@@ -449,7 +447,29 @@
   let prov = null, pingTimer = null, lastBarTime = null;
   try { const id = localStorage.getItem('oi_src'); const i = PROVIDERS.findIndex(p => p.id === id); if (i > 0) PROVIDERS.unshift(PROVIDERS.splice(i, 1)[0]); } catch (e) {}
 
-  const toBar = k => ({ time: Math.floor(k[0] / 1000) + TZ_SHIFT, open: k[1], high: k[2], low: k[3], close: k[4] });
+  const toBar = k => ({ time: Math.floor(k[0] / 1000) + TZ_SHIFT, open: k[1] - adj, high: k[2] - adj, low: k[3] - adj, close: k[4] - adj });
+
+  // ราคาทอง spot จาก gold-api.com ใช้วัดส่วนต่าง perp − spot แล้วเลื่อนกราฟลงให้ตรงกับราคา forex
+  function applyAdj(next) {
+    adj = next;
+    if (rawBars.length) { try { series.setData(rawBars.map(toBar)); } catch (e) {} }
+    if (rawClose !== null) lastClose = rawClose - adj;
+    if (oi && offRaw !== null) oi.rows.forEach(r => { r.price = r.strike - offRaw - adj; });
+    dirty = true; showPrice();
+  }
+  async function updateBasis() {
+    if (rawClose === null) return;
+    try {
+      const r = await fetch('https://api.gold-api.com/price/XAU', { cache: 'no-store' });
+      const spot = Number((await r.json()).price);
+      const basis = rawClose - spot;
+      if (!isFinite(basis) || Math.abs(basis) > 25) return;
+      basisEma = basisEma === null ? basis : basisEma * 0.7 + basis * 0.3;
+      const next = Math.round(basisEma * 100) / 100;
+      if (Math.abs(next - adj) >= 0.3 || adj === 0) applyAdj(next);
+    } catch (e) {}
+  }
+  setInterval(updateBasis, 30000);
 
   async function fetchBars(p, t, n) {
     const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 7000);
@@ -471,7 +491,7 @@
     const changed = prov !== p;
     prov = p;
     try { localStorage.setItem('oi_src', p.id); } catch (e) {}
-    $('src').textContent = `${p.name} XAUUSDT · OI CME`;
+    $('src').textContent = `OI · Powered by “${p.name}”`;
     if (changed) loadDayOpen().then(showPrice);
   }
 
@@ -485,10 +505,13 @@
     for (const p of order) {
       try {
         const rows = await fetchBars(p, tf, 600);
+        rawBars = rows;
         const bars = rows.map(toBar);
         series.setData(bars);
-        lastClose = bars[bars.length - 1].close;
+        rawClose = rows[rows.length - 1][4];
+        lastClose = rawClose - adj;
         lastBarTime = bars[bars.length - 1].time;
+        updateBasis();
         setSource(p);
         showPrice();
         chart.timeScale().scrollToRealTime();
@@ -520,7 +543,11 @@
       rows.sort((a, b) => a[0] - b[0]).forEach(k => {
         const b = toBar(k);
         if (lastBarTime !== null && b.time < lastBarTime) return;
-        try { series.update(b); lastBarTime = b.time; lastClose = k[4]; } catch (e) {}
+        try {
+          series.update(b); lastBarTime = b.time; rawClose = k[4]; lastClose = rawClose - adj;
+          const lastRaw = rawBars[rawBars.length - 1];
+          if (lastRaw && lastRaw[0] === k[0]) rawBars[rawBars.length - 1] = k; else rawBars.push(k);
+        } catch (e) {}
       });
       showPrice();
       checkAlerts(lastClose);
@@ -533,7 +560,7 @@
     if (lastClose === null) return;
     $('price').textContent = lastClose.toFixed(2);
     if (dayOpen) {
-      const d = lastClose - dayOpen, pct = d / dayOpen * 100;
+      const d = lastClose - (dayOpen - adj), pct = d / (dayOpen - adj) * 100;
       $('chg').textContent = `${d >= 0 ? '+' : ''}${d.toFixed(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%) วันนี้`;
       $('chg').style.color = d >= 0 ? C('--up') : C('--down');
     } else { $('chg').textContent = ''; }

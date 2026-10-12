@@ -577,6 +577,20 @@
   // ทุก 1 ชั่วโมง: อ่านชีตใหม่ (OI/carry ล่าสุด) แล้วคำนวณ offset ใหม่
   setInterval(() => { loadSheet().then(() => refreshAdj(false)); }, REFRESH_MS);
 
+  // ตลาดทอง CME ปิด: ศุกร์ 17:00 ET ถึงอาทิตย์ 18:00 ET และพักทุกวัน 17:00–18:00 ET
+  // perp เทรดตลอด 24 ชม. จึงตัดแท่งช่วงนี้ทิ้ง ให้กราฟตรงกับกราฟฟิวเจอร์
+  const etFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', hourCycle: 'h23' });
+  const closedCache = new Map();
+  function cmeClosed(ms) {
+    const hk = Math.floor(ms / 3600000);
+    if (closedCache.has(hk)) return closedCache.get(hk);
+    const parts = etFmt.formatToParts(new Date(hk * 3600000));
+    const wd = parts.find(x => x.type === 'weekday').value, h = +parts.find(x => x.type === 'hour').value;
+    const c = wd === 'Sat' || (wd === 'Fri' && h >= 17) || (wd === 'Sun' && h < 18) || h === 17;
+    closedCache.set(hk, c);
+    return c;
+  }
+
   async function fetchBars(p, t, n) {
     const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 7000);
     try {
@@ -610,7 +624,8 @@
     const errs = [];
     for (const p of order) {
       try {
-        const rows = await fetchBars(p, tf, 600);
+        const rows = (await fetchBars(p, tf, 800)).filter(k => !cmeClosed(k[0]));
+        if (!rows.length) throw new Error('no data');
         rawBars = rows;
         const bars = rows.map(toBar);
         series.setData(bars);
@@ -647,6 +662,7 @@
       if (!rows) return;
       // อัปเดตเฉพาะแท่งล่าสุดหรือใหม่กว่า (snapshot ของบางแหล่งส่งแท่งเก่ามาด้วย)
       rows.sort((a, b) => a[0] - b[0]).forEach(k => {
+        if (cmeClosed(k[0])) return; // ช่วงตลาดทอง CME ปิด ไม่วาดแท่ง
         const b = toBar(k);
         if (lastBarTime !== null && b.time < lastBarTime) return;
         try {

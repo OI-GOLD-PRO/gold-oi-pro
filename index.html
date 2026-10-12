@@ -16,11 +16,12 @@
     --fg: #e6e9f2;
     --muted: #8a93ab;
     --gold: #e0b44c;      /* สีแบรนด์ทอง ใช้กับราคา/ปุ่มที่เลือก */
-    --put: #2fbf8f;       /* Put = แนวรับ */
-    --call: #e5576b;      /* Call = แนวต้าน */
+    --put: #e5576b;       /* Put = แนวรับ (โทนแดง) */
+    --call: #2fbf8f;      /* Call = แนวต้าน (โทนเขียว) */
+    --live: #2fbf8f;      /* จุดสถานะเชื่อมต่อสด */
     --chg: #9aa3b8;       /* OI change สีเทา */
-    --volc: #ffb98a;      /* Volume Call ส้มอ่อน */
-    --volp: #8ccaff;      /* Volume Put ฟ้าอ่อน */
+    --volc: #8ccaff;      /* Volume Call ฟ้าอ่อน */
+    --volp: #ffb98a;      /* Volume Put ส้มอ่อน */
     --up: #26a69a;
     --down: #ef5350;
     --sans: 'IBM Plex Sans Thai', system-ui, -apple-system, sans-serif;
@@ -45,7 +46,7 @@
   .siren.on .bulb { filter: none; animation: sirenBlink .6s steps(2, start) infinite; }
   @keyframes sirenBlink { 0% { opacity: 1; filter: drop-shadow(0 0 6px #ff3b3b); } 100% { opacity: .25; } }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
-  .dot.live { background: var(--put); box-shadow: 0 0 6px var(--put); }
+  .dot.live { background: var(--live); box-shadow: 0 0 6px var(--live); }
   button.icon { background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; width: 38px; height: 38px; font-size: 18px; flex: none; }
   button.icon:active { transform: scale(.95); }
   .chips { display: flex; gap: 6px; padding: 0 14px 8px; overflow-x: auto; scrollbar-width: none; }

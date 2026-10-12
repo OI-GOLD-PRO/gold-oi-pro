@@ -57,6 +57,9 @@
   .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 14px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); }
   .legend i { display: inline-block; width: 10px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
   .legend .rt { margin-left: auto; font-family: var(--mono); }
+  button.icon.on { border-color: var(--gold); color: var(--gold); }
+  #toast { position: absolute; left: 10px; right: 10px; top: 10px; z-index: 5; background: #2a2208; border: 1px solid var(--gold); color: var(--fg); border-radius: 10px; padding: 9px 12px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
+  #toast b { color: var(--gold); font-family: var(--mono); }
 </style>
 </head>
 <body>
@@ -64,6 +67,7 @@
     <span class="dot" id="dot"></span>
     <div class="sym"><b>XAUUSD</b><span>Bybit XAUUSDT · OI CME</span></div>
     <div class="px"><div id="price">–</div><div id="chg">กำลังโหลด</div></div>
+    <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือนโซน OI">🔕</button>
     <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่">⟳</button>
   </header>
   <div class="chips" id="chips"><span class="chip">กำลังอ่านชีต…</span></div>
@@ -79,6 +83,7 @@
     <div id="chart"></div>
     <canvas id="ov"></canvas>
     <div id="tip" hidden></div>
+    <div id="toast" hidden></div>
     <div id="msg">กำลังโหลดกราฟ…</div>
   </div>
   <div class="legend">
@@ -154,6 +159,7 @@
     chips.push(`<span class="chip">${rows.length} strike</span>`);
     $('chips').innerHTML = chips.join('');
     dirty = true;
+    if (typeof resetArming === 'function') resetArming(lastClose);
   }
 
   function esc(s) { return String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); }
@@ -211,6 +217,10 @@
       ctx.setLineDash(big ? [] : [3, 4]);
       ctx.beginPath(); ctx.moveTo(0, Math.round(y) + .5); ctx.lineTo(plotW, Math.round(y) + .5); ctx.stroke();
       ctx.setLineDash([]);
+      if (hit && hit.strike === r.strike && Date.now() < hit.until) {
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = C('--gold'); ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(0, Math.round(y) + .5); ctx.lineTo(plotW, Math.round(y) + .5); ctx.stroke();
+      }
       // แท่ง Call (บนเส้น) และ Put (ใต้เส้น) ยื่นจากขอบขวา
       ctx.globalAlpha = 0.9;
       if (r.c > 0) { const L = Math.max(2, barMax * r.c / oi.maxOI); ctx.fillStyle = callC; ctx.fillRect(plotW - L, y - thick, L, thick); }
@@ -275,6 +285,86 @@
     tip.hidden = false;
   });
 
+  // ---------- แจ้งเตือนเมื่อราคาเข้าใกล้โซน OI ----------
+  const ALERT_MIN_OI = 50;   // เฉพาะ strike ที่ Put หรือ Call มี OI ตั้งแต่ 50
+  const ALERT_TOL = 1.5;     // ห่างจากเส้นไม่เกิน $1.5 ถือว่าเข้าโซน
+  const REARM = ALERT_TOL * 3; // ต้องออกห่าง $4.5 ก่อนจึงเตือนโซนเดิมซ้ำ
+  let alertsOn = false;
+  try { alertsOn = localStorage.getItem('oi_alert') === '1'; } catch (e) {}
+  let actx = null, wakeLock = null, hit = null;
+  const armed = new Map();
+
+  const alertZones = () => (oi && oi.offset !== null) ? oi.rows.filter(r => Math.max(r.p, r.c) >= ALERT_MIN_OI) : [];
+
+  function resetArming(price) {
+    armed.clear();
+    alertZones().forEach(r => armed.set(r.strike, price === null || Math.abs(price - r.price) > ALERT_TOL));
+  }
+
+  function beep() {
+    if (!actx) return;
+    const t = actx.currentTime;
+    [0, 0.22, 0.44].forEach(d => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.frequency.value = 880; o.connect(g); g.connect(actx.destination);
+      g.gain.setValueAtTime(0.0001, t + d);
+      g.gain.exponentialRampToValueAtTime(0.35, t + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.18);
+      o.start(t + d); o.stop(t + d + 0.2);
+    });
+  }
+
+  function showToast(html) {
+    const el = $('toast'); el.innerHTML = html; el.hidden = false;
+    clearTimeout(showToast.t); showToast.t = setTimeout(() => { el.hidden = true; }, 15000);
+  }
+
+  function fire(r, price) {
+    hit = { strike: r.strike, until: Date.now() + 60000 }; dirty = true;
+    beep();
+    try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
+    const side = r.c >= r.p ? 'แนวต้าน' : 'แนวรับ';
+    showToast(`🔔 ราคา <b>${price.toFixed(2)}</b> เข้าโซน ${side} strike <b>${r.strike}</b> (XAU ${r.price.toFixed(2)}) · Call ${r.c} · Put ${r.p}`);
+  }
+
+  function checkAlerts(price) {
+    if (!alertsOn || price === null) return;
+    alertZones().forEach(r => {
+      const d = Math.abs(price - r.price);
+      if (d <= ALERT_TOL) {
+        if (armed.get(r.strike) !== false) { armed.set(r.strike, false); fire(r, price); }
+      } else if (d >= REARM) {
+        armed.set(r.strike, true);
+      }
+    });
+  }
+
+  async function keepAwake() {
+    try { if (alertsOn && 'wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+  }
+
+  function paintBell() {
+    const b = $('bell'); b.textContent = alertsOn ? '🔔' : '🔕'; b.classList.toggle('on', alertsOn);
+  }
+
+  $('bell').addEventListener('click', () => {
+    alertsOn = !alertsOn;
+    try { localStorage.setItem('oi_alert', alertsOn ? '1' : '0'); } catch (e) {}
+    if (alertsOn) {
+      try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {}
+      resetArming(lastClose);
+      beep();
+      keepAwake();
+      showToast(`🔔 เปิดแจ้งเตือนแล้ว: ${alertZones().length} โซน (OI ≥ ${ALERT_MIN_OI}) ห่างเส้นไม่เกิน $${ALERT_TOL} · เปิดแอปค้างไว้เพื่อให้เตือนได้`);
+    } else {
+      try { wakeLock && wakeLock.release(); } catch (e) {}
+      wakeLock = null;
+      showToast('🔕 ปิดแจ้งเตือนแล้ว');
+    }
+    paintBell();
+  });
+  paintBell();
+
   // ---------- ราคา Bybit ----------
   const tfSec = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400 };
   const toBar = k => ({ time: Math.floor(+k[0] / 1000) + TZ_SHIFT, open: +k[1], high: +k[2], low: +k[3], close: +k[4] });
@@ -329,6 +419,7 @@
         lastClose = +k.close;
       });
       showPrice();
+      checkAlerts(lastClose);
     };
     ws.onclose = () => { clearInterval(pingTimer); $('dot').classList.remove('live'); wsTimer = setTimeout(openWS, 3000); };
     ws.onerror = () => { try { ws.close(); } catch (e) {} };
@@ -346,7 +437,7 @@
 
   // กลับมาเปิดแอปจากหน้าจอโฮม: ต่อ websocket ใหม่และเติมแท่งที่ขาด
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') loadTF(tf);
+    if (document.visibilityState === 'visible') { loadTF(tf); keepAwake(); try { actx && actx.resume(); } catch (e) {} }
   });
 
   setInterval(() => {

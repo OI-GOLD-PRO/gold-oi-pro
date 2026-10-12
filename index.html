@@ -252,7 +252,7 @@
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 3]); hline(0, plotW); ctx.setLineDash([]);
       }
-      // กำแพง OI ใหญ่ 3 อันดับ (Call แดง / Put เขียว): เส้นทึบจากขอบขวาถึงกลางกราฟ
+      // กำแพง OI ใหญ่ 3 อันดับ (Call เขียว / Put แดง): เส้นทึบจากขอบขวาถึงกลางกราฟ
       const isTopC = oi.topC.includes(r.strike) && r.c > 0, isTopP = oi.topP.includes(r.strike) && r.p > 0;
       if (isTopC || isTopP) {
         ctx.globalAlpha = 0.95; ctx.lineWidth = 2;

@@ -90,6 +90,7 @@
     <span><i style="background:var(--put)"></i>Put แนวรับ</span>
     <span><i style="background:var(--call)"></i>Call แนวต้าน</span>
     <span><i style="background:linear-gradient(90deg,var(--call) 50%,var(--put) 50%);opacity:.5"></i>OI เปลี่ยน</span>
+    <span><i style="background:var(--gold);opacity:.6"></i>Vol วันนี้</span>
     <span class="rt" id="clock"></span>
   </div>
 
@@ -141,9 +142,15 @@
     const maxOI = Math.max(1, ...rows.map(r => Math.max(r.p, r.c)));
     const maxChg = Math.max(1, ...rows.map(r => Math.max(Math.abs(r.dp || 0), Math.abs(r.dc || 0))));
     const hasChg = rows.some(r => r.dp !== null || r.dc !== null);
+    // volume ระหว่างวัน: แท็บ webapp key "volume" = {"strike":[call,put]}
+    let vol = {};
+    try { vol = d.cfg && d.cfg.volume ? JSON.parse(d.cfg.volume) : {}; } catch (e) { vol = {}; }
+    rows.forEach(r => { const v = vol[String(r.strike)]; r.vc = v ? Number(v[0]) : null; r.vp = v ? Number(v[1]) : null; });
+    const maxVol = Math.max(1, ...rows.map(r => Math.max(r.vc || 0, r.vp || 0)));
+    const hasVol = rows.some(r => r.vc !== null || r.vp !== null);
     const topP = [...rows].sort((a, b) => b.p - a.p).slice(0, 3).map(r => r.strike);
     const topC = [...rows].sort((a, b) => b.c - a.c).slice(0, 3).map(r => r.strike);
-    oi = { rows, offset: ok ? off : null, maxOI, maxChg, hasChg, topP, topC };
+    oi = { rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC };
 
     const cfg = d.cfg || {};
     const chips = [];
@@ -152,6 +159,7 @@
     chips.push(ok ? `<span class="chip">offset <b>${off.toFixed(2)}</b></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
     if (cfg.offset_time) chips.push(`<span class="chip">วัด offset <b>${esc(cfg.offset_time)}</b></span>`);
     if (d.gc) chips.push(`<span class="chip">GC ตอนดึง OI <b>${Number(d.gc).toFixed(2)}</b></span>`);
+    if (cfg.volume_time) chips.push(`<span class="chip">Vol <b>${esc(cfg.volume_time)}</b></span>`);
     chips.push(`<span class="chip">${rows.length} strike</span>`);
     $('chips').innerHTML = chips.join('');
     dirty = true;
@@ -197,7 +205,9 @@
     for (let i = 1; i < pts.length; i++) gap = Math.min(gap, Math.abs(pts[i].y - pts[i - 1].y));
     const thick = Math.max(2, Math.min(6, gap / 2 - 1));
     const putC = C('--put'), callC = C('--call'), chgC = C('--chg');
-    const chgMax = Math.min(plotW * 0.22, 100);
+    const chgMax = Math.min(plotW * 0.18, 80);
+    const volMax = Math.min(plotW * 0.14, 60);
+    const volC = C('--gold');
     ctx.font = `10px ${C('--mono')}`;
     const padL = Math.ceil(ctx.measureText('0000').width) + 8; // ที่ว่างซ้ายสำหรับเลข strike (ราคาฟิวเจอร์)
 
@@ -238,6 +248,16 @@
         chgBar(r.dp, false, putC);
       }
 
+      // Volume ระหว่างวัน: แท่งสีทอง คอลัมน์ถัดจาก OI change (Call บนเส้น / Put ใต้เส้น)
+      let leftEnd = chgEnd;
+      if (oi.hasVol) {
+        const volX = padL + (oi.hasChg ? chgMax + 6 : 0);
+        ctx.globalAlpha = 0.6; ctx.fillStyle = volC;
+        if (r.vc) { const L = Math.max(2, volMax * r.vc / oi.maxVol); ctx.fillRect(volX, y - thick, L, thick); }
+        if (r.vp) { const L = Math.max(2, volMax * r.vp / oi.maxVol); ctx.fillRect(volX, y, L, thick); }
+        leftEnd = volX + volMax;
+      }
+
       // ป้ายตัวเลข: แสดงเมื่อมีที่ว่างพอ หรือเป็นกำแพงใหญ่
       if (gap >= 13 || big || strength >= 0.35) {
         ctx.globalAlpha = 1;
@@ -252,7 +272,12 @@
         ctx.fillText(lab, plotW - L - 4, y);
         const sgn = v => (v > 0 ? '+' : '') + v;
         const dl = [r.dc ? 'C' + sgn(r.dc) : '', r.dp ? 'P' + sgn(r.dp) : ''].filter(Boolean).join(' ');
-        if (dl) { ctx.textAlign = 'left'; ctx.fillStyle = C('--muted'); ctx.fillText(dl, chgEnd + 4, y); }
+        const vl = (r.vc || r.vp) ? `V ${r.vc || 0}/${r.vp || 0}` : '';
+        const txt = [dl, vl].filter(Boolean).join('  ');
+        const rightEdge = plotW - L - 8 - ctx.measureText(lab).width;
+        if (txt && leftEnd + 4 + ctx.measureText(txt).width < rightEdge) {
+          ctx.textAlign = 'left'; ctx.fillStyle = C('--muted'); ctx.fillText(txt, leftEnd + 4, y);
+        }
       }
     });
     ctx.globalAlpha = 1;
@@ -277,7 +302,7 @@
     if (!best || best.d > 3) { tip.hidden = true; return; }
     const r = best.r;
     const sg = v => v === null ? '–' : (v > 0 ? '+' : '') + v;
-    tip.innerHTML = `strike <b>${r.strike}</b> → XAU ${r.price.toFixed(2)}<br><span class="c">Call ${r.c}</span> (${sg(r.dc)}) · <span class="p">Put ${r.p}</span> (${sg(r.dp)})`;
+    tip.innerHTML = `strike <b>${r.strike}</b> → XAU ${r.price.toFixed(2)}<br><span class="c">Call ${r.c}</span> (${sg(r.dc)}) · <span class="p">Put ${r.p}</span> (${sg(r.dp)})${(r.vc !== null || r.vp !== null) ? `<br>Vol วันนี้ C${r.vc || 0} / P${r.vp || 0}` : ''}`;
     tip.hidden = false;
   });
 

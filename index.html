@@ -150,7 +150,9 @@
     const hasVol = rows.some(r => r.vc !== null || r.vp !== null);
     const topP = [...rows].sort((a, b) => b.p - a.p).slice(0, 3).map(r => r.strike);
     const topC = [...rows].sort((a, b) => b.c - a.c).slice(0, 3).map(r => r.strike);
-    oi = { rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC };
+    const topV = [...rows].filter(r => (r.vc || 0) + (r.vp || 0) > 0)
+      .sort((a, b) => ((b.vc || 0) + (b.vp || 0)) - ((a.vc || 0) + (a.vp || 0))).slice(0, 5).map(r => r.strike);
+    oi = { rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC, topV };
 
     const cfg = d.cfg || {};
     const chips = [];
@@ -216,13 +218,25 @@
     pts.forEach(({ r, y }) => {
       const big = oi.topP.includes(r.strike) && r.p > 0 || oi.topC.includes(r.strike) && r.c > 0;
       const strength = Math.max(r.p, r.c) / oi.maxOI;
-      // เส้นระดับ
-      ctx.globalAlpha = big ? 0.85 : 0.15 + strength * 0.45;
+      // เส้นระดับจาง ๆ ทุก strike
+      const yy = Math.round(y) + .5, mid = plotW / 2;
+      const hline = (x0, x1) => { ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke(); };
+      ctx.globalAlpha = 0.12 + strength * 0.35;
       ctx.strokeStyle = r.c >= r.p ? callC : putC;
-      ctx.lineWidth = big ? 1.2 : 1;
-      ctx.setLineDash(big ? [] : [3, 4]);
-      ctx.beginPath(); ctx.moveTo(0, Math.round(y) + .5); ctx.lineTo(plotW, Math.round(y) + .5); ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 4]); hline(0, plotW); ctx.setLineDash([]);
+      // กำแพง OI ใหญ่ 3 อันดับ (Call แดง / Put เขียว): เส้นทึบจากขอบขวาถึงกลางกราฟ
+      const isTopC = oi.topC.includes(r.strike) && r.c > 0, isTopP = oi.topP.includes(r.strike) && r.p > 0;
+      if (isTopC || isTopP) {
+        ctx.globalAlpha = 0.95; ctx.lineWidth = 2;
+        ctx.strokeStyle = (isTopC && (!isTopP || r.c >= r.p)) ? callC : putC;
+        hline(mid, plotW);
+      }
+      // Volume วันนี้ 5 อันดับ: เส้นทึบสีเหลืองจากขอบซ้ายถึงกลางกราฟ
+      if (oi.topV && oi.topV.includes(r.strike)) {
+        ctx.globalAlpha = 0.95; ctx.lineWidth = 2; ctx.strokeStyle = volC;
+        hline(0, mid);
+      }
       if (hit && hit.strike === r.strike && Date.now() < hit.until) {
         ctx.globalAlpha = 0.9; ctx.strokeStyle = C('--gold'); ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.moveTo(0, Math.round(y) + .5); ctx.lineTo(plotW, Math.round(y) + .5); ctx.stroke();

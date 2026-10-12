@@ -19,6 +19,8 @@
     --put: #2fbf8f;       /* Put = แนวรับ */
     --call: #e5576b;      /* Call = แนวต้าน */
     --chg: #9aa3b8;       /* OI change สีเทา */
+    --volc: #8ccaff;      /* Volume Call ฟ้าอ่อน */
+    --volp: #ffb98a;      /* Volume Put ส้มอ่อน */
     --up: #26a69a;
     --down: #ef5350;
     --sans: 'IBM Plex Sans Thai', system-ui, -apple-system, sans-serif;
@@ -33,9 +35,15 @@
   .sym { display: flex; flex-direction: column; min-width: 0; }
   .sym b { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
   .sym span { font-size: 11px; color: var(--muted); }
-  .px { margin-left: auto; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .px { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .px #price { font-size: 22px; font-weight: 600; color: var(--gold); }
   .px #chg { font-size: 11px; color: var(--muted); }
+  /* ไซเรนข่าวแดง: กระพริบเมื่อข่าวจะออกภายใน 30 นาที */
+  .siren { margin: 0 auto; display: flex; flex-direction: column; align-items: center; background: none; border: 0; padding: 0; color: inherit; font: inherit; line-height: 1; }
+  .siren .bulb { font-size: 22px; filter: grayscale(.85) brightness(.75); }
+  .siren .new { margin-top: 2px; font: 700 9px var(--mono); color: #3ddc84; letter-spacing: .03em; }
+  .siren.on .bulb { filter: none; animation: sirenBlink .6s steps(2, start) infinite; }
+  @keyframes sirenBlink { 0% { opacity: 1; filter: drop-shadow(0 0 6px #ff3b3b); } 100% { opacity: .25; } }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
   .dot.live { background: var(--put); box-shadow: 0 0 6px var(--put); }
   button.icon { background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; width: 38px; height: 38px; font-size: 18px; flex: none; }
@@ -45,8 +53,8 @@
   .chip { flex: none; font-size: 11px; padding: 4px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
   .chip b { color: var(--fg); font-family: var(--mono); font-weight: 600; }
   .chip.warn { border-color: #7a5a1c; color: var(--gold); }
-  .tfs { display: flex; gap: 4px; padding: 0 14px 8px; }
-  .tfs button { flex: 1; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 6px 0; font: 600 12px var(--mono); }
+  .tfs { display: flex; gap: 3px; padding: 0 14px 6px; }
+  .tfs button { flex: 1; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 3px 0; font: 600 10.5px var(--mono); }
   .tfs button.on { background: var(--gold); border-color: var(--gold); color: #1a1405; }
   #wrap { position: relative; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
   #chart, #ov { position: absolute; inset: 0; }
@@ -66,6 +74,7 @@
   <header>
     <span class="dot" id="dot"></span>
     <div class="sym"><b>XAUUSD</b><span id="src">OI</span></div>
+    <button class="siren" id="siren" aria-label="ข่าวแดงที่กำลังจะออก"><span class="bulb">🚨</span><span class="new">new!!</span></button>
     <div class="px"><div id="price">–</div><div id="chg">กำลังโหลด</div></div>
     <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือนโซน OI">🔕</button>
     <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่">⟳</button>
@@ -78,6 +87,7 @@
     <button data-tf="30m">M30</button>
     <button data-tf="1h">H1</button>
     <button data-tf="4h">H4</button>
+    <button data-tf="1d">D1</button>
   </div>
   <div id="wrap">
     <div id="chart"></div>
@@ -90,7 +100,7 @@
     <span><i style="background:var(--put)"></i>Put แนวรับ</span>
     <span><i style="background:var(--call)"></i>Call แนวต้าน</span>
     <span><i style="background:linear-gradient(90deg,var(--call) 50%,var(--put) 50%);opacity:.5"></i>OI เปลี่ยน</span>
-    <span><i style="background:var(--gold);opacity:.6"></i>Vol วันนี้</span>
+    <span><i style="background:linear-gradient(90deg,var(--volc) 50%,var(--volp) 50%);opacity:.8"></i>Vol วันนี้</span>
     <span class="rt" id="clock"></span>
   </div>
 
@@ -206,6 +216,7 @@
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
+    drawSessions(w, h);
     drawNews(w, h);
     if (!oi || oi.offset === null || !oi.rows.length) return;
 
@@ -281,9 +292,9 @@
       let leftEnd = chgEnd;
       if (oi.hasVol) {
         const volX = padL + (oi.hasChg ? chgMax + 6 : 0);
-        ctx.globalAlpha = 0.6; ctx.fillStyle = volC;
-        if (r.vc) { const L = Math.max(2, volMax * r.vc / oi.maxVol); ctx.fillRect(volX, y - thick, L, thick); }
-        if (r.vp) { const L = Math.max(2, volMax * r.vp / oi.maxVol); ctx.fillRect(volX, y, L, thick); }
+        ctx.globalAlpha = 0.6;
+        if (r.vc) { const L = Math.max(2, volMax * r.vc / oi.maxVol); ctx.fillStyle = C('--volc'); ctx.fillRect(volX, y - thick, L, thick); }
+        if (r.vp) { const L = Math.max(2, volMax * r.vp / oi.maxVol); ctx.fillStyle = C('--volp'); ctx.fillRect(volX, y, L, thick); }
         leftEnd = volX + volMax;
       }
 
@@ -330,7 +341,7 @@
       if (!r.ok) return;
       const j = await r.json();
       news = (j.events || []).map(e => ({ ...e, ms: Date.parse(e.date) })).filter(e => isFinite(e.ms)).sort((a, b) => a.ms - b.ms);
-      dirty = true; paintNextNews();
+      dirty = true; paintNextNews(); paintSiren();
     } catch (e) {}
   }
   // แปลงเวลาข่าวเป็นตำแหน่ง x บนกราฟ (รองรับข่าวในอนาคตที่ยังไม่มีแท่ง)
@@ -346,6 +357,49 @@
     return xl + (t - lastBarTime) / sec * sp;
   }
   const NEWS_H = 14;
+  // เส้นแบ่งวันเทรด: CME ปิดรายวัน 17:00 ET แล้วเริ่มวันใหม่ 18:00 ET
+  const etDayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const dayCache = new Map();
+  function tradeDay(ms) {
+    const hk = Math.floor(ms / 3600000);
+    if (!dayCache.has(hk)) dayCache.set(hk, etDayFmt.format(new Date(hk * 3600000 + 6 * 3600000)));
+    return dayCache.get(hk);
+  }
+  function drawSessions(w, h) {
+    if (!rawBars.length || tf === '1d') return;
+    const ts = chart.timeScale(), plotW = ts.width(), plotH = h - ts.height();
+    const lr = ts.getVisibleLogicalRange(); if (!lr) return;
+    const i0 = Math.max(1, Math.floor(lr.from) - 1), i1 = Math.min(rawBars.length - 1, Math.ceil(lr.to) + 1);
+    const x0 = ts.logicalToCoordinate(i0), x1 = ts.logicalToCoordinate(i0 + 1);
+    const sp = (x0 !== null && x1 !== null) ? x1 - x0 : 6;
+    ctx.strokeStyle = C('--muted'); ctx.globalAlpha = 0.45; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+    let prev = tradeDay(+rawBars[i0 - 1][0]);
+    for (let i = i0; i <= i1; i++) {
+      const d = tradeDay(+rawBars[i][0]);
+      if (d !== prev) {
+        const xb = ts.logicalToCoordinate(i);
+        if (xb !== null) {
+          const x = Math.round(xb - sp / 2) + .5;
+          if (x > 0 && x < plotW) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, plotH); ctx.stroke(); }
+        }
+      }
+      prev = d;
+    }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+  // ไซเรน: กระพริบเมื่อมีข่าวแดงจะออกภายใน 30 นาที แตะเพื่อดูรายการข่าวถัดไป
+  function paintSiren() {
+    const now = Date.now();
+    const soon = news.some(e => e.ms > now && e.ms - now <= 30 * 60000);
+    $('siren').classList.toggle('on', soon);
+  }
+  setInterval(paintSiren, 15000);
+  $('siren').addEventListener('click', () => {
+    const now = Date.now() - 5 * 60000;
+    const up = news.filter(e => e.ms >= now).slice(0, 6);
+    const fmtT = ms => new Date(ms).toLocaleString('th-TH', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' });
+    showToast(up.length ? '🚨 ข่าวแดงถัดไป<br>' + up.map(e => `<b>${esc(e.c)}</b> ${esc(e.title)} · ${fmtT(e.ms)} น.`).join('<br>') : 'ยังไม่มีข่าวแดงที่กำลังจะออก');
+  });
   // ชิปบอกข่าวแดง USD ถัดไป (ข่าวในอนาคตอาจอยู่นอกจอกราฟ)
   function paintNextNews() {
     const el = $('newschip'); if (!el) return;
@@ -506,7 +560,7 @@
   }, { passive: true });
 
   // ---------- ราคา: ลองหลายแหล่ง (บางเครือข่ายในไทยเข้า Bybit ไม่ได้) ----------
-  const tfSec = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400 };
+  const tfSec = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   const BYBIT_TF = { '1m': '1', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '4h': '240', '1d': 'D' };
   const BITGET_TF = { '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m', '1h': '1H', '4h': '4H', '1d': '1D' };
   const PROVIDERS = [
@@ -546,7 +600,7 @@
   function paintOff() {
     const el = $('offchip'); if (!el) return;
     const t = adjAt ? adjAt.toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
-    el.innerHTML = `offset <b>${(-adj).toFixed(2)}</b>${t ? ' · ' + t : ''}`;
+    el.innerHTML = `offset <b>${(-adj).toFixed(2)}</b>`;
   }
   function applyAdj(next) {
     adj = Math.round(next * 100) / 100; adjSet = true; adjAt = new Date();

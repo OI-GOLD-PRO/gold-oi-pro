@@ -65,7 +65,7 @@
 <body>
   <header>
     <span class="dot" id="dot"></span>
-    <div class="sym"><b>XAUUSD</b><span>Bybit XAUUSDT · OI CME</span></div>
+    <div class="sym"><b>XAUUSD</b><span id="src">XAUUSDT · OI CME</span></div>
     <div class="px"><div id="price">–</div><div id="chg">กำลังโหลด</div></div>
     <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือนโซน OI">🔕</button>
     <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่">⟳</button>
@@ -95,12 +95,8 @@
 
 <script>
 (function () {
-  // ราคาจาก Bybit XAUUSDT (สัญญา perpetual อิงทอง spot)
   const SYMBOL = 'XAUUSDT';
-  const REST = 'https://api.bybit.com/v5/market/kline';
-  const WS = 'wss://stream.bybit.com/v5/public/linear';
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
-  const TF_CODE = { '1m': '1', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '4h': '240' };
 
   const $ = id => document.getElementById(id);
   const css = getComputedStyle(document.documentElement);
@@ -371,17 +367,65 @@
     if (!wakeLock) keepAwake();
   }, { passive: true });
 
-  // ---------- ราคา Bybit ----------
+  // ---------- ราคา: ลองหลายแหล่ง (บางเครือข่ายในไทยเข้า Bybit ไม่ได้) ----------
   const tfSec = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400 };
-  const toBar = k => ({ time: Math.floor(+k[0] / 1000) + TZ_SHIFT, open: +k[1], high: +k[2], low: +k[3], close: +k[4] });
-  const klineURL = (code, limit) => `${REST}?category=linear&symbol=${SYMBOL}&interval=${code}&limit=${limit}`;
-  let pingTimer = null;
+  const BYBIT_TF = { '1m': '1', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '4h': '240', '1d': 'D' };
+  const BITGET_TF = { '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m', '1h': '1H', '4h': '4H', '1d': '1D' };
+  const PROVIDERS = [
+    {
+      id: 'bybit', name: 'Bybit',
+      rest: (t, n) => `https://api.bybit.com/v5/market/kline?category=linear&symbol=${SYMBOL}&interval=${BYBIT_TF[t]}&limit=${n}`,
+      parse: j => { if (j.retCode !== 0) throw new Error(j.retMsg); return j.result.list.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4]]); },
+      ws: () => 'wss://stream.bybit.com/v5/public/linear',
+      sub: t => ({ op: 'subscribe', args: [`kline.${BYBIT_TF[t]}.${SYMBOL}`] }),
+      ping: '{"op":"ping"}', pingMs: 20000,
+      msg: (m, t) => (m.topic === `kline.${BYBIT_TF[t]}.${SYMBOL}` && m.data) ? m.data.map(k => [+k.start, +k.open, +k.high, +k.low, +k.close]) : null,
+    },
+    {
+      id: 'bitget', name: 'Bitget',
+      rest: (t, n) => `https://api.bitget.com/api/v2/mix/market/candles?symbol=${SYMBOL}&productType=usdt-futures&granularity=${BITGET_TF[t]}&limit=${n}`,
+      parse: j => { if (j.code !== '00000') throw new Error(j.msg); return j.data.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4]]); },
+      ws: () => 'wss://ws.bitget.com/v2/ws/public',
+      sub: t => ({ op: 'subscribe', args: [{ instType: 'USDT-FUTURES', channel: 'candle' + BITGET_TF[t], instId: SYMBOL }] }),
+      ping: 'ping', pingMs: 25000,
+      msg: (m, t) => (m.arg && m.arg.channel === 'candle' + BITGET_TF[t] && m.data) ? m.data.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4]]) : null,
+    },
+    {
+      id: 'binance', name: 'Binance',
+      rest: (t, n) => `https://fapi.binance.com/fapi/v1/klines?symbol=${SYMBOL}&interval=${t}&limit=${n}`,
+      parse: j => { if (!Array.isArray(j)) throw new Error(j.msg || 'bad data'); return j.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4]]); },
+      ws: t => `wss://fstream.binance.com/ws/${SYMBOL.toLowerCase()}@kline_${t}`,
+      sub: null, ping: null, pingMs: 0,
+      msg: (m, t) => (m.k && m.k.i === t) ? [[+m.k.t, +m.k.o, +m.k.h, +m.k.l, +m.k.c]] : null,
+    },
+  ];
+  let prov = null, pingTimer = null;
+  try { const id = localStorage.getItem('oi_src'); const i = PROVIDERS.findIndex(p => p.id === id); if (i > 0) PROVIDERS.unshift(PROVIDERS.splice(i, 1)[0]); } catch (e) {}
+
+  const toBar = k => ({ time: Math.floor(k[0] / 1000) + TZ_SHIFT, open: k[1], high: k[2], low: k[3], close: k[4] });
+
+  async function fetchBars(p, t, n) {
+    const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 7000);
+    try {
+      const r = await fetch(p.rest(t, n), { cache: 'no-store', signal: ac.signal });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const rows = p.parse(await r.json()).sort((a, b) => a[0] - b[0]);
+      if (!rows.length) throw new Error('no data');
+      return rows;
+    } finally { clearTimeout(timer); }
+  }
 
   async function loadDayOpen() {
-    try {
-      const r = await fetch(klineURL('D', 1), { cache: 'no-store' });
-      const k = (await r.json()).result.list[0]; dayOpen = +k[1];
-    } catch (e) { dayOpen = null; }
+    if (!prov) return;
+    try { const rows = await fetchBars(prov, '1d', 2); dayOpen = rows[rows.length - 1][1]; } catch (e) { dayOpen = null; }
+  }
+
+  function setSource(p) {
+    const changed = prov !== p;
+    prov = p;
+    try { localStorage.setItem('oi_src', p.id); } catch (e) {}
+    $('src').textContent = `${p.name} XAUUSDT · OI CME`;
+    if (changed) loadDayOpen().then(showPrice);
   }
 
   async function loadTF(next) {
@@ -389,41 +433,42 @@
     try { localStorage.setItem('oi_tf', tf); } catch (e) {}
     document.querySelectorAll('#tfs button').forEach(b => b.classList.toggle('on', b.dataset.tf === tf));
     $('msg').hidden = false; $('msg').textContent = 'กำลังโหลดกราฟ…';
-    try {
-      const r = await fetch(klineURL(TF_CODE[tf], 600), { cache: 'no-store' });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const j = await r.json();
-      if (j.retCode !== 0) throw new Error(j.retMsg);
-      const bars = j.result.list.map(toBar).reverse(); // Bybit ส่งแท่งใหม่สุดมาก่อน
-      series.setData(bars);
-      lastClose = bars.length ? bars[bars.length - 1].close : null;
-      showPrice();
-      chart.timeScale().scrollToRealTime();
-      $('msg').hidden = true;
-      dirty = true;
-    } catch (e) {
-      $('msg').textContent = 'ดึงราคาจาก Bybit ไม่ได้ (' + e.message + ') ลองกดเปลี่ยนไทม์เฟรมอีกครั้ง';
+    const order = prov ? [prov, ...PROVIDERS.filter(p => p !== prov)] : PROVIDERS;
+    const errs = [];
+    for (const p of order) {
+      try {
+        const rows = await fetchBars(p, tf, 600);
+        const bars = rows.map(toBar);
+        series.setData(bars);
+        lastClose = bars[bars.length - 1].close;
+        setSource(p);
+        showPrice();
+        chart.timeScale().scrollToRealTime();
+        $('msg').hidden = true;
+        dirty = true;
+        openWS();
+        return;
+      } catch (e) { errs.push(`${p.name}: ${e.name === 'AbortError' ? 'timeout' : e.message}`); }
     }
-    openWS();
+    $('msg').textContent = 'ดึงราคาไม่ได้จากทุกแหล่ง (' + errs.join(' / ') + ') ลองกดเปลี่ยนไทม์เฟรมอีกครั้ง';
   }
 
   function openWS() {
     clearTimeout(wsTimer); clearInterval(pingTimer);
     if (ws) { ws.onclose = null; ws.close(); }
-    const topic = `kline.${TF_CODE[tf]}.${SYMBOL}`;
-    ws = new WebSocket(WS);
+    if (!prov) return;
+    const p = prov, t = tf;
+    ws = new WebSocket(p.ws(t));
     ws.onopen = () => {
-      ws.send(JSON.stringify({ op: 'subscribe', args: [topic] }));
-      pingTimer = setInterval(() => { try { ws.send('{"op":"ping"}'); } catch (e) {} }, 20000);
+      if (p.sub) ws.send(JSON.stringify(p.sub(t)));
+      if (p.ping) pingTimer = setInterval(() => { try { ws.send(p.ping); } catch (e) {} }, p.pingMs);
       $('dot').classList.add('live');
     };
     ws.onmessage = ev => {
-      const m = JSON.parse(ev.data);
-      if (m.topic !== topic || !m.data) return;
-      m.data.forEach(k => {
-        series.update({ time: Math.floor(k.start / 1000) + TZ_SHIFT, open: +k.open, high: +k.high, low: +k.low, close: +k.close });
-        lastClose = +k.close;
-      });
+      let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      const rows = p.msg(m, t);
+      if (!rows) return;
+      rows.forEach(k => { series.update(toBar(k)); lastClose = k[4]; });
       showPrice();
       checkAlerts(lastClose);
     };
@@ -456,7 +501,6 @@
 
   if (!tfSec[tf]) tf = '5m';
   loadSheet();
-  loadDayOpen().then(showPrice);
   loadTF(tf);
 })();
 </script>

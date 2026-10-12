@@ -154,8 +154,10 @@
     const topC = [...rows].sort((a, b) => b.c - a.c).slice(0, 3).map(r => r.strike);
     const topV = [...rows].filter(r => (r.vc || 0) + (r.vp || 0) > 0)
       .sort((a, b) => ((b.vc || 0) + (b.vp || 0)) - ((a.vc || 0) + (a.vp || 0))).slice(0, 5).map(r => r.strike);
+    const top5P = [...rows].filter(r => r.p > 0).sort((a, b) => b.p - a.p).slice(0, 5).map(r => r.strike);
+    const top5C = [...rows].filter(r => r.c > 0).sort((a, b) => b.c - a.c).slice(0, 5).map(r => r.strike);
     offRaw = ok ? off : null;
-    oi = { rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC, topV };
+    oi = { top5P, top5C, rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC, topV };
 
     const cfg = d.cfg || {};
     const chips = [];
@@ -219,10 +221,14 @@
       // เส้นระดับจาง ๆ ทุก strike
       const yy = Math.round(y) + .5, mid = plotW / 2;
       const hline = (x0, x1) => { ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke(); };
-      ctx.globalAlpha = 0.4 + strength * 0.4;
-      ctx.strokeStyle = r.c >= r.p ? callC : putC;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 3]); hline(0, plotW); ctx.setLineDash([]);
+      // เส้นประเฉพาะ OI มากสุด 5 อันดับของแต่ละฝั่ง
+      const in5C = oi.top5C.includes(r.strike), in5P = oi.top5P.includes(r.strike);
+      if (in5C || in5P) {
+        ctx.globalAlpha = 0.75;
+        ctx.strokeStyle = (in5C && (!in5P || r.c >= r.p)) ? callC : putC;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]); hline(0, plotW); ctx.setLineDash([]);
+      }
       // กำแพง OI ใหญ่ 3 อันดับ (Call แดง / Put เขียว): เส้นทึบจากขอบขวาถึงกลางกราฟ
       const isTopC = oi.topC.includes(r.strike) && r.c > 0, isTopP = oi.topP.includes(r.strike) && r.p > 0;
       if (isTopC || isTopP) {

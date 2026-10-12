@@ -168,7 +168,9 @@
     const chips = [];
     chips.push(`<span class="chip">สัญญา <b>${esc(cfg.contract || '–')}</b></span>`);
     chips.push(ok ? `<span class="chip" id="offchip"></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
+    chips.push(`<span class="chip" id="rawchip"></span>`);
     $('chips').innerHTML = chips.join('');
+    paintRaw();
     if (ok && (carry === null || !adjSet)) applyAdj(-off); else paintOff();
     if (ok) refreshAdj(true);
     dirty = true;
@@ -582,7 +584,13 @@
     ws.onerror = () => { try { ws.close(); } catch (e) {} };
   }
 
+  // ราคา XAUUSD จริงจากแหล่งที่ดึงกราฟ (ก่อนบวก offset)
+  function paintRaw() {
+    const el = $('rawchip'); if (!el) return;
+    el.innerHTML = `XAUUSD${prov ? ' ' + esc(prov.name) : ''} <b>${rawClose !== null ? rawClose.toFixed(2) : '–'}</b>`;
+  }
   function showPrice() {
+    paintRaw();
     if (lastClose === null) return;
     $('price').textContent = lastClose.toFixed(2);
     if (dayOpen) {

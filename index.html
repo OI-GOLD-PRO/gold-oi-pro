@@ -364,6 +364,12 @@
     paintBell();
   });
   paintBell();
+  // เปิดแอปมาโดยที่เปิดแจ้งเตือนค้างไว้: บราวเซอร์ให้เล่นเสียงได้หลังแตะจอครั้งแรกเท่านั้น
+  document.addEventListener('pointerdown', () => {
+    if (!alertsOn) return;
+    try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {}
+    if (!wakeLock) keepAwake();
+  }, { passive: true });
 
   // ---------- ราคา Bybit ----------
   const tfSec = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400 };

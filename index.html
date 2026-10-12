@@ -169,8 +169,9 @@
     chips.push(`<span class="chip">สัญญา <b>${esc(cfg.contract || '–')}</b></span>`);
     chips.push(ok ? `<span class="chip" id="offchip"></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
     chips.push(`<span class="chip" id="rawchip"></span>`);
+    chips.push(`<span class="chip" id="newschip" hidden></span>`);
     $('chips').innerHTML = chips.join('');
-    paintRaw();
+    paintRaw(); paintNextNews();
     if (ok && (carry === null || !adjSet)) applyAdj(-off); else paintOff();
     if (ok) refreshAdj(true);
     dirty = true;
@@ -329,7 +330,7 @@
       if (!r.ok) return;
       const j = await r.json();
       news = (j.events || []).map(e => ({ ...e, ms: Date.parse(e.date) })).filter(e => isFinite(e.ms)).sort((a, b) => a.ms - b.ms);
-      dirty = true;
+      dirty = true; paintNextNews();
     } catch (e) {}
   }
   // แปลงเวลาข่าวเป็นตำแหน่ง x บนกราฟ (รองรับข่าวในอนาคตที่ยังไม่มีแท่ง)
@@ -341,6 +342,18 @@
     return ts.logicalToCoordinate((rawBars.length - 1) + (t - lastBarTime) / sec);
   }
   const NEWS_H = 14;
+  // ชิปบอกข่าวแดง USD ถัดไป (ข่าวในอนาคตอาจอยู่นอกจอกราฟ)
+  function paintNextNews() {
+    const el = $('newschip'); if (!el) return;
+    const now = Date.now() - 5 * 60000;
+    const nx = news.find(e => e.ms >= now && e.c === 'USD') || news.find(e => e.ms >= now);
+    if (!nx) { el.hidden = true; return; }
+    const same = news.filter(e => e.ms === nx.ms && e.c === nx.c).length;
+    const t = new Date(nx.ms).toLocaleString('th-TH', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' });
+    el.innerHTML = `<span style="color:#ef4444">●</span> ${esc(nx.c)} ${esc(nx.title)}${same > 1 ? ' +' + (same - 1) : ''} <b>${t}</b>`;
+    el.hidden = false;
+  }
+  setInterval(paintNextNews, 60000);
   function newsHits(px) {
     return news.map(e => ({ e, x: newsX(e.ms) })).filter(o => o.x !== null && Math.abs(o.x - px) <= 12);
   }

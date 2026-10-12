@@ -338,8 +338,12 @@
     const sec = tfSec[tf], ts = chart.timeScale();
     if (!sec || !rawBars.length || lastBarTime === null) return null;
     const t = Math.floor(ms / 1000) + TZ_SHIFT, tb = Math.floor(t / sec) * sec;
-    if (tb <= lastBarTime) { const x = ts.timeToCoordinate(tb); if (x !== null) return x + (t - tb) / sec * (ts.options().barSpacing || 6); }
-    return ts.logicalToCoordinate((rawBars.length - 1) + (t - lastBarTime) / sec);
+    // logicalToCoordinate รับเฉพาะเลขจำนวนเต็ม จึงหาระยะห่างแท่งเองแล้วคูณ
+    const N = rawBars.length, xl = ts.logicalToCoordinate(N - 1), xp = ts.logicalToCoordinate(N - 2);
+    if (xl === null) return null;
+    const sp = (xp !== null && xl - xp > 0) ? xl - xp : (ts.options().barSpacing || 6);
+    if (tb <= lastBarTime) { const x = ts.timeToCoordinate(tb); if (x !== null) return x + (t - tb) / sec * sp; }
+    return xl + (t - lastBarTime) / sec * sp;
   }
   const NEWS_H = 14;
   // ชิปบอกข่าวแดง USD ถัดไป (ข่าวในอนาคตอาจอยู่นอกจอกราฟ)

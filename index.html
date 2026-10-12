@@ -205,6 +205,7 @@
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
+    drawNews(w, h);
     if (!oi || oi.offset === null || !oi.rows.length) return;
 
     const plotW = chart.timeScale().width();
@@ -318,9 +319,60 @@
     ctx.globalAlpha = 1;
   }
 
+  // ---------- ข่าวแดง (High impact) จาก Forex Factory ----------
+  // GitHub Actions ดึงปฏิทินทุกชั่วโมงเก็บเป็น news.json ในรีโป แอปอ่านไฟล์นั้น
+  const NEWS_URL = 'https://raw.githubusercontent.com/sahutchaitheppikul-sys/oi-gold/main/news.json';
+  let news = [];
+  async function loadNews() {
+    try {
+      const r = await fetch(NEWS_URL + '?t=' + Math.floor(Date.now() / 300000), { cache: 'no-store' });
+      if (!r.ok) return;
+      const j = await r.json();
+      news = (j.events || []).map(e => ({ ...e, ms: Date.parse(e.date) })).filter(e => isFinite(e.ms)).sort((a, b) => a.ms - b.ms);
+      dirty = true;
+    } catch (e) {}
+  }
+  // แปลงเวลาข่าวเป็นตำแหน่ง x บนกราฟ (รองรับข่าวในอนาคตที่ยังไม่มีแท่ง)
+  function newsX(ms) {
+    const sec = tfSec[tf], ts = chart.timeScale();
+    if (!sec || !rawBars.length || lastBarTime === null) return null;
+    const t = Math.floor(ms / 1000) + TZ_SHIFT, tb = Math.floor(t / sec) * sec;
+    if (tb <= lastBarTime) { const x = ts.timeToCoordinate(tb); if (x !== null) return x + (t - tb) / sec * (ts.options().barSpacing || 6); }
+    return ts.logicalToCoordinate((rawBars.length - 1) + (t - lastBarTime) / sec);
+  }
+  const NEWS_H = 14;
+  function newsHits(px) {
+    return news.map(e => ({ e, x: newsX(e.ms) })).filter(o => o.x !== null && Math.abs(o.x - px) <= 12);
+  }
+  function drawNews(w, h) {
+    if (!news.length) return;
+    const plotW = chart.timeScale().width(), plotH = h - chart.timeScale().height();
+    const y = plotH - NEWS_H - 2;
+    ctx.font = `bold 8px ${C('--mono')}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    let lastX = -99;
+    news.forEach(e => {
+      const x = newsX(e.ms);
+      if (x === null || x < 0 || x > plotW) return;
+      const usd = e.c === 'USD', col = usd ? '#ef4444' : '#f97316';
+      // เส้นแนวตั้งจาง ๆ ตรงเวลาข่าว
+      ctx.globalAlpha = usd ? 0.35 : 0.2; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, 0); ctx.lineTo(Math.round(x) + .5, y); ctx.stroke(); ctx.setLineDash([]);
+      if (Math.abs(x - lastX) < 22) return; // ข่าวเวลาเดียวกันวาดป้ายเดียว
+      lastX = x;
+      const bw = 22;
+      ctx.globalAlpha = 0.95; ctx.fillStyle = col;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x - bw / 2, y, bw, NEWS_H - 2, 3); else ctx.rect(x - bw / 2, y, bw, NEWS_H - 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(e.c, x, y + (NEWS_H - 2) / 2 + .5);
+    });
+    ctx.globalAlpha = 1; ctx.textBaseline = 'middle';
+  }
+
   function loop() {
     const ref = oi && oi.rows.length && oi.offset !== null ? oi.rows[0].price : 0;
-    const key = [chartEl.clientWidth, chartEl.clientHeight, chart.timeScale().width(), series.priceToCoordinate(ref), series.priceToCoordinate(ref + 50)].join('|');
+    const lr = chart.timeScale().getVisibleLogicalRange();
+    const key = [chartEl.clientWidth, chartEl.clientHeight, chart.timeScale().width(), series.priceToCoordinate(ref), series.priceToCoordinate(ref + 50), lr ? lr.from.toFixed(2) + ',' + lr.to.toFixed(2) : ''].join('|');
     if (dirty || key !== lastKey) { drawOverlay(); lastKey = key; dirty = false; }
     requestAnimationFrame(loop);
   }
@@ -329,6 +381,15 @@
   // แตะกราฟเพื่อดู OI ของระดับที่ใกล้ที่สุด
   chart.subscribeCrosshairMove(param => {
     const tip = $('tip');
+    // แตะแถบข่าวด้านล่าง: แสดงรายการข่าวแดงตรงนั้น
+    if (param.point && param.point.y > chartEl.clientHeight - chart.timeScale().height() - NEWS_H - 8) {
+      const hs = newsHits(param.point.x);
+      if (hs.length) {
+        const fmtT = ms => new Date(ms).toLocaleString('th-TH', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' });
+        tip.innerHTML = hs.slice(0, 5).map(({ e }) => `<b>${esc(e.c)}</b> ${esc(e.title)}<br><span style="opacity:.75">${fmtT(e.ms)} น.${e.forecast ? ' · คาด ' + esc(e.forecast) : ''}${e.previous ? ' · ก่อนหน้า ' + esc(e.previous) : ''}</span>`).join('<br>');
+        tip.hidden = false; return;
+      }
+    }
     if (!param.point || !oi || oi.offset === null) { tip.hidden = true; return; }
     const price = series.coordinateToPrice(param.point.y);
     if (price === null) { tip.hidden = true; return; }
@@ -616,6 +677,7 @@
   if (!tfSec[tf]) tf = '5m';
   loadSheet();
   loadTF(tf);
+  loadNews(); setInterval(loadNews, 15 * 60 * 1000);
 })();
 </script>
 </body>

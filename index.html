@@ -106,8 +106,11 @@
   let tf = '5m';
   try { tf = localStorage.getItem('oi_tf') || '5m'; } catch (e) { /* ใช้ค่าเริ่มต้น */ }
   let ws = null, wsTimer = null, lastClose = null, dayOpen = null;
-  // ปรับราคากราฟ perpetual ให้เท่าราคาทอง spot (forex): ราคาที่แสดง = ราคา perp − adj
-  let adj = 0, basisEma = null, rawBars = [], rawClose = null, offRaw = null;
+  // ปรับราคากราฟ perpetual ให้เท่าราคา GC (ทองฟิวเจอร์): ราคาที่แสดง = ราคา perp − adj
+  // adj = (perp − spot) − carry  โดย carry = GC − spot จากชีต (วัดตอนอัพเดท) และรีเฟรชทุก 1 ชม.
+  // ถ้าไม่มี carry ในชีต ใช้ adj = −offset (ราคา perp + offset)
+  let adj = 0, basisEma = null, rawBars = [], rawClose = null, offRaw = null, carry = null, adjSet = false, adjAt = null;
+  const REFRESH_MS = 60 * 60 * 1000;
 
   // ---------- กราฟ ----------
   const chartEl = $('chart');
@@ -140,7 +143,9 @@
     });
     const rows = [...map.values()].sort((a, b) => a.strike - b.strike);
     const ok = isFinite(off);
-    rows.forEach(r => { r.price = ok ? r.strike - off - adj : null; });
+    const cr = Number(d.cfg && d.cfg.carry);
+    carry = (d.cfg && d.cfg.carry !== undefined && d.cfg.carry !== '' && isFinite(cr)) ? cr : null;
+    rows.forEach(r => { r.price = ok ? r.strike : null; });
     const maxOI = Math.max(1, ...rows.map(r => Math.max(r.p, r.c)));
     const maxChg = Math.max(1, ...rows.map(r => Math.max(Math.abs(r.dp || 0), Math.abs(r.dc || 0))));
     const hasChg = rows.some(r => r.dp !== null || r.dc !== null);
@@ -162,8 +167,10 @@
     const cfg = d.cfg || {};
     const chips = [];
     chips.push(`<span class="chip">สัญญา <b>${esc(cfg.contract || '–')}</b></span>`);
-    chips.push(ok ? `<span class="chip">offset <b>${off.toFixed(2)}</b></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
+    chips.push(ok ? `<span class="chip" id="offchip"></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
     $('chips').innerHTML = chips.join('');
+    if (ok && (carry === null || !adjSet)) applyAdj(-off); else paintOff();
+    if (ok) refreshAdj(true);
     dirty = true;
     if (typeof resetArming === 'function') resetArming(lastClose);
   }
@@ -328,7 +335,7 @@
     if (!best || best.d > 3) { tip.hidden = true; return; }
     const r = best.r;
     const sg = v => v === null ? '–' : (v > 0 ? '+' : '') + v;
-    tip.innerHTML = `strike <b>${r.strike}</b> → XAU ${r.price.toFixed(2)}<br><span class="c">Call ${r.c}</span> (${sg(r.dc)}) · <span class="p">Put ${r.p}</span> (${sg(r.dp)})${(r.vc !== null || r.vp !== null) ? `<br>Vol วันนี้ C${r.vc || 0} / P${r.vp || 0}` : ''}`;
+    tip.innerHTML = `strike <b>${r.strike}</b> → GC ${r.price.toFixed(2)}<br><span class="c">Call ${r.c}</span> (${sg(r.dc)}) · <span class="p">Put ${r.p}</span> (${sg(r.dp)})${(r.vc !== null || r.vp !== null) ? `<br>Vol วันนี้ C${r.vc || 0} / P${r.vp || 0}` : ''}`;
     tip.hidden = false;
   });
 
@@ -371,7 +378,7 @@
     beep();
     try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
     const side = r.c >= r.p ? 'แนวต้าน' : 'แนวรับ';
-    showToast(`🔔 ราคา <b>${price.toFixed(2)}</b> เข้าโซน ${side} strike <b>${r.strike}</b> (XAU ${r.price.toFixed(2)}) · Call ${r.c} · Put ${r.p}`);
+    showToast(`🔔 ราคา <b>${price.toFixed(2)}</b> เข้าโซน ${side} strike <b>${r.strike}</b> (GC ${r.price.toFixed(2)}) · Call ${r.c} · Put ${r.p}`);
   }
 
   function checkAlerts(price) {
@@ -456,12 +463,23 @@
   const toBar = k => ({ time: Math.floor(k[0] / 1000) + TZ_SHIFT, open: k[1] - adj, high: k[2] - adj, low: k[3] - adj, close: k[4] - adj });
 
   // ราคาทอง spot จาก gold-api.com ใช้วัดส่วนต่าง perp − spot แล้วเลื่อนกราฟลงให้ตรงกับราคา forex
+  function paintOff() {
+    const el = $('offchip'); if (!el) return;
+    const t = adjAt ? adjAt.toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
+    el.innerHTML = `offset <b>${(-adj).toFixed(2)}</b>${t ? ' · ' + t : ''}`;
+  }
   function applyAdj(next) {
-    adj = next;
+    adj = Math.round(next * 100) / 100; adjSet = true; adjAt = new Date();
     if (rawBars.length) { try { series.setData(rawBars.map(toBar)); } catch (e) {} }
     if (rawClose !== null) lastClose = rawClose - adj;
-    if (oi && offRaw !== null) oi.rows.forEach(r => { r.price = r.strike - offRaw - adj; });
-    dirty = true; showPrice();
+    dirty = true; showPrice(); paintOff();
+    if (typeof resetArming === 'function' && lastClose !== null) resetArming(lastClose);
+  }
+  // คำนวณ offset ใหม่: GC ประมาณ = spot ล่าสุด + carry → offset = GC − perp
+  function refreshAdj(force) {
+    if (carry === null || basisEma === null) return;
+    if (!force && adjAt && Date.now() - adjAt.getTime() < REFRESH_MS - 5000) return;
+    applyAdj(basisEma - carry);
   }
   async function updateBasis() {
     if (rawClose === null) return;
@@ -470,12 +488,14 @@
       const spot = Number((await r.json()).price);
       const basis = rawClose - spot;
       if (!isFinite(basis) || Math.abs(basis) > 25) return;
-      basisEma = basisEma === null ? basis : basisEma * 0.7 + basis * 0.3;
-      const next = Math.round(basisEma * 100) / 100;
-      if (Math.abs(next - adj) >= 0.3 || adj === 0) applyAdj(next);
+      const first = basisEma === null;
+      basisEma = first ? basis : basisEma * 0.7 + basis * 0.3;
+      if (first) refreshAdj(true);
     } catch (e) {}
   }
   setInterval(updateBasis, 30000);
+  // ทุก 1 ชั่วโมง: อ่านชีตใหม่ (OI/carry ล่าสุด) แล้วคำนวณ offset ใหม่
+  setInterval(() => { loadSheet().then(() => refreshAdj(false)); }, REFRESH_MS);
 
   async function fetchBars(p, t, n) {
     const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 7000);

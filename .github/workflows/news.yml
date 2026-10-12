@@ -27,12 +27,25 @@ jobs:
                  | unique_by([.date, .c, .title]) | sort_by(.date)' /tmp/thisweek.json /tmp/nextweek.json > /tmp/high.json
           jq -n --slurpfile ev /tmp/high.json '{source: "Forex Factory", events: $ev[0]}' > news.json
           cat news.json | head -c 600
+      - name: Fetch GC futures 5m history (Yahoo)
+        run: |
+          set +e
+          for host in query1 query2; do
+            curl -fsSL -A 'Mozilla/5.0' "https://${host}.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=5d" -o /tmp/gc.json && break
+          done
+          if jq -e '.chart.result[0].timestamp' /tmp/gc.json >/dev/null 2>&1; then
+            jq -c '.chart.result[0] as $r | {symbol: $r.meta.symbol, updated: now|floor,
+                   bars: [range($r.timestamp|length) as $i | [$r.timestamp[$i], $r.indicators.quote[0].close[$i]] | select(.[1] != null) | [.[0], ((.[1]*100|round)/100)]]}' /tmp/gc.json > gc.json
+            echo "GC bars: $(jq '.bars|length' gc.json)"; jq -c '.bars[-3:]' gc.json
+          else
+            echo "Yahoo fetch failed"; head -c 300 /tmp/gc.json
+          fi
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add news.json
+          git add news.json gc.json 2>/dev/null || git add news.json
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
-          git commit -m "Update Forex Factory high-impact news"
+          git commit -m "Update news and GC history"
           git pull --rebase -q || true
           git push

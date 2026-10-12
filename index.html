@@ -272,25 +272,33 @@
         leftEnd = volX + volMax;
       }
 
-      // ป้ายตัวเลข: แสดงเมื่อมีที่ว่างพอ หรือเป็นกำแพงใหญ่
+      // ป้ายตัวเลข
+      ctx.globalAlpha = 1;
+      // เลข strike (ราคาฟิวเจอร์) ชิดซ้าย
       if (gap >= 13 || big || strength >= 0.35) {
-        ctx.globalAlpha = 1;
         ctx.fillStyle = big ? C('--fg') : C('--muted');
-        // เลข strike (ราคาฟิวเจอร์) ชิดซ้าย
         ctx.textAlign = 'left';
         ctx.fillText(String(r.strike), 4, y);
+      }
+      // OI ฝั่งขวา: แสดงเมื่อ Call หรือ Put ตั้งแต่ 30
+      if (Math.max(r.c, r.p) >= 30) {
         ctx.fillStyle = big ? C('--fg') : C('--muted');
         const lab = `${r.c ? 'C' + r.c : ''}${r.c && r.p ? ' ' : ''}${r.p ? 'P' + r.p : ''}`;
-        ctx.textAlign = 'right';
         const L = barMax * Math.max(r.p, r.c) / oi.maxOI;
+        ctx.textAlign = 'right';
         ctx.fillText(lab, plotW - L - 4, y);
+      }
+      // OI change + Volume: ใต้เลข strike ฝั่งซ้าย (ต้องมีที่ว่างระหว่างเส้นพอ)
+      if (gap >= 24) {
         const sgn = v => (v > 0 ? '+' : '') + v;
         const dl = [r.dc ? 'C' + sgn(r.dc) : '', r.dp ? 'P' + sgn(r.dp) : ''].filter(Boolean).join(' ');
         const vl = (r.vc || r.vp) ? `V ${r.vc || 0}/${r.vp || 0}` : '';
-        const txt = [dl, vl].filter(Boolean).join('  ');
-        const rightEdge = plotW - L - 8 - ctx.measureText(lab).width;
-        if (txt && leftEnd + 4 + ctx.measureText(txt).width < rightEdge) {
-          ctx.textAlign = 'left'; ctx.fillStyle = C('--muted'); ctx.fillText(txt, leftEnd + 4, y);
+        const txt = [dl ? 'Δ ' + dl : '', vl].filter(Boolean).join('  ');
+        if (txt) {
+          ctx.font = `9px ${C('--mono')}`;
+          ctx.textAlign = 'left'; ctx.fillStyle = C('--muted');
+          ctx.fillText(txt, 4, y + thick + 7);
+          ctx.font = `10px ${C('--mono')}`;
         }
       }
     });

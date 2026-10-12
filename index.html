@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>OI Gold</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  /* Layout: แถบหัวราคา > ชิปข้อมูล OI > ปุ่มไทม์เฟรม > กราฟเต็มจอ (มี overlay วาดแท่ง OI ทับ) */
+  :root {
+    --bg: #0b1020;        /* พื้นหลังกราฟ น้ำเงินกรมเข้ม */
+    --panel: #121a30;
+    --line: #1f2a46;
+    --fg: #e6e9f2;
+    --muted: #8a93ab;
+    --gold: #e0b44c;      /* สีแบรนด์ทอง ใช้กับราคา/ปุ่มที่เลือก */
+    --put: #2fbf8f;       /* Put = แนวรับ */
+    --call: #e5576b;      /* Call = แนวต้าน */
+    --chg: #9aa3b8;       /* OI change สีเทา */
+    --up: #26a69a;
+    --down: #ef5350;
+    --sans: 'IBM Plex Sans Thai', system-ui, -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; height: 100dvh; margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); -webkit-tap-highlight-color: transparent; }
+  body { display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); overflow: hidden; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 14px 6px; }
+  .sym { display: flex; flex-direction: column; min-width: 0; }
+  .sym b { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+  .sym span { font-size: 11px; color: var(--muted); }
+  .px { margin-left: auto; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .px #price { font-size: 22px; font-weight: 600; color: var(--gold); }
+  .px #chg { font-size: 11px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.live { background: var(--put); box-shadow: 0 0 6px var(--put); }
+  button.icon { background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; width: 38px; height: 38px; font-size: 18px; flex: none; }
+  button.icon:active { transform: scale(.95); }
+  .chips { display: flex; gap: 6px; padding: 0 14px 8px; overflow-x: auto; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; font-size: 11px; padding: 4px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .chip b { color: var(--fg); font-family: var(--mono); font-weight: 600; }
+  .chip.warn { border-color: #7a5a1c; color: var(--gold); }
+  .tfs { display: flex; gap: 4px; padding: 0 14px 8px; }
+  .tfs button { flex: 1; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 6px 0; font: 600 12px var(--mono); }
+  .tfs button.on { background: var(--gold); border-color: var(--gold); color: #1a1405; }
+  #wrap { position: relative; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
+  #chart, #ov { position: absolute; inset: 0; }
+  #ov { pointer-events: none; z-index: 2; }
+  #tip { position: absolute; left: 10px; top: 8px; z-index: 3; font-size: 12px; background: rgba(18,26,48,.92); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-family: var(--mono); pointer-events: none; }
+  #tip .p { color: var(--put); } #tip .c { color: var(--call); }
+  #msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--muted); font-size: 13px; z-index: 4; pointer-events: none; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 14px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); }
+  .legend i { display: inline-block; width: 10px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+  .legend .rt { margin-left: auto; font-family: var(--mono); }
+</style>
+</head>
+<body>
+  <header>
+    <span class="dot" id="dot"></span>
+    <div class="sym"><b>XAUUSD</b><span>Bybit XAUUSDT · OI CME</span></div>
+    <div class="px"><div id="price">–</div><div id="chg">กำลังโหลด</div></div>
+    <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่">⟳</button>
+  </header>
+  <div class="chips" id="chips"><span class="chip">กำลังอ่านชีต…</span></div>
+  <div class="tfs" id="tfs">
+    <button data-tf="1m">M1</button>
+    <button data-tf="5m">M5</button>
+    <button data-tf="15m">M15</button>
+    <button data-tf="30m">M30</button>
+    <button data-tf="1h">H1</button>
+    <button data-tf="4h">H4</button>
+  </div>
+  <div id="wrap">
+    <div id="chart"></div>
+    <canvas id="ov"></canvas>
+    <div id="tip" hidden></div>
+    <div id="msg">กำลังโหลดกราฟ…</div>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--put)"></i>Put แนวรับ</span>
+    <span><i style="background:var(--call)"></i>Call แนวต้าน</span>
+    <span><i style="background:linear-gradient(90deg,var(--call) 50%,var(--put) 50%);opacity:.5"></i>OI เปลี่ยน</span>
+    <span class="rt" id="clock"></span>
+  </div>
+
+<script>
+(function () {
+  // ราคาจาก Bybit XAUUSDT (สัญญา perpetual อิงทอง spot)
+  const SYMBOL = 'XAUUSDT';
+  const REST = 'https://api.bybit.com/v5/market/kline';
+  const WS = 'wss://stream.bybit.com/v5/public/linear';
+  const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
+  const TF_CODE = { '1m': '1', '5m': '5', '15m': '15', '30m': '30', '1h': '60', '4h': '240' };
+
+  const $ = id => document.getElementById(id);
+  const css = getComputedStyle(document.documentElement);
+  const C = k => css.getPropertyValue(k).trim();
+
+  let tf = '5m';
+  try { tf = localStorage.getItem('oi_tf') || '5m'; } catch (e) { /* ใช้ค่าเริ่มต้น */ }
+  let ws = null, wsTimer = null, lastClose = null, dayOpen = null;
+
+  // ---------- กราฟ ----------
+  const chartEl = $('chart');
+  const chart = LightweightCharts.createChart(chartEl, {
+    layout: { background: { color: C('--bg') }, textColor: C('--muted'), fontFamily: C('--mono'), fontSize: 11 },
+    grid: { vertLines: { color: 'rgba(31,42,70,.55)' }, horzLines: { color: 'rgba(31,42,70,.55)' } },
+    rightPriceScale: { borderColor: C('--line'), scaleMargins: { top: .08, bottom: .08 } },
+    timeScale: { borderColor: C('--line'), timeVisible: true, secondsVisible: false, rightOffset: 8 },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    autoSize: true,
+  });
+  const series = chart.addCandlestickSeries({
+    upColor: C('--up'), downColor: C('--down'), borderVisible: false,
+    wickUpColor: C('--up'), wickDownColor: C('--down'),
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+  });
+
+  // ---------- ข้อมูล OI ----------
+  let oi = null; // {rows:[{strike,p,c,price}], offset, maxOI}
+
+  function buildOI(d) {
+    const off = Number(d.cfg && d.cfg.offset);
+    const map = new Map();
+    (d.levels || []).forEach(l => {
+      const r = map.get(l.strike) || { strike: l.strike, p: 0, c: 0, dp: null, dc: null };
+      const chg = (l.chg === null || l.chg === undefined || !isFinite(l.chg)) ? null : Number(l.chg);
+      if (l.type === 'P') { r.p += l.oi; if (chg !== null) r.dp = chg; }
+      else { r.c += l.oi; if (chg !== null) r.dc = chg; }
+      map.set(l.strike, r);
+    });
+    const rows = [...map.values()].sort((a, b) => a.strike - b.strike);
+    const ok = isFinite(off);
+    rows.forEach(r => { r.price = ok ? r.strike - off : null; });
+    const maxOI = Math.max(1, ...rows.map(r => Math.max(r.p, r.c)));
+    const maxChg = Math.max(1, ...rows.map(r => Math.max(Math.abs(r.dp || 0), Math.abs(r.dc || 0))));
+    const hasChg = rows.some(r => r.dp !== null || r.dc !== null);
+    const topP = [...rows].sort((a, b) => b.p - a.p).slice(0, 3).map(r => r.strike);
+    const topC = [...rows].sort((a, b) => b.c - a.c).slice(0, 3).map(r => r.strike);
+    oi = { rows, offset: ok ? off : null, maxOI, maxChg, hasChg, topP, topC };
+
+    const cfg = d.cfg || {};
+    const chips = [];
+    chips.push(`<span class="chip">สัญญา <b>${esc(cfg.contract || '–')}</b></span>`);
+    chips.push(`<span class="chip">OI <b>${esc(d.stamp || '–')}</b></span>`);
+    chips.push(ok ? `<span class="chip">offset <b>${off.toFixed(2)}</b></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
+    if (cfg.offset_time) chips.push(`<span class="chip">วัด offset <b>${esc(cfg.offset_time)}</b></span>`);
+    if (d.gc) chips.push(`<span class="chip">GC ตอนดึง OI <b>${Number(d.gc).toFixed(2)}</b></span>`);
+    chips.push(`<span class="chip">${rows.length} strike</span>`);
+    $('chips').innerHTML = chips.join('');
+    dirty = true;
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); }
+
+  // ข้อมูล OI ดึงจาก Apps Script (?api=data) ซึ่งอ่านชีตให้
+  const API = 'https://script.google.com/macros/s/AKfycbwQrp29KWhUCVO0ojjS73SiLtDKe1QKx69KOOF90QQOlV3csHXqxfOGUYKYw2D6nZp0tw/exec?api=data';
+
+  async function loadSheet() {
+    $('chips').innerHTML = '<span class="chip">กำลังอ่านชีต…</span>';
+    try {
+      const r = await fetch(API + '&t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      buildOI(await r.json());
+    } catch (e) {
+      $('chips').innerHTML = `<span class="chip warn">อ่านชีตไม่ได้: ${esc(e.message || e)} กด ⟳ ลองใหม่</span>`;
+    }
+  }
+
+  // ---------- overlay แท่ง OI ----------
+  const ov = $('ov'), ctx = ov.getContext('2d');
+  let dirty = true, lastKey = '';
+
+  function drawOverlay() {
+    const w = chartEl.clientWidth, h = chartEl.clientHeight, dpr = window.devicePixelRatio || 1;
+    if (ov.width !== Math.round(w * dpr) || ov.height !== Math.round(h * dpr)) {
+      ov.width = Math.round(w * dpr); ov.height = Math.round(h * dpr);
+      ov.style.width = w + 'px'; ov.style.height = h + 'px';
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (!oi || oi.offset === null || !oi.rows.length) return;
+
+    const plotW = chart.timeScale().width();
+    const plotH = h - chart.timeScale().height();
+    const barMax = Math.min(plotW * 0.32, 150);
+    const pts = oi.rows.map(r => ({ r, y: series.priceToCoordinate(r.price) })).filter(o => o.y !== null && o.y > 2 && o.y < plotH - 2);
+    if (!pts.length) return;
+    let gap = Infinity;
+    for (let i = 1; i < pts.length; i++) gap = Math.min(gap, Math.abs(pts[i].y - pts[i - 1].y));
+    const thick = Math.max(2, Math.min(6, gap / 2 - 1));
+    const putC = C('--put'), callC = C('--call'), chgC = C('--chg');
+    const chgMax = Math.min(plotW * 0.22, 100);
+    ctx.font = `10px ${C('--mono')}`;
+    const padL = Math.ceil(ctx.measureText('0000').width) + 8; // ที่ว่างซ้ายสำหรับเลข strike (ราคาฟิวเจอร์)
+
+    ctx.font = `10px ${C('--mono')}`;
+    ctx.textBaseline = 'middle';
+    pts.forEach(({ r, y }) => {
+      const big = oi.topP.includes(r.strike) && r.p > 0 || oi.topC.includes(r.strike) && r.c > 0;
+      const strength = Math.max(r.p, r.c) / oi.maxOI;
+      // เส้นระดับ
+      ctx.globalAlpha = big ? 0.85 : 0.15 + strength * 0.45;
+      ctx.strokeStyle = r.c >= r.p ? callC : putC;
+      ctx.lineWidth = big ? 1.2 : 1;
+      ctx.setLineDash(big ? [] : [3, 4]);
+      ctx.beginPath(); ctx.moveTo(0, Math.round(y) + .5); ctx.lineTo(plotW, Math.round(y) + .5); ctx.stroke();
+      ctx.setLineDash([]);
+      // แท่ง Call (บนเส้น) และ Put (ใต้เส้น) ยื่นจากขอบขวา
+      ctx.globalAlpha = 0.9;
+      if (r.c > 0) { const L = Math.max(2, barMax * r.c / oi.maxOI); ctx.fillStyle = callC; ctx.fillRect(plotW - L, y - thick, L, thick); }
+      if (r.p > 0) { const L = Math.max(2, barMax * r.p / oi.maxOI); ctx.fillStyle = putC; ctx.fillRect(plotW - L, y, L, thick); }
+
+      // OI change: แท่งเทาจากขอบซ้าย (Call บนเส้น / Put ใต้เส้น) ทึบ = เพิ่ม, กรอบโปร่ง = ลด
+      let chgEnd = padL;
+      if (oi.hasChg) {
+        const chgBar = (v, top, col) => {
+          if (v === null || v === 0) return;
+          const L = Math.max(2, chgMax * Math.abs(v) / oi.maxChg);
+          const yy = top ? y - thick : y;
+          if (v > 0) { ctx.fillStyle = col; ctx.fillRect(padL, yy, L, thick); }
+          else { ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(padL + 0.5, yy + 0.5, L - 1, Math.max(1, thick - 1)); }
+          chgEnd = Math.max(chgEnd, padL + L);
+        };
+        ctx.globalAlpha = 0.9;
+        ctx.globalAlpha = 0.45; chgBar(r.dc, true, callC);
+        chgBar(r.dp, false, putC);
+      }
+
+      // ป้ายตัวเลข: แสดงเมื่อมีที่ว่างพอ หรือเป็นกำแพงใหญ่
+      if (gap >= 13 || big || strength >= 0.35) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = big ? C('--fg') : C('--muted');
+        // เลข strike (ราคาฟิวเจอร์) ชิดซ้าย
+        ctx.textAlign = 'left';
+        ctx.fillText(String(r.strike), 4, y);
+        ctx.fillStyle = big ? C('--fg') : C('--muted');
+        const lab = `${r.c ? 'C' + r.c : ''}${r.c && r.p ? ' ' : ''}${r.p ? 'P' + r.p : ''}`;
+        ctx.textAlign = 'right';
+        const L = barMax * Math.max(r.p, r.c) / oi.maxOI;
+        ctx.fillText(lab, plotW - L - 4, y);
+        const sgn = v => (v > 0 ? '+' : '') + v;
+        const dl = [r.dc ? 'C' + sgn(r.dc) : '', r.dp ? 'P' + sgn(r.dp) : ''].filter(Boolean).join(' ');
+        if (dl) { ctx.textAlign = 'left'; ctx.fillStyle = C('--muted'); ctx.fillText(dl, chgEnd + 4, y); }
+      }
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  function loop() {
+    const ref = oi && oi.rows.length && oi.offset !== null ? oi.rows[0].price : 0;
+    const key = [chartEl.clientWidth, chartEl.clientHeight, chart.timeScale().width(), series.priceToCoordinate(ref), series.priceToCoordinate(ref + 50)].join('|');
+    if (dirty || key !== lastKey) { drawOverlay(); lastKey = key; dirty = false; }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // แตะกราฟเพื่อดู OI ของระดับที่ใกล้ที่สุด
+  chart.subscribeCrosshairMove(param => {
+    const tip = $('tip');
+    if (!param.point || !oi || oi.offset === null) { tip.hidden = true; return; }
+    const price = series.coordinateToPrice(param.point.y);
+    if (price === null) { tip.hidden = true; return; }
+    let best = null;
+    oi.rows.forEach(r => { const d = Math.abs(r.price - price); if (!best || d < best.d) best = { r, d }; });
+    if (!best || best.d > 3) { tip.hidden = true; return; }
+    const r = best.r;
+    const sg = v => v === null ? '–' : (v > 0 ? '+' : '') + v;
+    tip.innerHTML = `strike <b>${r.strike}</b> → XAU ${r.price.toFixed(2)}<br><span class="c">Call ${r.c}</span> (${sg(r.dc)}) · <span class="p">Put ${r.p}</span> (${sg(r.dp)})`;
+    tip.hidden = false;
+  });
+
+  // ---------- ราคา Bybit ----------
+  const tfSec = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400 };
+  const toBar = k => ({ time: Math.floor(+k[0] / 1000) + TZ_SHIFT, open: +k[1], high: +k[2], low: +k[3], close: +k[4] });
+  const klineURL = (code, limit) => `${REST}?category=linear&symbol=${SYMBOL}&interval=${code}&limit=${limit}`;
+  let pingTimer = null;
+
+  async function loadDayOpen() {
+    try {
+      const r = await fetch(klineURL('D', 1), { cache: 'no-store' });
+      const k = (await r.json()).result.list[0]; dayOpen = +k[1];
+    } catch (e) { dayOpen = null; }
+  }
+
+  async function loadTF(next) {
+    tf = next;
+    try { localStorage.setItem('oi_tf', tf); } catch (e) {}
+    document.querySelectorAll('#tfs button').forEach(b => b.classList.toggle('on', b.dataset.tf === tf));
+    $('msg').hidden = false; $('msg').textContent = 'กำลังโหลดกราฟ…';
+    try {
+      const r = await fetch(klineURL(TF_CODE[tf], 600), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (j.retCode !== 0) throw new Error(j.retMsg);
+      const bars = j.result.list.map(toBar).reverse(); // Bybit ส่งแท่งใหม่สุดมาก่อน
+      series.setData(bars);
+      lastClose = bars.length ? bars[bars.length - 1].close : null;
+      showPrice();
+      chart.timeScale().scrollToRealTime();
+      $('msg').hidden = true;
+      dirty = true;
+    } catch (e) {
+      $('msg').textContent = 'ดึงราคาจาก Bybit ไม่ได้ (' + e.message + ') ลองกดเปลี่ยนไทม์เฟรมอีกครั้ง';
+    }
+    openWS();
+  }
+
+  function openWS() {
+    clearTimeout(wsTimer); clearInterval(pingTimer);
+    if (ws) { ws.onclose = null; ws.close(); }
+    const topic = `kline.${TF_CODE[tf]}.${SYMBOL}`;
+    ws = new WebSocket(WS);
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ op: 'subscribe', args: [topic] }));
+      pingTimer = setInterval(() => { try { ws.send('{"op":"ping"}'); } catch (e) {} }, 20000);
+      $('dot').classList.add('live');
+    };
+    ws.onmessage = ev => {
+      const m = JSON.parse(ev.data);
+      if (m.topic !== topic || !m.data) return;
+      m.data.forEach(k => {
+        series.update({ time: Math.floor(k.start / 1000) + TZ_SHIFT, open: +k.open, high: +k.high, low: +k.low, close: +k.close });
+        lastClose = +k.close;
+      });
+      showPrice();
+    };
+    ws.onclose = () => { clearInterval(pingTimer); $('dot').classList.remove('live'); wsTimer = setTimeout(openWS, 3000); };
+    ws.onerror = () => { try { ws.close(); } catch (e) {} };
+  }
+
+  function showPrice() {
+    if (lastClose === null) return;
+    $('price').textContent = lastClose.toFixed(2);
+    if (dayOpen) {
+      const d = lastClose - dayOpen, pct = d / dayOpen * 100;
+      $('chg').textContent = `${d >= 0 ? '+' : ''}${d.toFixed(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%) วันนี้`;
+      $('chg').style.color = d >= 0 ? C('--up') : C('--down');
+    } else { $('chg').textContent = ''; }
+  }
+
+  // กลับมาเปิดแอปจากหน้าจอโฮม: ต่อ websocket ใหม่และเติมแท่งที่ขาด
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') loadTF(tf);
+  });
+
+  setInterval(() => {
+    const d = new Date();
+    $('clock').textContent = d.toLocaleTimeString('th-TH', { hour12: false, timeZone: 'Asia/Bangkok' }) + ' น.';
+  }, 1000);
+
+  $('tfs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) loadTF(b.dataset.tf); });
+  $('reload').addEventListener('click', loadSheet);
+
+  if (!tfSec[tf]) tf = '5m';
+  loadSheet();
+  loadDayOpen().then(showPrice);
+  loadTF(tf);
+})();
+</script>
+</body>
+</html>

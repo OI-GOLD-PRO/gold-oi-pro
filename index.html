@@ -108,6 +108,8 @@
 <script>
 (function () {
   const SYMBOL = 'XAUUSDT';
+  // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
+  const APP_VER = '1.0.21';
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
   const $ = id => document.getElementById(id);
@@ -127,7 +129,7 @@
   const chartEl = $('chart');
   const chart = LightweightCharts.createChart(chartEl, {
     layout: { background: { color: C('--bg') }, textColor: C('--muted'), fontFamily: C('--mono'), fontSize: 11 },
-    grid: { vertLines: { color: 'rgba(31,42,70,.55)' }, horzLines: { color: 'rgba(31,42,70,.55)' } },
+    grid: { vertLines: { visible: false }, horzLines: { visible: false } },
     rightPriceScale: { borderColor: C('--line'), scaleMargins: { top: .08, bottom: .08 } },
     timeScale: { borderColor: C('--line'), timeVisible: true, secondsVisible: false, rightOffset: 8 },
     crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
@@ -666,7 +668,7 @@
     const changed = prov !== p;
     prov = p;
     try { localStorage.setItem('oi_src', p.id); } catch (e) {}
-    $('src').textContent = `OI · Powered by “${p.name}”`;
+    $('src').textContent = `OI · Powered by “${p.name}” · V${APP_VER}`;
     if (changed) loadDayOpen().then(showPrice);
   }
 

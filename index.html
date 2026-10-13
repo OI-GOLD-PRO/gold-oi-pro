@@ -143,7 +143,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.3.02';
+  const APP_VER = '1.3.03';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -489,6 +489,7 @@
   }
   setInterval(paintSiren, 15000);
   $('siren').addEventListener('click', () => {
+    if (!$('toast').hidden) { hideToast(); return; } // แตะไซเรนซ้ำ = ปิดกล่องข่าว
     const now = Date.now() - 5 * 60000;
     const up = news.filter(e => e.ms >= now).slice(0, 6);
     const fmtT = ms => new Date(ms).toLocaleString('th-TH', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' });
@@ -596,10 +597,14 @@
     });
   }
 
-  function showToast(html) {
-    const el = $('toast'); el.innerHTML = html; el.hidden = false;
-    clearTimeout(showToast.t); showToast.t = setTimeout(() => { el.hidden = true; }, 15000);
+  // กล่องข้อความ: แตะที่กล่องหรือที่กราฟเพื่อปิด, ปิดเองหลัง ms (ค่าเริ่ม 8 วินาที)
+  function showToast(html, ms) {
+    const el = $('toast'); el.innerHTML = html + '<div style="margin-top:6px;font-size:11px;opacity:.6">แตะเพื่อปิด</div>'; el.hidden = false;
+    clearTimeout(showToast.t); showToast.t = setTimeout(hideToast, ms || 8000);
   }
+  function hideToast() { clearTimeout(showToast.t); $('toast').hidden = true; }
+  $('toast').addEventListener('click', hideToast);
+  chartEl.addEventListener('pointerdown', () => { if (!$('toast').hidden) hideToast(); });
 
   function fire(r, price) {
     hit = { strike: r.strike, until: Date.now() + 60000 }; dirty = true;

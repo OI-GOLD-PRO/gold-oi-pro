@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#14120D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gold E-BOOK">
+<title>Gold E-BOOK</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpolygon points='14,18 50,18 60,34 4,34' fill='%23E9CF84'/%3E%3Cpolygon points='4,34 60,34 54,52 10,52' fill='%23CBA24A'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&family=Sarabun:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<style>
+  :root {
+    --head: 'Prompt', 'Sarabun', sans-serif;
+    --body: 'Sarabun', 'Prompt', sans-serif;
+    /* brand (login / shelf) */
+    --ink: #14120D; --ink2: #1D1A12; --ink-line: #2E291C; --ink-fg: #EDE8DA; --ink-muted: #A39B86;
+    --bullion: #D9B35A; --bullion-hi: #E9CF84; --bullion-lo: #CBA24A; --bullion-dk: #7A5A12;
+    --plank: #2A2417; --plank-hi: #5A4B2A;
+    --signal: #FF6B5E;
+    /* reader (theme set on <body data-theme>) */
+    --bg: #FBFAF7; --fg: #1E1B14; --muted: #6F6A5E; --line: #E4DFD1; --panel: #F3F0E7;
+    --gold: #946B08; --red: #C62828; --head-bg: #2B2414; --head-fg: #E9CF84;
+    --fs: 1.125rem;
+  }
+  body[data-theme="sepia"] { --bg: #F2E9D3; --fg: #2B2415; --muted: #6B5E41; --line: #DCCFAE; --panel: #EADFC4; --gold: #7F5B05; --red: #B3261E; }
+  body[data-theme="dark"]  { --bg: #14120D; --fg: #E9E4D6; --muted: #A39B86; --line: #2C281D; --panel: #1D1A12; --gold: #D9B35A; --red: #FF7468; --head-bg: #241F13; }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--ink); color: var(--ink-fg); font: 400 16px/1.6 var(--body); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 2px solid var(--bullion); outline-offset: 3px; border-radius: 4px; }
+  .screen { min-height: 100vh; min-height: 100dvh; }
+
+  /* ---------- login ---------- */
+  #login { display: flex; align-items: center; justify-content: center; padding: 28px 18px; }
+  #login .wrap { width: 100%; max-width: 360px; text-align: center; }
+  .ingot { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto 26px; filter: drop-shadow(0 18px 18px rgba(0,0,0,.55)); }
+  .ingot text { font-family: var(--head); font-weight: 600; }
+  #login p.lead { margin: 0 0 16px; font-size: 14px; color: var(--ink-muted); }
+  #login input { width: 100%; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--ink-line); background: var(--ink2); color: var(--ink-fg);
+    font: 600 17px var(--head); text-align: center; letter-spacing: .14em; outline: none; }
+  #login input::placeholder { letter-spacing: 0; font-weight: 400; color: #7d7662; }
+  #login input:focus { border-color: var(--bullion); }
+  #login button { width: 100%; margin-top: 12px; padding: 13px; border: 0; border-radius: 10px; background: var(--bullion); color: #1a1405; font: 600 16px var(--head); }
+  #login button:disabled { opacity: .6; }
+  #login .err { min-height: 22px; margin-top: 12px; font-size: 14px; color: var(--signal); }
+  #login .ver { margin-top: 16px; font-size: 11px; color: #6d6652; letter-spacing: .08em; }
+
+  /* ---------- shelf ---------- */
+  #shelf { padding: 0 0 56px; }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: max(14px, env(safe-area-inset-top)) 18px 14px; }
+  .brand { font: 600 15px var(--head); letter-spacing: .12em; color: var(--bullion); }
+  .linkbtn { background: none; border: 0; padding: 6px 2px; font-size: 14px; color: var(--ink-muted); text-decoration: underline; text-underline-offset: 3px; }
+  .hello { padding: 18px 18px 6px; max-width: 920px; margin: 0 auto; }
+  .hello h1 { margin: 0 0 4px; font: 600 26px/1.3 var(--head); color: var(--ink-fg); }
+  .hello p { margin: 0; font-size: 14px; color: var(--ink-muted); }
+  .hello b { color: var(--bullion); font-weight: 600; }
+  #rows { max-width: 920px; margin: 26px auto 0; padding: 0 18px; }
+  .shelfrow { margin-bottom: 30px; }
+  .shelfrow .covers, .shelfrow .caps { display: grid; gap: 0 22px; }
+  .shelfrow .covers { align-items: end; padding: 0 12px; }
+  .shelfrow .caps { padding: 12px 12px 0; align-items: start; }
+  .plank { height: 15px; border-radius: 2px; background: var(--plank); box-shadow: inset 0 1px 0 var(--plank-hi), 0 12px 14px -6px rgba(0,0,0,.65); }
+  .book { display: block; width: 100%; padding: 0; background: none; border: 0; text-align: left; }
+  .book .cov { display: block; position: relative; aspect-ratio: 940 / 1672; background: var(--ink2); border-radius: 2px 5px 5px 2px;
+    box-shadow: inset 7px 0 0 rgba(0,0,0,.30), inset 8px 0 0 rgba(255,255,255,.08), 0 -1px 0 rgba(255,255,255,.04);
+    transition: transform .22s ease; transform-origin: 50% 100%; }
+  .book .cov img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
+  .book:hover .cov, .book:focus-visible .cov { transform: translateY(-8px) rotate(-1.2deg); }
+  .cap { text-align: left; }
+  .cap b { display: block; font: 500 14px/1.35 var(--head); color: var(--ink-fg); }
+  .cap span { display: block; margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--ink-muted); }
+  .empty { margin: 40px 18px; padding: 22px; border: 1px dashed var(--ink-line); border-radius: 12px; color: var(--ink-muted); text-align: center; font-size: 15px; }
+
+  /* ---------- reader ---------- */
+  #reader { background: var(--bg); color: var(--fg); }
+  #topbar { position: fixed; z-index: 20; top: 0; left: 0; right: 0; height: calc(52px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top);
+    display: flex; align-items: center; gap: 4px; padding-left: 6px; padding-right: 6px; background: var(--bg); border-bottom: 1px solid var(--line);
+    transition: transform .25s ease; }
+  #topbar.hide { transform: translateY(-100%); }
+  #topbar .title { flex: 1; min-width: 0; text-align: center; font: 500 13px var(--head); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ib { display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 12px; border: 0; background: none; color: var(--fg); font: 500 14px var(--head); border-radius: 8px; }
+  .ib:hover { background: var(--panel); }
+  .ib svg { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  #prog { position: fixed; z-index: 21; top: 0; left: 0; height: 3px; width: 0; background: var(--gold); }
+  #page { max-width: 40rem; margin: 0 auto; padding: calc(52px + env(safe-area-inset-top) + 18px) 20px 40px; }
+  #content { font-size: var(--fs); line-height: 1.95; overflow-wrap: break-word; }
+
+  #content p { margin: 0 0 1.05em; }
+  #content strong { font-weight: 700; color: var(--fg); }
+  #content mark.r { background: none; color: var(--red); font-weight: 700; }
+  #content .opener { margin: 0 -20px 26px; }
+  #content .opener img { width: 100%; height: auto; display: block; }
+  #content .opener.end { margin-top: 40px; }
+  @media (min-width: 680px) { #content .opener { margin-left: 0; margin-right: 0; border-radius: 10px; overflow: hidden; } }
+  .chead { margin: 0 0 6px; }
+  .clabel { font: 600 .95rem var(--head); color: var(--gold); letter-spacing: .02em; margin-bottom: 4px; }
+  #content h1, #titlepage h1 { text-wrap: balance; }
+  #content h1 { margin: 0 0 8px; font: 600 1.85rem/1.4 var(--head); color: var(--fg); }
+  .csub { margin: 0 0 1.6em !important; padding-bottom: 1em; font-style: italic; color: var(--muted); border-bottom: 3px solid var(--red); }
+  #content h2 { margin: 2.2em 0 .7em; font: 600 1.4rem/1.45 var(--head); color: var(--gold); }
+  #content h3 { margin: 1.7em 0 .5em; font: 600 1.18rem/1.5 var(--head); color: var(--fg); }
+  #content ul, #content ol { margin: 0 0 1.2em; padding-left: 1.4em; }
+  #content li { margin-bottom: .5em; padding-left: .2em; }
+  #content ul li::marker { color: var(--gold); }
+  #content ol li::marker { color: var(--gold); font-weight: 700; }
+  .divider { display: flex; justify-content: center; gap: 14px; margin: 2em 0; }
+  .divider i { width: 7px; height: 7px; background: var(--gold); transform: rotate(45deg); }
+  figure { margin: 1.6em -4px; text-align: center; }
+  figure img { max-width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); background: #fff; }
+  figcaption { margin-top: .6em; font-size: .85rem; line-height: 1.6; font-style: italic; color: var(--muted); }
+  .pull { margin: 1.8em 0; padding: 1em .4em; text-align: center; font: 600 1.35rem/1.65 var(--head); color: var(--gold); border-top: 2px solid var(--gold); border-bottom: 2px solid var(--gold); }
+  .pull::before { content: '\201C'; } .pull::after { content: '\201D'; }
+  .pull.red { color: var(--red); border-color: var(--red); }
+  .qa { margin: 0 0 .9em; }
+  .qa p { margin: 0; }
+  .qa .who { display: block; font: 600 .82rem var(--head); margin-bottom: 2px; }
+  .qa.q { padding: .7em .9em; background: var(--panel); border-left: 4px solid var(--muted); border-radius: 0 6px 6px 0; margin-top: 1.5em; }
+  .qa.q .who { color: var(--muted); } .qa.q p { font-weight: 700; }
+  .qa.a { padding: 0 .2em; } .qa.a .who { color: var(--gold); }
+  .callout { margin: 1.4em 0; padding: .9em 1.1em; background: var(--panel); border-left: 4px solid var(--gold); border-radius: 0 6px 6px 0; font-size: .97em; line-height: 1.9; }
+  .formula { margin: 1.2em 0; padding: .8em 1em; text-align: center; font: 600 1rem/1.7 var(--head); background: var(--panel); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tw { margin: 1.3em -20px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 0 20px; }
+  @media (min-width: 680px) { .tw { margin-left: 0; margin-right: 0; padding: 0; } }
+  table { border-collapse: collapse; width: 100%; font-size: .88em; line-height: 1.6; }
+  th, td { min-width: 6.5em; }
+  th { background: var(--head-bg); color: var(--head-fg); font: 600 .92em var(--head); text-align: left; padding: .6em .7em; vertical-align: bottom; }
+  td { padding: .6em .7em; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--panel) 55%, transparent); }
+  .check { list-style: none; padding-left: 0 !important; }
+  .check li { padding: 0; margin-bottom: .55em; }
+  .check label { display: flex; gap: .75em; align-items: flex-start; cursor: pointer; }
+  .check input { position: absolute; opacity: 0; }
+  .check .box { flex: none; width: 1.35em; height: 1.35em; margin-top: .3em; border: 2px solid var(--gold); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; }
+  .check input:focus-visible + .box { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .check input:checked + .box { background: var(--gold); }
+  .check input:checked + .box::after { content: ''; width: .35em; height: .65em; border: solid var(--bg); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg) translate(-1px, -1px); }
+  .check input:checked ~ .t { color: var(--muted); }
+  .lines { margin: .6em 0 1.4em; } .lines i { display: block; height: 2.4rem; border-bottom: 1.5px dotted var(--muted); opacity: .6; }
+  .theend { margin: 2.4em 0 1em; text-align: center; font: 600 .95rem var(--head); color: var(--gold); letter-spacing: .1em; }
+
+  #pager { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 40rem; margin: 10px auto 0; padding: 0 20px calc(48px + env(safe-area-inset-bottom)); }
+  #pager button { display: block; padding: 14px 16px; text-align: left; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--fg); min-height: 64px; }
+  #pager button small { display: block; font-size: 12px; color: var(--muted); }
+  #pager button b { display: block; font: 500 14px/1.4 var(--head); }
+  #pager .next { text-align: right; } #pager .next:only-child { grid-column: 2; }
+  #pager button:hover { border-color: var(--gold); }
+  #pager span.sp { display: block; }
+
+  /* title screen */
+  #titlepage { max-width: 40rem; margin: 0 auto; padding: calc(52px + env(safe-area-inset-top) + 22px) 24px 56px; text-align: center; }
+  #titlepage .cv { width: min(64%, 260px); margin: 0 auto 28px; aspect-ratio: 940/1672; border-radius: 2px 6px 6px 2px; overflow: hidden; box-shadow: inset 7px 0 0 rgba(0,0,0,.22), 0 24px 30px -14px rgba(0,0,0,.55); }
+  #titlepage .cv img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #titlepage .kick { font: 500 12px var(--head); letter-spacing: .14em; color: var(--gold); }
+  #titlepage h1 { margin: 8px 0 6px; font: 600 2rem/1.35 var(--head); }
+  #titlepage .sub { margin: 0 0 16px; font: 400 1.05rem/1.6 var(--head); color: var(--muted); padding-bottom: 16px; border-bottom: 2px solid var(--gold); display: inline-block; }
+  #titlepage .tag { margin: 4px 0; font-style: italic; color: var(--muted); font-size: .98rem; }
+  #titlepage .go { margin-top: 28px; padding: 14px 30px; border: 0; border-radius: 10px; background: var(--gold); color: var(--bg); font: 600 16px var(--head); }
+  #titlepage .meta { margin-top: 12px; font-size: 13px; color: var(--muted); }
+
+  /* drawer + settings */
+  #veil { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.45); }
+  #toc { position: fixed; z-index: 31; top: 0; bottom: 0; right: 0; width: min(88vw, 360px); background: var(--bg); color: var(--fg); border-left: 1px solid var(--line);
+    overflow-y: auto; padding: max(16px, env(safe-area-inset-top)) 0 30px; animation: slidein .22s ease; }
+  @keyframes slidein { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+  #toc h2 { margin: 0; padding: 4px 20px 12px; font: 600 1.1rem var(--head); border-bottom: 1px solid var(--line); }
+  #toc a { display: block; padding: 11px 20px; color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); font-size: 15px; line-height: 1.45; }
+  #toc a small { display: block; font: 600 12px var(--head); color: var(--gold); }
+  #toc a.cur { background: var(--panel); box-shadow: inset 4px 0 0 var(--gold); }
+  #toc a.seen small::after { content: ' · อ่านแล้ว'; color: var(--muted); font-weight: 400; }
+  #set { position: fixed; z-index: 31; top: calc(56px + env(safe-area-inset-top)); right: 10px; width: min(92vw, 300px); padding: 16px; background: var(--bg); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,.35); }
+  #set h3 { margin: 0 0 8px; font: 600 13px var(--head); color: var(--muted); }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin-bottom: 16px; }
+  .seg button { padding: 10px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); font: 500 14px var(--head); }
+  .seg button[aria-pressed="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+  .seg .sw { display: block; width: 100%; }
+
+  #toast { position: fixed; z-index: 60; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: max-content; max-width: 90vw;
+    padding: 12px 18px; border-radius: 12px; background: #2A2417; color: #EDE8DA; border: 1px solid var(--plank-hi); font-size: 14px; line-height: 1.5; text-align: center; box-shadow: 0 12px 30px rgba(0,0,0,.5); }
+  #toast b { color: var(--bullion); font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body data-theme="light">
+
+<!-- ================= login ================= -->
+<main id="login" class="screen">
+  <form class="wrap" id="loginForm" autocomplete="on">
+    <svg class="ingot" viewBox="0 0 320 156" role="img" aria-label="Gold E-BOOK">
+      <polygon points="64,12 256,12 298,56 22,56" fill="#E9CF84"/>
+      <polygon points="22,56 298,56 282,134 38,134" fill="#CBA24A"/>
+      <polygon points="38,134 282,134 280,144 40,144" fill="#8F6D1F"/>
+      <polygon points="64,12 256,12 298,56 22,56" fill="none" stroke="#F4E3A8" stroke-width="1.5"/>
+      <polygon points="86,22 234,22 262,48 58,48" fill="none" stroke="#C9A24A" stroke-width="1" opacity=".7"/>
+      <text x="160" y="104" text-anchor="middle" font-size="28" letter-spacing="4.5" fill="#F1DC9A" transform="translate(0 1.6)">GOLD E-BOOK</text>
+      <text x="160" y="104" text-anchor="middle" font-size="28" letter-spacing="4.5" fill="#76571A">GOLD E-BOOK</text>
+    </svg>
+    <p class="lead">ใส่รหัสผ่านเพื่อเข้าชั้นหนังสือ</p>
+    <input id="code" name="password" type="password" autocomplete="current-password" placeholder="รหัสผ่าน" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="รหัสผ่าน">
+    <button type="submit" id="loginBtn">เข้าสู่ระบบ</button>
+    <div class="err" id="loginErr" role="alert"></div>
+    <div class="ver" id="loginVer"></div>
+  </form>
+</main>
+
+<!-- ================= shelf ================= -->
+<main id="shelf" class="screen" hidden>
+  <div class="bar"><span class="brand">GOLD E-BOOK</span><button class="linkbtn" id="logout">ออกจากระบบ</button></div>
+  <div class="hello"><h1 id="helloH"></h1><p id="helloP"></p></div>
+  <div id="rows"></div>
+</main>
+
+<!-- ================= reader ================= -->
+<div id="reader" class="screen" hidden>
+  <div id="prog"></div>
+  <header id="topbar">
+    <button class="ib" id="back" aria-label="กลับไปชั้นหนังสือ"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg><span>ชั้น</span></button>
+    <div class="title" id="rtitle"></div>
+    <button class="ib" id="setBtn" aria-label="ตั้งค่าการอ่าน" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 19l5-14 5 14M6 14h6M17 9v10M14 12h6" /></svg></button>
+    <button class="ib" id="tocBtn" aria-label="สารบัญ"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+  </header>
+  <section id="titlepage" hidden></section>
+  <article id="page" hidden><div id="content"></div></article>
+  <nav id="pager" hidden></nav>
+</div>
+<div id="veil" hidden></div>
+<aside id="toc" hidden aria-label="สารบัญ"></aside>
+<div id="set" hidden role="dialog" aria-label="ตั้งค่าการอ่าน">
+  <h3>ขนาดตัวอักษร</h3>
+  <div class="seg" id="segFs">
+    <button data-v="-1" aria-label="ลดขนาดตัวอักษร">A−</button><button data-v="0" id="fsVal" aria-pressed="false">ปกติ</button><button data-v="1" aria-label="เพิ่มขนาดตัวอักษร">A+</button>
+  </div>
+  <h3>สีพื้นหลัง</h3>
+  <div class="seg" id="segTheme">
+    <button data-t="light">ขาว</button><button data-t="sepia">ถนอมสายตา</button><button data-t="dark">มืด</button>
+  </div>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+  const API_BASE = 'EBOOK_API_URL';
+  const VER = '1.0.0';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const ls = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+    json(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } },
+  };
+
+  // ---------- state ----------
+  const S = { code: null, name: '', expire: null, books: [], bookId: null, key: null, man: null, ch: -2, cache: new Map(), booting: false };
+
+  // ---------- toast ----------
+  let toastT;
+  function toast(html, ms) {
+    const t = $('toast'); t.innerHTML = html; t.hidden = false; clearTimeout(toastT);
+    toastT = setTimeout(() => { t.hidden = true; }, ms || 5200);
+  }
+
+  // ---------- dates ----------
+  function fmtExpire(s) {
+    if (!s || String(s) >= '9999') return 'ไม่จำกัด';
+    const d = new Date(s + 'T00:00:00+07:00');
+    return isNaN(d) ? s : d.toLocaleDateString('th-TH-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' });
+  }
+  const expLabel = s => (!s || String(s) >= '9999') ? 'อายุใช้งาน' : 'ใช้ได้ถึง';
+
+  // ---------- api ----------
+  async function api(params) {
+    if (!/^https:\/\//.test(API_BASE)) throw new Error('no_api');
+    const q = Object.keys(params).map(k => k + '=' + encodeURIComponent(params[k])).join('&');
+    const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 20000);
+    try {
+      const r = await fetch(API_BASE + '?' + q + '&t=' + Date.now(), { cache: 'no-store', signal: ac.signal });
+      return JSON.parse(await r.text());
+    } finally { clearTimeout(timer); }
+  }
+
+  // ---------- crypto ----------
+  async function importKey(b64) {
+    const raw = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+  }
+  async function loadEnc(path) {
+    const r = await fetch(path, { cache: 'no-cache' });
+    if (!r.ok) throw new Error('http_' + r.status);
+    const buf = new Uint8Array(await r.arrayBuffer());
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, S.key, buf.slice(12));
+    return JSON.parse(new TextDecoder().decode(pt));
+  }
+
+  // ---------- screens ----------
+  function show(which) {
+    $('login').hidden = which !== 'login';
+    $('shelf').hidden = which !== 'shelf';
+    $('reader').hidden = which !== 'reader';
+    document.body.style.background = which === 'reader' ? 'var(--bg)' : 'var(--ink)';
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', which === 'reader' ? getComputedStyle(document.body).getPropertyValue('--bg').trim() || '#FBFAF7' : '#14120D');
+    closePanels();
+    if (which !== 'reader') window.scrollTo(0, 0);
+  }
+
+  // ---------- login ----------
+  function showLogin(msg) {
+    ls.del('gbk_code');
+    Object.assign(S, { code: null, name: '', expire: null, books: [], bookId: null, key: null, man: null, ch: -2 }); S.cache.clear();
+    $('loginErr').textContent = msg || '';
+    $('loginVer').textContent = 'V' + VER;
+    $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ';
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    show('login');
+  }
+  async function tryLogin(code, silent) {
+    code = String(code || '').trim();
+    if (!code) { $('loginErr').textContent = 'กรุณาใส่รหัสผ่าน'; return; }
+    $('loginBtn').disabled = true; $('loginBtn').textContent = 'กำลังตรวจสอบ…'; $('loginErr').textContent = '';
+    try {
+      const res = await api({ api: 'login', code });
+      if (res.ok) {
+        S.code = code; S.name = res.name || ''; S.expire = res.expire || null; S.books = res.books || [];
+        ls.set('gbk_code', code);
+        enter(true);
+        return;
+      }
+      showLogin(res.reason === 'expired' ? 'รหัสผ่านนี้หมดอายุแล้ว' + (res.expire ? ' (' + fmtExpire(res.expire) + ')' : '')
+        : res.reason === 'busy' ? 'มีการลองรหัสมากเกินไป รอสักครู่แล้วลองใหม่' : 'รหัสผ่านไม่ถูกต้อง');
+    } catch (e) {
+      show('login');
+      $('loginErr').textContent = e.message === 'no_api' ? 'ระบบยังไม่ได้เชื่อมต่อ ติดต่อผู้ดูแล' : 'เชื่อมต่อไม่ได้ ลองใหม่อีกครั้ง';
+      $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ';
+      if (silent) $('code').value = code;
+    }
+  }
+  function enter(welcome) {
+    renderShelf();
+    if (welcome) toast(`สวัสดี <b>${esc(S.name)}</b> วันนี้คือวันที่ดีสำหรับคุณ<br>${expLabel(S.expire)} <b>${esc(fmtExpire(S.expire))}</b>`);
+    route();
+  }
+
+  // ---------- shelf ----------
+  function colsFor(w) { return Math.max(2, Math.min(5, Math.floor((w + 22) / 172))); }
+  function renderShelf() {
+    $('helloH').textContent = 'ชั้นหนังสือของ' + (S.name ? ' ' + S.name : 'คุณ');
+    $('helloP').innerHTML = `${expLabel(S.expire)} <b>${esc(fmtExpire(S.expire))}</b> · ${S.books.length} เล่ม`;
+    const box = $('rows'); box.innerHTML = '';
+    if (!S.books.length) { box.innerHTML = '<div class="empty">บัญชีนี้ยังไม่มีหนังสือในชั้น<br>ติดต่อผู้ดูแลเพื่อขอสิทธิ์อ่าน</div>'; return; }
+    const cols = colsFor(Math.min(box.clientWidth || window.innerWidth, 920) - 24);
+    const tpl = `repeat(${cols}, minmax(0, 1fr))`;
+    for (let i = 0; i < S.books.length; i += cols) {
+      const row = document.createElement('div'); row.className = 'shelfrow';
+      const chunk = S.books.slice(i, i + cols);
+      const covers = document.createElement('div'); covers.className = 'covers'; covers.style.gridTemplateColumns = tpl;
+      const caps = document.createElement('div'); caps.className = 'caps'; caps.style.gridTemplateColumns = tpl;
+      chunk.forEach(b => {
+        const btn = document.createElement('button'); btn.className = 'book'; btn.setAttribute('aria-label', 'เปิดอ่าน ' + b.title);
+        btn.innerHTML = `<span class="cov"><img src="${esc(b.cover)}" alt="ปก ${esc(b.title)}" loading="lazy"></span>`;
+        btn.addEventListener('click', () => { location.hash = '#b' + b.id; });
+        covers.appendChild(btn);
+        const cap = document.createElement('div'); cap.className = 'cap';
+        cap.innerHTML = `<b>${esc(b.title)}</b>` + (b.subtitle ? `<span>${esc(b.subtitle)}</span>` : '');
+        caps.appendChild(cap);
+      });
+      const plank = document.createElement('div'); plank.className = 'plank';
+      row.append(covers, plank, caps); box.appendChild(row);
+    }
+  }
+  let rsz; window.addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(() => { if (!$('shelf').hidden) renderShelf(); }, 150); });
+
+  // ---------- routing: #b<book> = title page, #b<book>/<n> = chapter n ----------
+  async function route() {
+    if (!S.code) return;
+    const m = location.hash.match(/^#b(\w+)(?:\/(\d+))?$/);
+    if (!m) { S.bookId = null; show('shelf'); return; }
+    const b = S.books.find(x => String(x.id) === m[1]);
+    if (!b) { location.hash = ''; return; }
+    try {
+      if (S.bookId !== b.id || !S.man) await openBook(b);
+      if (m[2] != null && +m[2] < S.man.chapters.length) await showChapter(+m[2]);
+      else showTitle();
+    } catch (e) {
+      if (e && e.expired) { showLogin('รหัสผ่านนี้หมดอายุแล้ว'); return; }
+      toast('เปิดหนังสือไม่ได้ ลองใหม่อีกครั้ง');
+      location.hash = '';
+    }
+  }
+  window.addEventListener('hashchange', route);
+
+  async function openBook(b) {
+    $('titlepage').hidden = true; $('page').hidden = true; $('pager').hidden = true;
+    show('reader'); $('rtitle').textContent = 'กำลังเปิด…';
+    const k = await api({ api: 'key', code: S.code, book: b.id });
+    if (!k.ok) { const err = new Error('key'); err.expired = k.reason === 'expired'; throw err; }
+    S.key = await importKey(k.key); S.cache.clear();
+    S.man = await loadEnc(b.folder + '/manifest.bin');
+    S.bookId = b.id; S.book = b;
+    $('rtitle').textContent = S.man.title;
+    applyPrefs();
+  }
+
+  const pos = () => ls.json('gbk_pos_' + S.bookId, {});
+  const seen = () => ls.json('gbk_seen_' + S.bookId, {});
+
+  function showTitle() {
+    S.ch = -1; show('reader');
+    $('page').hidden = true; $('pager').hidden = true;
+    const p = pos(); const man = S.man; const ch = man.chapters[p.ch];
+    const t = $('titlepage');
+    t.innerHTML = `<div class="cv"><img src="${esc(S.book.cover)}" alt="ปกหนังสือ"></div>
+      <div class="kick">${esc(man.kicker || '')}</div><h1>${esc(man.title)}</h1><p class="sub">${esc(man.subtitle || '')}</p>
+      ${(man.tagline || []).map(x => `<p class="tag">${esc(x)}</p>`).join('')}
+      <button class="go" id="goBtn">${ch && p.ch > 0 ? 'อ่านต่อ' : 'เริ่มอ่าน'}</button>
+      <div class="meta">${ch && p.ch > 0 ? esc((ch.label ? ch.label + ' ' : '') + ch.title) : man.chapters.length + ' ตอน'}</div>`;
+    t.hidden = false; $('rtitle').textContent = man.title; $('prog').style.width = '0';
+    $('goBtn').onclick = () => { location.hash = '#b' + S.bookId + '/' + (ch ? p.ch : 0); };
+    $('topbar').classList.remove('hide'); window.scrollTo(0, 0); buildToc();
+  }
+
+  async function showChapter(i, keepY) {
+    const man = S.man; const c = man.chapters[i];
+    $('rtitle').textContent = (c.label ? c.label + ' · ' : '') + c.title.replace(/\s*[–-]\s.*$/, '');
+    let data = S.cache.get(i);
+    if (!data) {
+      $('prog').style.width = '0';
+      data = await loadEnc(S.book.folder + '/' + c.file); S.cache.set(i, data);
+    }
+    S.ch = i; $('titlepage').hidden = true; $('page').hidden = false;
+    $('content').innerHTML = data.html;
+    applyChecks();
+    renderPager(i); $('pager').hidden = false;
+    const sn = seen(); sn[i] = 1; ls.set('gbk_seen_' + S.bookId, JSON.stringify(sn));
+    const p = pos(); const y = (p.ch === i && p.y) ? p.y : 0;
+    ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: i, y: p.ch === i ? p.y : 0 }));
+    $('topbar').classList.remove('hide'); lastY = 0;
+    requestAnimationFrame(() => { window.scrollTo(0, y ? Math.round(y * (document.documentElement.scrollHeight - innerHeight)) : 0); updateProg(); });
+    buildToc();
+    // prefetch next chapter quietly
+    if (i + 1 < man.chapters.length && !S.cache.has(i + 1)) loadEnc(S.book.folder + '/' + man.chapters[i + 1].file).then(d => S.cache.set(i + 1, d)).catch(() => {});
+  }
+
+  function renderPager(i) {
+    const ch = S.man.chapters; const pg = $('pager'); pg.innerHTML = '';
+    const mk = (j, cls, dir) => {
+      const b = document.createElement('button'); b.className = cls;
+      const c = ch[j]; b.innerHTML = `<small>${dir}</small><b>${esc((c.label ? c.label + ' ' : '') + c.title.replace(/\s*[–-]\s.*$/, ''))}</b>`;
+      b.onclick = () => { ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: j, y: 0 })); location.hash = '#b' + S.bookId + '/' + j; };
+      pg.appendChild(b);
+    };
+    if (i > 0) mk(i - 1, 'prev', 'บทก่อนหน้า'); else pg.appendChild(Object.assign(document.createElement('span'), { className: 'sp' }));
+    if (i + 1 < ch.length) mk(i + 1, 'next', 'บทถัดไป');
+  }
+
+  // ---------- toc ----------
+  function buildToc() {
+    const t = $('toc'); const sn = seen();
+    t.innerHTML = '<h2>สารบัญ</h2>' + S.man.chapters.map((c, i) =>
+      `<a href="#b${esc(S.bookId)}/${i}" class="${i === S.ch ? 'cur' : ''} ${sn[i] ? 'seen' : ''}"><small>${esc(c.label || (c.nonum ? 'ก่อนเริ่มเรียน' : ''))}</small>${esc(c.title)}</a>`).join('');
+    t.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+      const n = +a.getAttribute('href').split('/')[1]; ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: n, y: 0 })); closePanels();
+    }));
+  }
+  function openPanel(which) {
+    closePanels(); $('veil').hidden = false;
+    if (which === 'toc') { $('toc').hidden = false; const cur = $('toc').querySelector('.cur'); if (cur) cur.scrollIntoView({ block: 'center' }); }
+    else { $('set').hidden = false; $('veil').style.background = 'transparent'; $('setBtn').setAttribute('aria-expanded', 'true'); }
+  }
+  function closePanels() { $('veil').hidden = true; $('veil').style.background = ''; $('toc').hidden = true; $('set').hidden = true; $('setBtn').setAttribute('aria-expanded', 'false'); }
+  $('veil').addEventListener('click', closePanels);
+  $('tocBtn').addEventListener('click', () => openPanel('toc'));
+  $('setBtn').addEventListener('click', () => ($('set').hidden ? openPanel('set') : closePanels()));
+  $('back').addEventListener('click', () => { location.hash = ''; });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closePanels();
+    if ($('reader').hidden || S.ch < 0 || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+    if (e.key === 'ArrowRight' && S.ch + 1 < S.man.chapters.length) { ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: S.ch + 1, y: 0 })); location.hash = '#b' + S.bookId + '/' + (S.ch + 1); }
+    if (e.key === 'ArrowLeft' && S.ch > 0) { ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: S.ch - 1, y: 0 })); location.hash = '#b' + S.bookId + '/' + (S.ch - 1); }
+  });
+
+  // ---------- reading preferences ----------
+  const FS = [0.98, 1.05, 1.125, 1.25, 1.4, 1.6];
+  let fsIdx = +ls.get('gbk_fs', 2); if (!(fsIdx >= 0 && fsIdx < FS.length)) fsIdx = 2;
+  let theme = ls.get('gbk_theme', '') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  function applyPrefs() {
+    document.body.dataset.theme = theme;
+    document.documentElement.style.setProperty('--fs', FS[fsIdx] + 'rem');
+    document.querySelectorAll('#segTheme button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === theme)));
+    $('fsVal').textContent = fsIdx === 2 ? 'ปกติ' : (fsIdx < 2 ? 'เล็ก' : 'ใหญ่') + (Math.abs(fsIdx - 2) > 1 ? '+' : '');
+    if (!$('reader').hidden) document.querySelector('meta[name="theme-color"]').setAttribute('content', getComputedStyle(document.body).getPropertyValue('--bg').trim());
+  }
+  $('segFs').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !b.dataset.v) return;
+    const d = +b.dataset.v; if (d === 0) fsIdx = 2; else fsIdx = Math.max(0, Math.min(FS.length - 1, fsIdx + d));
+    ls.set('gbk_fs', fsIdx); applyPrefs();
+  });
+  $('segTheme').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; theme = b.dataset.t; ls.set('gbk_theme', theme); applyPrefs(); });
+  applyPrefs();
+
+  // ---------- checklist state ----------
+  function applyChecks() {
+    const st = ls.json('gbk_chk_' + S.bookId, {}); const pfx = S.ch + '|';
+    $('content').querySelectorAll('input[type=checkbox][data-k]').forEach(c => { c.checked = !!st[pfx + c.dataset.k]; });
+  }
+  $('content').addEventListener('change', e => {
+    const c = e.target; if (!c.dataset || !c.dataset.k) return;
+    const st = ls.json('gbk_chk_' + S.bookId, {}); const k = S.ch + '|' + c.dataset.k;
+    if (c.checked) st[k] = 1; else delete st[k]; ls.set('gbk_chk_' + S.bookId, JSON.stringify(st));
+  });
+
+  // ---------- scroll: progress, remember position, hide bar ----------
+  let lastY = 0, tick = false, saveT;
+  function updateProg() {
+    const h = document.documentElement.scrollHeight - innerHeight; const f = h > 0 ? Math.min(1, scrollY / h) : 0;
+    $('prog').style.width = (S.ch >= 0 ? f * 100 : 0) + '%'; return f;
+  }
+  window.addEventListener('scroll', () => {
+    if (tick || $('reader').hidden || S.ch < 0) return; tick = true;
+    requestAnimationFrame(() => {
+      tick = false; const f = updateProg(); const y = scrollY;
+      if (y > lastY + 8 && y > 120) $('topbar').classList.add('hide'); else if (y < lastY - 8 || y < 60) $('topbar').classList.remove('hide');
+      lastY = y; clearTimeout(saveT);
+      saveT = setTimeout(() => ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: S.ch, y: Math.round(f * 1000) / 1000 })), 400);
+    });
+  }, { passive: true });
+
+  // ---------- boot ----------
+  $('loginForm').addEventListener('submit', e => { e.preventDefault(); tryLogin($('code').value, false); });
+  $('logout').addEventListener('click', () => { $('code').value = ''; showLogin('ออกจากระบบแล้ว'); });
+  $('loginVer').textContent = 'V' + VER;
+  const saved = ls.get('gbk_code', null);
+  if (saved) { $('loginBtn').disabled = true; $('loginBtn').textContent = 'กำลังตรวจสอบ…'; tryLogin(saved, true).then(() => { $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ'; }); }
+})();
+</script>
+</body>
+</html>

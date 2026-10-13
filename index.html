@@ -109,7 +109,8 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.0.21';
+  const APP_VER = '1.1.00';
+  const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
   const $ = id => document.getElementById(id);
@@ -257,8 +258,15 @@
       // กำแพง OI ใหญ่ 3 อันดับ (Call เขียว / Put แดง): เส้นทึบจากขอบขวาถึงกลางกราฟ
       const isTopC = oi.topC.includes(r.strike) && r.c > 0, isTopP = oi.topP.includes(r.strike) && r.p > 0;
       if (isTopC || isTopP) {
+        const wallC = (isTopC && (!isTopP || r.c >= r.p)) ? callC : putC;
+        // โซนราคา ±ZONE_HALF รอบเส้นกำแพง (สีเดียวกันแต่อ่อน) จากกลางกราฟถึงขอบขวา
+        const yTop = series.priceToCoordinate(r.price + ZONE_HALF), yBot = series.priceToCoordinate(r.price - ZONE_HALF);
+        if (yTop !== null && yBot !== null) {
+          ctx.globalAlpha = 0.16; ctx.fillStyle = wallC;
+          ctx.fillRect(mid, Math.min(yTop, yBot), plotW - mid, Math.abs(yBot - yTop));
+        }
         ctx.globalAlpha = 0.95; ctx.lineWidth = 2;
-        ctx.strokeStyle = (isTopC && (!isTopP || r.c >= r.p)) ? callC : putC;
+        ctx.strokeStyle = wallC;
         hline(mid, plotW);
       }
       // Volume วันนี้ 5 อันดับ: เส้นทึบสีเหลืองจากขอบซ้ายถึงกลางกราฟ

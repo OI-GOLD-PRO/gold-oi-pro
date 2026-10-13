@@ -864,9 +864,17 @@
   async function checkLogin(code) {
     const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 15000);
     try {
-      const r = await fetch(`${API_BASE}?api=login&code=${encodeURIComponent(code)}&t=${Date.now()}`, { cache: 'no-store', signal: ac.signal });
-      const t = await r.text();
-      try { return JSON.parse(t); } catch (e) { return { legacy: true }; }
+      try {
+        const r = await fetch(`${API_BASE}?api=login&code=${encodeURIComponent(code)}&t=${Date.now()}`, { cache: 'no-store', signal: ac.signal });
+        const t = await r.text();
+        return JSON.parse(t);
+      } catch (e) {
+        // สคริปต์รุ่นเก่ายังไม่มี api=login: ถ้าดึงข้อมูลได้โดยไม่ต้องใช้รหัส ถือว่าเป็นรุ่นเก่า
+        const r2 = await fetch(`${API_BASE}?api=data&t=${Date.now()}`, { cache: 'no-store' });
+        const d = await r2.json();
+        if (d && Array.isArray(d.levels) && !d.error) return { legacy: true };
+        throw e;
+      }
     } finally { clearTimeout(timer); }
   }
   async function tryLogin(code, silent) {

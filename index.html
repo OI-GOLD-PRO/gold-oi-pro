@@ -18,7 +18,8 @@
     --gold: #e0b44c;      /* สีแบรนด์ทอง ใช้กับราคา/ปุ่มที่เลือก */
     --put: #e5576b;       /* Put = แนวรับ (โทนแดง) */
     --call: #2fbf8f;      /* Call = แนวต้าน (โทนเขียว) */
-    --live: #2fbf8f;      /* จุดสถานะเชื่อมต่อสด */
+    --live: #2fbf8f;
+    --mp: #ff3fb4;        /* Max Pain สีบานเย็น */      /* จุดสถานะเชื่อมต่อสด */
     --chg: #9aa3b8;       /* OI change สีเทา */
     --volc: #8ccaff;      /* Volume Call ฟ้าอ่อน */
     --volp: #ffb98a;      /* Volume Put ส้มอ่อน */
@@ -102,6 +103,7 @@
     <span><i style="background:var(--call)"></i>Call แนวต้าน</span>
     <span><i style="background:linear-gradient(90deg,var(--call) 50%,var(--put) 50%);opacity:.5"></i>OI เปลี่ยน</span>
     <span><i style="background:linear-gradient(90deg,var(--volc) 50%,var(--volp) 50%);opacity:.8"></i>Vol วันนี้</span>
+    <span><i style="background:repeating-linear-gradient(90deg,var(--mp) 0 4px,transparent 4px 6px)"></i>Max Pain</span>
     <span class="rt" id="clock"></span>
   </div>
 
@@ -109,7 +111,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.1.00';
+  const APP_VER = '1.1.01';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -176,7 +178,13 @@
     const top5P = [...rows].filter(r => r.p > 0).sort((a, b) => b.p - a.p).slice(0, 5).map(r => r.strike);
     const top5C = [...rows].filter(r => r.c > 0).sort((a, b) => b.c - a.c).slice(0, 5).map(r => r.strike);
     offRaw = ok ? off : null;
-    oi = { top5P, top5C, rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC, topV };
+    // Max Pain: ราคาหมดอายุที่ผู้ถือ Call+Put ได้มูลค่ารวมน้อยที่สุด
+    let maxPain = null, best = Infinity;
+    rows.forEach(s => {
+      const pay = rows.reduce((a, r) => a + r.c * Math.max(0, s.strike - r.strike) + r.p * Math.max(0, r.strike - s.strike), 0);
+      if (pay < best) { best = pay; maxPain = s.strike; }
+    });
+    oi = { top5P, top5C, rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC, topV, maxPain };
 
     const cfg = d.cfg || {};
     const chips = [];
@@ -339,6 +347,22 @@
         }
       }
     });
+    // เส้น Max Pain: เส้นประสีบานเย็นเต็มความกว้าง พร้อมป้ายกำกับ
+    if (oi.maxPain !== null) {
+      const ym = series.priceToCoordinate(oi.maxPain);
+      if (ym !== null && ym > 2 && ym < plotH - 2) {
+        const yy = Math.round(ym) + .5, mpC = C('--mp');
+        ctx.globalAlpha = 0.95; ctx.strokeStyle = mpC; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke(); ctx.setLineDash([]);
+        const lab = `Max Pain ${oi.maxPain}`;
+        ctx.font = `bold 10px ${C('--mono')}`;
+        const tw = ctx.measureText(lab).width, lx = plotW / 2 - tw / 2;
+        ctx.globalAlpha = 0.85; ctx.fillStyle = C('--bg'); ctx.fillRect(lx - 4, yy - 15, tw + 8, 13);
+        ctx.globalAlpha = 1; ctx.fillStyle = mpC; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(lab, lx, yy - 8.5);
+        ctx.font = `10px ${C('--mono')}`;
+      }
+    }
     ctx.globalAlpha = 1;
   }
 

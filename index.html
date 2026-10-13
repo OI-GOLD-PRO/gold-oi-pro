@@ -134,7 +134,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.2.01';
+  const APP_VER = '1.2.02';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -854,13 +854,13 @@
     $('login').hidden = false;
     $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ';
   }
-  function enterApp(code, expire) {
+  function enterApp(code, expire, name) {
     authCode = code; authExpire = expire || null;
     try { localStorage.setItem('oi_code', code); } catch (e) {}
     $('login').hidden = true;
     if (!started) { started = true; loadTF(tf); loadNews(); setInterval(loadNews, 15 * 60 * 1000); }
     loadSheet();
-    if (expire) showToast(`เข้าสู่ระบบแล้ว · ${expLabel(expire)} <b>${esc(fmtExpire(expire))}</b>`);
+    if (expire) showToast(`สวัสดี <b>${esc(name || '')}</b> วันนี้คือวันที่ดีสำหรับคุณ<br>${expLabel(expire)} <b>${esc(fmtExpire(expire))}</b>`);
   }
   // ตรวจรหัสกับเซิร์ฟเวอร์: คืน {ok, expire} / {ok:false, reason} / {legacy:true} ถ้าสคริปต์ยังเป็นรุ่นเก่า
   async function checkLogin(code) {
@@ -892,7 +892,7 @@
         if (r2.ok || r2.reason === 'expired') { res = r2; code = alt; }
       }
       if (res.legacy) { enterApp(code, null); return; }
-      if (res.ok) { enterApp(code, res.expire); return; }
+      if (res.ok) { enterApp(code, res.expire, res.name); return; }
       showLogin(res.reason === 'expired' ? `รหัสผ่านนี้หมดอายุแล้ว${res.expire ? ' (' + fmtExpire(res.expire) + ')' : ''}` : 'รหัสผ่านไม่ถูกต้อง');
     } catch (e) {
       $('login').hidden = false;

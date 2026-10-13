@@ -6,5 +6,13 @@
   "cover": "books/1/cover.jpg",
   "folder": "books/1",
   "sample": "books/1/sample.json"
+ },
+ {
+  "id": "2",
+  "title": "OI Gold Pro",
+  "subtitle": "คู่มือการใช้งานเวปแอป",
+  "cover": "books/2/cover.jpg",
+  "folder": "books/2",
+  "sample": "books/2/sample.json"
  }
 ]

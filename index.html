@@ -81,7 +81,7 @@
     <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือนโซน OI">🔕</button>
     <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่">⟳</button>
   </header>
-  <div class="chips" id="chips"><span class="chip">กำลังอ่านชีต…</span></div>
+  <div class="chips" id="chips"><span class="chip">กำลัง Sync Data…</span></div>
   <div class="tfs" id="tfs">
     <button data-tf="1m">M1</button>
     <button data-tf="5m">M5</button>
@@ -111,7 +111,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.1.01';
+  const APP_VER = '1.1.02';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -205,15 +205,29 @@
   // ข้อมูล OI ดึงจาก Apps Script (?api=data) ซึ่งอ่านชีตให้
   const API = 'https://script.google.com/macros/s/AKfycbwQrp29KWhUCVO0ojjS73SiLtDKe1QKx69KOOF90QQOlV3csHXqxfOGUYKYw2D6nZp0tw/exec?api=data';
 
+  // Sync ข้อมูลจากชีต: หมดเวลา 15 วินาทีต่อครั้ง ลองใหม่สูงสุด 3 ครั้ง
+  // ถ้ามีข้อมูลชุดเดิมอยู่แล้ว จะไม่ล้างชิปทิ้งระหว่างโหลด (เส้น OI ยังแสดงต่อ)
+  let syncing = false;
   async function loadSheet() {
-    $('chips').innerHTML = '<span class="chip">กำลังอ่านชีต…</span>';
-    try {
-      const r = await fetch(API + '&t=' + Date.now(), { cache: 'no-store' });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      buildOI(await r.json());
-    } catch (e) {
-      $('chips').innerHTML = `<span class="chip warn">อ่านชีตไม่ได้: ${esc(e.message || e)} กด ⟳ ลองใหม่</span>`;
+    if (syncing) return;
+    syncing = true;
+    if (!oi) $('chips').innerHTML = '<span class="chip">กำลัง Sync Data…</span>';
+    let err = null;
+    for (let i = 0; i < 3; i++) {
+      const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 15000);
+      try {
+        const r = await fetch(API + '&t=' + Date.now(), { cache: 'no-store', signal: ac.signal });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        buildOI(await r.json());
+        err = null; break;
+      } catch (e) {
+        err = e.name === 'AbortError' ? 'หมดเวลา' : (e.message || e);
+        if (!oi) $('chips').innerHTML = `<span class="chip">กำลัง Sync Data… (ลองใหม่ครั้งที่ ${i + 2})</span>`;
+        await new Promise(r => setTimeout(r, 1500));
+      } finally { clearTimeout(timer); }
     }
+    syncing = false;
+    if (err && !oi) $('chips').innerHTML = `<span class="chip warn">Sync Data ไม่สำเร็จ: ${esc(err)} กด ⟳ ลองใหม่</span>`;
   }
 
   // ---------- overlay แท่ง OI ----------
@@ -785,7 +799,7 @@
 
   // กลับมาเปิดแอปจากหน้าจอโฮม: ต่อ websocket ใหม่และเติมแท่งที่ขาด
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') { loadTF(tf); keepAwake(); try { actx && actx.resume(); } catch (e) {} }
+    if (document.visibilityState === 'visible') { loadTF(tf); if (!oi) loadSheet(); keepAwake(); try { actx && actx.resume(); } catch (e) {} }
   });
 
   setInterval(() => {

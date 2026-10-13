@@ -79,6 +79,7 @@
   .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 14px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); }
   .legend i { display: inline-block; width: 10px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
   .legend .rt { margin-left: auto; font-family: var(--mono); }
+  #mmpl { margin-right: 8px; } #mmpl .neg { color: var(--put); } #mmpl .pos { color: var(--call); }
   button.icon.on { border-color: var(--gold); color: var(--gold); }
   #toast { position: absolute; left: 10px; right: 10px; top: 10px; z-index: 5; background: #2a2208; border: 1px solid var(--gold); color: var(--fg); border-radius: 10px; padding: 9px 12px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
   #toast b { color: var(--gold); font-family: var(--mono); }
@@ -127,14 +128,14 @@
     <span><i style="background:linear-gradient(90deg,var(--call) 50%,var(--put) 50%);opacity:.5"></i>OI เปลี่ยน</span>
     <span><i style="background:linear-gradient(90deg,var(--volc) 50%,var(--volp) 50%);opacity:.8"></i>Vol วันนี้</span>
     <span><i style="background:repeating-linear-gradient(90deg,var(--mp) 0 4px,transparent 4px 6px)"></i>Max Pain</span>
-    <span class="rt" id="clock"></span>
+    <span class="rt"><span id="mmpl"></span> <span id="clock"></span></span>
   </div>
 
 <script>
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.2.03';
+  const APP_VER = '1.3.00';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -818,8 +819,23 @@
     const el = $('rawchip'); if (!el) return;
     el.innerHTML = `XAUUSD${prov ? ' ' + esc(prov.name) : ''} <b>${rawClose !== null ? rawClose.toFixed(2) : '–'}</b>`;
   }
+  // ประมาณการกำไร/ขาดทุนของ MM (สมมติเป็นฝั่งขายออปชัน) ที่ราคาปัจจุบัน เทียบกับถ้าราคาอยู่ที่ Max Pain
+  // ใช้ OI ในชีต (±20 strike) 1 สัญญา = 100 ออนซ์ ค่าลบ = MM ขาดทุนเพิ่ม
+  function paintMM() {
+    const el = $('mmpl'); if (!el) return;
+    if (!oi || oi.maxPain === null || lastClose === null) { el.textContent = ''; return; }
+    const S = lastClose, M = oi.maxPain;
+    let cS = 0, pS = 0, cM = 0, pM = 0;
+    oi.rows.forEach(r => {
+      cS += r.c * Math.max(0, S - r.strike); pS += r.p * Math.max(0, r.strike - S);
+      cM += r.c * Math.max(0, M - r.strike); pM += r.p * Math.max(0, r.strike - M);
+    });
+    const dc = -(cS - cM) * 100, dp = -(pS - pM) * 100, net = dc + dp;
+    const f = v => `<span class="${v < 0 ? 'neg' : 'pos'}">${v < 0 ? '−' : '+'}$${(Math.abs(v) / 1e6).toFixed(2)}M</span>`;
+    el.innerHTML = `MM vs MP · C ${f(dc)} P ${f(dp)} = ${f(net)}`;
+  }
   function showPrice() {
-    paintRaw();
+    paintRaw(); paintMM();
     if (lastClose === null) return;
     $('price').textContent = lastClose.toFixed(2);
     if (dayOpen) {

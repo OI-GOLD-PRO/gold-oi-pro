@@ -50,6 +50,7 @@
   #login input:focus { border-color: var(--bullion); }
   #login button { width: 100%; margin-top: 12px; padding: 13px; border: 0; border-radius: 10px; background: var(--bullion); color: #1a1405; font: 600 16px var(--head); }
   #login button:disabled { opacity: .6; }
+  #login button.ghost { margin-top: 10px; background: transparent; border: 1px solid var(--bullion); color: var(--bullion); font-weight: 500; }
   #login .err { min-height: 22px; margin-top: 12px; font-size: 14px; color: var(--signal); }
   #login .ver { margin-top: 16px; font-size: 11px; color: #6d6652; letter-spacing: .08em; }
 
@@ -74,6 +75,7 @@
     transition: transform .22s ease; transform-origin: 50% 100%; }
   .book .cov img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
   .book:hover .cov, .book:focus-visible .cov { transform: translateY(-8px) rotate(-1.2deg); }
+  .book .cov .tag { position: absolute; top: 8px; left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--bullion); color: #1a1405; font: 600 11px var(--head); font-style: normal; }
   .cap { text-align: left; }
   .cap b { display: block; font: 500 14px/1.35 var(--head); color: var(--ink-fg); }
   .cap span { display: block; margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--ink-muted); }
@@ -193,6 +195,7 @@
   body.pgmode #findBtn, body.pgmode #zoomBtn { display: inline-flex; }
   body:not(.pgmode) #findBtn, body:not(.pgmode) #zoomBtn { display: none; }
   body.pgmode #setBtn { display: none; }
+  body.pgmode.guest #findBtn { display: none; }
   #book { position: fixed; inset: 0; z-index: 5; background: #0C0A07; }
   #stage { position: absolute; left: 0; right: 0; top: calc(52px + env(safe-area-inset-top)); bottom: calc(76px + env(safe-area-inset-bottom));
     display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
@@ -200,11 +203,11 @@
   .spread { display: flex; justify-content: center; align-items: center; height: 100%; max-width: 100%; gap: 3px; }
   .pgbox { height: 100%; min-width: 0; display: flex; align-items: center; justify-content: center; }
   .spread.n2 .pgbox { max-width: 50%; }
-  .pgbox img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; background: #fff; box-shadow: 0 6px 28px rgba(0,0,0,.6); opacity: 0; transition: opacity .18s ease; -webkit-user-drag: none; pointer-events: none; }
-  .pgbox img.on { opacity: 1; }
-  .spread.fwd .pgbox img.on { animation: pgf .2s ease; } .spread.bwd .pgbox img.on { animation: pgb .2s ease; }
-  @keyframes pgf { from { transform: translateX(26px); opacity: .2; } to { transform: none; opacity: 1; } }
-  @keyframes pgb { from { transform: translateX(-26px); opacity: .2; } to { transform: none; opacity: 1; } }
+  .pgbox img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; background: #fff; box-shadow: 0 6px 28px rgba(0,0,0,.6); -webkit-user-drag: none; pointer-events: none; }
+  .spread.fwd .pgbox img { animation: pgf .16s ease-out; } .spread.bwd .pgbox img { animation: pgb .16s ease-out; }
+  @keyframes pgf { from { transform: translateX(16px); } to { transform: none; } }
+  @keyframes pgb { from { transform: translateX(-16px); } to { transform: none; } }
+  #book.busy #pLbl::after { content: ' · กำลังโหลด…'; }
   #stage.zoom .spread { height: auto; width: 190%; max-width: none; align-items: flex-start; }
   #stage.zoom .pgbox { width: 100%; height: auto; display: block; }
   #stage.zoom .spread.n2 .pgbox { width: 50%; max-width: none; }
@@ -215,6 +218,12 @@
   #pLbl { text-align: center; font: 500 13px var(--head); color: #A39B86; padding-bottom: 2px; }
   #pRange { flex: 1; min-width: 0; height: 28px; accent-color: #D9B35A; background: transparent; }
   body.nobars #topbar { transform: translateY(-100%); } body.nobars #pbar { transform: translateY(100%); }
+  #sampleEnd { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(12,10,7,.88); }
+  #sampleEnd .card { width: 100%; max-width: 340px; padding: 26px 22px; text-align: center; border: 1px solid var(--ink-line); border-radius: 16px; background: var(--ink2); color: var(--ink-fg); }
+  #sampleEnd h3 { margin: 0 0 8px; font: 600 20px/1.4 var(--head); color: var(--bullion); }
+  #sampleEnd p { margin: 0 0 18px; font-size: 14px; color: var(--ink-muted); }
+  #sampleEnd button { width: 100%; padding: 12px; margin-top: 8px; border-radius: 10px; font: 600 15px var(--head); border: 1px solid var(--bullion); background: var(--bullion); color: #1a1405; }
+  #sampleEnd button.ghost { background: transparent; color: var(--bullion); font-weight: 500; }
   .sbox { padding: 12px 20px; border-bottom: 1px solid var(--line); }
   .sbox input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); font: 15px var(--body); outline: none; }
   .sbox input:focus { border-color: var(--gold); }
@@ -240,6 +249,7 @@
     <p class="lead">ใส่รหัสผ่านเพื่อเข้าชั้นหนังสือ</p>
     <input id="code" name="password" type="password" autocomplete="current-password" placeholder="รหัสผ่าน" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="รหัสผ่าน">
     <button type="submit" id="loginBtn">เข้าสู่ระบบ</button>
+    <button type="button" id="sampleBtn" class="ghost">อ่านหนังสือตัวอย่าง</button>
     <div class="err" id="loginErr" role="alert"></div>
     <div class="ver" id="loginVer"></div>
   </form>
@@ -268,6 +278,7 @@
   <nav id="pager" hidden></nav>
   <section id="book" hidden>
     <div id="stage" aria-live="polite"><div id="spread" class="spread"></div></div>
+    <div id="sampleEnd" hidden><div class="card"><h3>จบตัวอย่างแล้ว</h3><p>คุณอ่านบทนำจบแล้ว<br>ใส่รหัสผ่านเพื่ออ่านต่อทั้งเล่ม</p><button id="seLogin">เข้าสู่ระบบ</button><button class="ghost" id="seBack">กลับไปชั้นหนังสือ</button></div></div>
     <div id="pbar">
       <div id="pLbl"></div>
       <div class="row"><button class="ib" id="pPrev" aria-label="หน้าก่อนหน้า"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
@@ -305,7 +316,7 @@
   };
 
   // ---------- state ----------
-  const S = { code: null, name: '', expire: null, books: [], bookId: null, key: null, man: null, ch: -2, cache: new Map(), booting: false };
+  const S = { guest: false, code: null, name: '', expire: null, books: [], bookId: null, key: null, man: null, ch: -2, cache: new Map(), booting: false };
 
   // ---------- toast ----------
   let toastT;
@@ -366,7 +377,7 @@
 
   // ---------- login ----------
   function showLogin(msg) {
-    ls.del('gbk_code');
+    ls.del('gbk_code'); S.guest = false;
     Object.assign(S, { code: null, name: '', expire: null, books: [], bookId: null, key: null, man: null, ch: -2 }); S.cache.clear();
     $('loginErr').textContent = msg || '';
     $('loginVer').textContent = 'V' + VER;
@@ -381,7 +392,7 @@
     try {
       const res = await api({ api: 'login', code });
       if (res.ok) {
-        S.code = code; S.name = res.name || ''; S.expire = res.expire || null; S.books = res.books || [];
+        S.guest = false; S.code = code; S.name = res.name || ''; S.expire = res.expire || null; S.books = res.books || [];
         ls.set('gbk_code', code);
         enter(true);
         return;
@@ -404,8 +415,9 @@
   // ---------- shelf ----------
   function colsFor(w) { return Math.max(2, Math.min(5, Math.floor((w + 22) / 172))); }
   function renderShelf() {
-    $('helloH').textContent = 'ชั้นหนังสือของ' + (S.name ? ' ' + S.name : 'คุณ');
-    $('helloP').innerHTML = `${expLabel(S.expire)} <b>${esc(fmtExpire(S.expire))}</b> · ${S.books.length} เล่ม`;
+    $('logout').textContent = S.guest ? 'เข้าสู่ระบบ' : 'ออกจากระบบ';
+    $('helloH').textContent = S.guest ? 'ชั้นหนังสือตัวอย่าง' : 'ชั้นหนังสือของ' + (S.name ? ' ' + S.name : 'คุณ');
+    $('helloP').innerHTML = S.guest ? 'อ่านตัวอย่างบทนำของทุกเล่มได้ฟรี · <b>เข้าสู่ระบบ</b>เพื่ออ่านทั้งเล่ม' : `${expLabel(S.expire)} <b>${esc(fmtExpire(S.expire))}</b> · ${S.books.length} เล่ม`;
     const box = $('rows'); box.innerHTML = '';
     if (!S.books.length) { box.innerHTML = '<div class="empty">บัญชีนี้ยังไม่มีหนังสือในชั้น<br>ติดต่อผู้ดูแลเพื่อขอสิทธิ์อ่าน</div>'; return; }
     const cols = colsFor(Math.min(box.clientWidth || window.innerWidth, 920) - 24);
@@ -417,7 +429,7 @@
       const caps = document.createElement('div'); caps.className = 'caps'; caps.style.gridTemplateColumns = tpl;
       chunk.forEach(b => {
         const btn = document.createElement('button'); btn.className = 'book'; btn.setAttribute('aria-label', 'เปิดอ่าน ' + b.title);
-        btn.innerHTML = `<span class="cov"><img src="${esc(b.cover)}" alt="ปก ${esc(b.title)}" loading="lazy"></span>`;
+        btn.innerHTML = `<span class="cov"><img src="${esc(b.cover)}" alt="ปก ${esc(b.title)}" loading="lazy">${S.guest ? '<i class="tag">ตัวอย่าง</i>' : ''}</span>`;
         btn.addEventListener('click', () => { location.hash = '#b' + b.id; });
         covers.appendChild(btn);
         const cap = document.createElement('div'); cap.className = 'cap';
@@ -432,7 +444,7 @@
 
   // ---------- routing: #b<book> = title page, #b<book>/<n> = chapter n ----------
   async function route() {
-    if (!S.code) return;
+    if (!S.code && !S.guest) return;
     const m = location.hash.match(/^#b(\w+)(?:\/(\d+))?$/);
     if (!m) { S.bookId = null; show('shelf'); return; }
     const b = S.books.find(x => String(x.id) === m[1]);
@@ -453,17 +465,23 @@
   async function openBook(b) {
     $('titlepage').hidden = true; $('page').hidden = true; $('pager').hidden = true;
     show('reader'); $('rtitle').textContent = 'กำลังเปิด…';
-    const k = await api({ api: 'key', code: S.code, book: b.id });
-    if (!k.ok) { const err = new Error('key'); err.expired = k.reason === 'expired'; throw err; }
-    S.key = await importKey(k.key); S.cache.clear();
-    S.man = await loadEnc(b.folder + '/manifest.bin');
+    if (S.guest) {
+      S.key = null; S.cache.clear();
+      S.man = await fetch(b.sample, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('sample'); return r.json(); });
+    } else {
+      const k = await api({ api: 'key', code: S.code, book: b.id });
+      if (!k.ok) { const err = new Error('key'); err.expired = k.reason === 'expired'; throw err; }
+      S.key = await importKey(k.key); S.cache.clear();
+      S.man = await loadEnc(b.folder + '/manifest.bin');
+    }
     S.bookId = b.id; S.book = b; S.pages = S.man.type === 'pages'; S.search = null;
-    document.body.classList.toggle('pgmode', S.pages); document.body.classList.remove('nobars');
+    document.body.classList.toggle('pgmode', S.pages); document.body.classList.toggle('guest', S.guest); document.body.classList.remove('nobars');
     $('rtitle').textContent = S.man.title;
     applyPrefs();
   }
 
-  const pos = () => ls.json('gbk_pos_' + S.bookId, {});
+  const pk = () => 'gbk_pos_' + (S.guest ? 'g' : '') + S.bookId;
+  const pos = () => ls.json(pk(), {});
   const seen = () => ls.json('gbk_seen_' + S.bookId, {});
 
   function showTitle() {
@@ -475,8 +493,8 @@
     t.innerHTML = `<div class="cv"><img src="${esc(S.book.cover)}" alt="ปกหนังสือ"></div>
       <div class="kick">${esc(man.kicker || '')}</div><h1>${esc(man.title)}</h1><p class="sub">${esc(man.subtitle || '')}</p>
       ${(man.tagline || []).map(x => `<p class="tag">${esc(x)}</p>`).join('')}
-      <button class="go" id="goBtn">${(ch && p.ch > 0) || pgResume ? 'อ่านต่อ' : 'เริ่มอ่าน'}</button>
-      <div class="meta">${pgResume ? esc(pageLabel(pgResume)) : ch && p.ch > 0 ? esc((ch.label ? ch.label + ' ' : '') + ch.title) : man.type === 'pages' ? (man.pages - man.offset) + ' หน้า' : man.chapters.length + ' ตอน'}</div>`;
+      <button class="go" id="goBtn">${(ch && p.ch > 0) || pgResume ? 'อ่านต่อ' : S.guest ? 'อ่านตัวอย่าง' : 'เริ่มอ่าน'}</button>
+      <div class="meta">${pgResume ? esc(pageLabel(pgResume)) : ch && p.ch > 0 ? esc((ch.label ? ch.label + ' ' : '') + ch.title) : man.type === 'pages' ? (S.guest ? 'ตัวอย่างบทนำ ' + (man.pages - man.offset) + ' หน้า' : (man.pages - man.offset) + ' หน้า') : man.chapters.length + ' ตอน'}</div>`;
     t.hidden = false; $('rtitle').textContent = man.title; $('prog').style.width = '0';
     $('goBtn').onclick = () => { location.hash = '#b' + S.bookId + '/' + (man.type === 'pages' ? (pgResume || 1) : (ch ? p.ch : 0)); };
     $('topbar').classList.remove('hide'); window.scrollTo(0, 0); buildToc();
@@ -496,7 +514,7 @@
     renderPager(i); $('pager').hidden = false;
     const sn = seen(); sn[i] = 1; ls.set('gbk_seen_' + S.bookId, JSON.stringify(sn));
     const p = pos(); const y = (p.ch === i && p.y) ? p.y : 0;
-    ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: i, y: p.ch === i ? p.y : 0 }));
+    ls.set(pk(), JSON.stringify({ ch: i, y: p.ch === i ? p.y : 0 }));
     $('topbar').classList.remove('hide'); lastY = 0;
     requestAnimationFrame(() => { window.scrollTo(0, y ? Math.round(y * (document.documentElement.scrollHeight - innerHeight)) : 0); updateProg(); });
     buildToc();
@@ -509,7 +527,7 @@
     const mk = (j, cls, dir) => {
       const b = document.createElement('button'); b.className = cls;
       const c = ch[j]; b.innerHTML = `<small>${dir}</small><b>${esc((c.label ? c.label + ' ' : '') + c.title.replace(/\s*[–-]\s.*$/, ''))}</b>`;
-      b.onclick = () => { ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: j, y: 0 })); location.hash = '#b' + S.bookId + '/' + j; };
+      b.onclick = () => { ls.set(pk(), JSON.stringify({ ch: j, y: 0 })); location.hash = '#b' + S.bookId + '/' + j; };
       pg.appendChild(b);
     };
     if (i > 0) mk(i - 1, 'prev', 'บทก่อนหน้า'); else pg.appendChild(Object.assign(document.createElement('span'), { className: 'sp' }));
@@ -521,18 +539,18 @@
     const t = $('toc'); const sn = seen(); const pg = S.man.type === 'pages';
     let cur = -1;
     if (pg) S.man.chapters.forEach((c, i) => { if (c.page && c.page <= PG.cur) cur = i; });
-    const head = pg ? '<h2>สารบัญ</h2><div class="sbox"><input id="q" type="search" placeholder="ค้นหาในหนังสือ" autocomplete="off" aria-label="ค้นหาในหนังสือ"></div><div id="tlist">' : '<h2>สารบัญ</h2>';
+    const head = pg && !S.guest ? '<h2>สารบัญ</h2><div class="sbox"><input id="q" type="search" placeholder="ค้นหาในหนังสือ" autocomplete="off" aria-label="ค้นหาในหนังสือ"></div><div id="tlist">' : '<h2>สารบัญ</h2>';
     const items = S.man.chapters.map((c, i) => pg
       ? `<a href="#b${esc(S.bookId)}/${c.page}" class="${i === cur ? 'cur' : ''}"><small>${esc(c.label || '')}${c.label ? ' · ' : ''}${esc(pageLabel(c.page))}</small>${esc(c.title)}</a>`
       : `<a href="#b${esc(S.bookId)}/${i}" class="${i === S.ch ? 'cur' : ''} ${sn[i] ? 'seen' : ''}"><small>${esc(c.label || (c.nonum ? 'ก่อนเริ่มเรียน' : ''))}</small>${esc(c.title)}</a>`).join('');
-    t.innerHTML = head + items + (pg ? '</div>' : '');
+    t.innerHTML = (pg && S.guest ? '<h2>สารบัญ (ตัวอย่าง)</h2>' : head) + items + (pg && !S.guest ? '</div>' : '');
     bindTocLinks(t);
-    if (pg) { const q = $('q'); let qt; q.addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(() => runSearch(q.value), 250); }); }
+    { const q = $('q'); let qt; if (q) q.addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(() => runSearch(q.value), 250); }); }
   }
   function bindTocLinks(t) {
     t.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
       const n = +a.getAttribute('href').split('/')[1];
-      if (S.man.type !== 'pages') ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: n, y: 0 }));
+      if (S.man.type !== 'pages') ls.set(pk(), JSON.stringify({ ch: n, y: 0 }));
       closePanels();
     }));
   }
@@ -555,8 +573,8 @@
       return;
     }
     if ($('reader').hidden || S.ch < 0 || S.pages || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
-    if (e.key === 'ArrowRight' && S.ch + 1 < S.man.chapters.length) { ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: S.ch + 1, y: 0 })); location.hash = '#b' + S.bookId + '/' + (S.ch + 1); }
-    if (e.key === 'ArrowLeft' && S.ch > 0) { ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: S.ch - 1, y: 0 })); location.hash = '#b' + S.bookId + '/' + (S.ch - 1); }
+    if (e.key === 'ArrowRight' && S.ch + 1 < S.man.chapters.length) { ls.set(pk(), JSON.stringify({ ch: S.ch + 1, y: 0 })); location.hash = '#b' + S.bookId + '/' + (S.ch + 1); }
+    if (e.key === 'ArrowLeft' && S.ch > 0) { ls.set(pk(), JSON.stringify({ ch: S.ch - 1, y: 0 })); location.hash = '#b' + S.bookId + '/' + (S.ch - 1); }
   });
 
   // ---------- reading preferences ----------
@@ -601,7 +619,7 @@
       tick = false; const f = updateProg(); const y = scrollY;
       if (y > lastY + 8 && y > 120) $('topbar').classList.add('hide'); else if (y < lastY - 8 || y < 60) $('topbar').classList.remove('hide');
       lastY = y; clearTimeout(saveT);
-      saveT = setTimeout(() => ls.set('gbk_pos_' + S.bookId, JSON.stringify({ ch: S.ch, y: Math.round(f * 1000) / 1000 })), 400);
+      saveT = setTimeout(() => ls.set(pk(), JSON.stringify({ ch: S.ch, y: Math.round(f * 1000) / 1000 })), 400);
     });
   }, { passive: true });
 
@@ -620,6 +638,7 @@
   const pgPath = p => S.book.folder + '/pages/p' + String(p).padStart(3, '0') + '.bin';
   function getPage(p) {
     let e = PG.cache.get(p); if (e) return e;
+    if (S.guest) { e = Promise.resolve(S.book.folder + '/sample/p' + String(p).padStart(3, '0') + '.webp'); PG.cache.set(p, e); return e; }
     e = loadRaw(pgPath(p)).then(buf => URL.createObjectURL(new Blob([buf], { type: 'image/webp' })));
     e.catch(() => PG.cache.delete(p)); PG.cache.set(p, e); return e;
   }
@@ -628,30 +647,35 @@
   }
   async function showPage(p, dir) {
     const man = S.man, n = man.pages; p = Math.max(1, Math.min(n, Math.round(p) || 1));
-    const sp = spreadOf(p); const tok = ++PG.tok; PG.cur = sp[0]; S.ch = PG.cur;
-    show('reader'); $('titlepage').hidden = true; $('page').hidden = true; $('pager').hidden = true; $('book').hidden = false; $('topbar').classList.remove('hide');
+    const sp = spreadOf(p); const tok = ++PG.tok; PG.cur = sp[0]; S.ch = PG.cur; PG.wideNow = wide();
+    show('reader'); $('titlepage').hidden = true; $('page').hidden = true; $('pager').hidden = true; $('book').hidden = false; $('sampleEnd').hidden = true; $('topbar').classList.remove('hide');
     $('rtitle').textContent = man.title;
     const lab = sp.length === 2 ? 'หน้า ' + (sp[0] - man.offset) + '–' + (sp[1] - man.offset) : pageLabel(sp[0]);
     $('pLbl').textContent = (sp[0] <= man.offset ? lab : lab + ' / ' + (n - man.offset));
     const r = $('pRange'); r.max = n; r.value = sp[0];
-    const box = $('spread'); box.className = 'spread n' + sp.length + (dir ? ' ' + dir : '');
-    box.innerHTML = sp.map(q => `<div class="pgbox"><img alt="${esc(pageLabel(q))}" width="${man.sizes[q - 1][0]}" height="${man.sizes[q - 1][1]}"></div>`).join('');
-    ls.set('gbk_pos_' + S.bookId, JSON.stringify({ p: PG.cur }));
+    ls.set(pk(), JSON.stringify({ p: PG.cur }));
     $('prog').style.width = (PG.cur / n * 100) + '%';
     history.replaceState(null, '', '#b' + S.bookId + '/' + PG.cur);
-    const imgs = box.querySelectorAll('img');
-    try {
-      const urls = await Promise.all(sp.map(getPage));
-      if (tok !== PG.tok) return;
-      urls.forEach((u, i) => { imgs[i].onload = () => imgs[i].classList.add('on'); imgs[i].src = u; if (imgs[i].complete) imgs[i].classList.add('on'); });
-    } catch (e) { toast('โหลดหน้านี้ไม่ได้ ลองใหม่อีกครั้ง'); return; }
+    const bk = $('book'); const busyT = setTimeout(() => { if (tok === PG.tok) bk.classList.add('busy'); }, 250);
+    let urls;
+    try { urls = await Promise.all(sp.map(getPage)); } catch (e) { clearTimeout(busyT); bk.classList.remove('busy'); if (tok === PG.tok) toast('โหลดหน้านี้ไม่ได้ ลองใหม่อีกครั้ง'); return; }
+    if (tok !== PG.tok) { clearTimeout(busyT); return; }
+    // build the new page(s) off-screen and swap only once they are decoded, so the old page stays up (no blank flash)
+    const boxes = sp.map((q, i) => {
+      const d = document.createElement('div'); d.className = 'pgbox';
+      const im = new Image(); im.alt = pageLabel(q); im.width = man.sizes[q - 1][0]; im.height = man.sizes[q - 1][1]; im.src = urls[i];
+      d.appendChild(im); return d;
+    });
+    await Promise.all(boxes.map(d => (d.firstChild.decode ? d.firstChild.decode() : Promise.resolve()).catch(() => {})));
+    clearTimeout(busyT); bk.classList.remove('busy');
+    if (tok !== PG.tok) return;
+    const box = $('spread'); box.className = 'spread n' + sp.length + (dir ? ' ' + dir : ''); box.replaceChildren(...boxes);
     const st = $('stage'); st.scrollTop = 0; if (PG.zoom) st.scrollLeft = (st.scrollWidth - st.clientWidth) / 2;
     const last = sp[sp.length - 1];
     [last + 1, last + 2, last + 3, sp[0] - 1, sp[0] - 2].forEach(q => { if (q >= 1 && q <= n) getPage(q).catch(() => {}); });
     trimCache(PG.cur);
-    if (!$('toc').hidden) buildToc();
   }
-  function pgNext() { const sp = spreadOf(PG.cur); const q = sp[sp.length - 1] + 1; if (q <= S.man.pages) showPage(q, 'fwd'); }
+  function pgNext() { const sp = spreadOf(PG.cur); const q = sp[sp.length - 1] + 1; if (q <= S.man.pages) showPage(q, 'fwd'); else if (S.guest) $('sampleEnd').hidden = false; }
   function pgPrev() { const q = PG.cur - 1; if (q >= 1) showPage(q, 'bwd'); }
   $('pNext').addEventListener('click', pgNext); $('pPrev').addEventListener('click', pgPrev);
   $('pRange').addEventListener('input', e => { const v = +e.target.value; $('pLbl').textContent = pageLabel(v) + (v > S.man.offset ? ' / ' + (S.man.pages - S.man.offset) : ''); });
@@ -677,7 +701,7 @@
     if (PG.zoom || (x > .28 && x < .72)) { document.body.classList.toggle('nobars'); return; }
     x <= .28 ? pgPrev() : pgNext();
   });
-  let prz; window.addEventListener('resize', () => { clearTimeout(prz); prz = setTimeout(() => { if (S.pages && !$('book').hidden) showPage(PG.cur); }, 200); });
+  let prz; window.addEventListener('resize', () => { clearTimeout(prz); prz = setTimeout(() => { if (S.pages && !$('book').hidden && wide() !== PG.wideNow) showPage(PG.cur); }, 200); });
   // full-text search (page texts are encrypted and loaded on first use)
   async function runSearch(q) {
     const list = $('tlist'); q = q.trim().toLowerCase();
@@ -693,9 +717,22 @@
     bindTocLinks(list);
   }
 
+  async function enterGuest() {
+    $('loginErr').textContent = '';
+    try {
+      const list = await fetch('catalog.json', { cache: 'no-cache' }).then(r => r.json());
+      Object.assign(S, { guest: true, code: null, name: '', expire: null, books: list, bookId: null, key: null, man: null, ch: -2 }); S.cache.clear();
+      if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+      renderShelf(); route();
+    } catch (e) { $('loginErr').textContent = 'เปิดหนังสือตัวอย่างไม่ได้ ลองใหม่อีกครั้ง'; }
+  }
+  $('sampleBtn').addEventListener('click', enterGuest);
+  $('seLogin').addEventListener('click', () => showLogin(''));
+  $('seBack').addEventListener('click', () => { $('sampleEnd').hidden = true; location.hash = ''; });
+
   // ---------- boot ----------
   $('loginForm').addEventListener('submit', e => { e.preventDefault(); tryLogin($('code').value, false); });
-  $('logout').addEventListener('click', () => { $('code').value = ''; showLogin('ออกจากระบบแล้ว'); });
+  $('logout').addEventListener('click', () => { $('code').value = ''; showLogin(S.guest ? '' : 'ออกจากระบบแล้ว'); });
   $('loginVer').textContent = 'V' + VER;
   const saved = ls.get('gbk_code', null);
   if (saved) { $('loginBtn').disabled = true; $('loginBtn').textContent = 'กำลังตรวจสอบ…'; tryLogin(saved, true).then(() => { $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ'; }); }

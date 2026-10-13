@@ -1,0 +1,10 @@
+[
+ {
+  "id": "1",
+  "title": "ถอดรหัส Market Maker",
+  "subtitle": "เจาะลึก Options Order Flow สู่การเทรดจริง",
+  "cover": "books/1/cover.jpg",
+  "folder": "books/1",
+  "sample": "books/1/sample.json"
+ }
+]

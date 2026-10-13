@@ -135,7 +135,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.3.00';
+  const APP_VER = '1.3.01';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -397,12 +397,16 @@
         const yy = Math.round(ym) + .5, mpC = C('--mp');
         ctx.globalAlpha = 0.95; ctx.strokeStyle = mpC; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
         ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke(); ctx.setLineDash([]);
-        const lab = `Max Pain ${oi.maxPain}`;
+        // ป้ายราคาที่แกนขวา (กรอบสีบานเย็น) และคำว่า Max Pain ใต้กรอบ ไม่บังกราฟ
+        const lab = oi.maxPain.toFixed(2);
         ctx.font = `bold 10px ${C('--mono')}`;
-        const tw = ctx.measureText(lab).width, lx = plotW / 2 - tw / 2;
-        ctx.globalAlpha = 0.85; ctx.fillStyle = C('--bg'); ctx.fillRect(lx - 4, yy - 15, tw + 8, 13);
-        ctx.globalAlpha = 1; ctx.fillStyle = mpC; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-        ctx.fillText(lab, lx, yy - 8.5);
+        const axW = w - plotW, bh = 14, bx = plotW + 1, by = Math.round(ym - bh / 2);
+        ctx.globalAlpha = 1; ctx.fillStyle = mpC; ctx.fillRect(bx, by, axW - 1, bh);
+        ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(lab, bx + (axW - 1) / 2, by + bh / 2 + .5);
+        ctx.font = `bold 8px ${C('--mono')}`;
+        ctx.fillStyle = C('--bg'); ctx.globalAlpha = 0.85; ctx.fillRect(bx, by + bh, axW - 1, 10);
+        ctx.globalAlpha = 1; ctx.fillStyle = mpC; ctx.fillText('Max Pain', bx + (axW - 1) / 2, by + bh + 5.5);
         ctx.font = `10px ${C('--mono')}`;
       }
     }

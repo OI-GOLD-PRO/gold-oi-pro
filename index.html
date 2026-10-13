@@ -134,7 +134,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.2.02';
+  const APP_VER = '1.2.03';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -410,11 +410,15 @@
 
   // ---------- ข่าวแดง (High impact) จาก Forex Factory ----------
   // GitHub Actions ดึงปฏิทินทุกชั่วโมงเก็บเป็น news.json ในรีโป แอปอ่านไฟล์นั้น
-  const NEWS_URL = 'https://raw.githubusercontent.com/sahutchaitheppikul-sys/oi-gold/main/news.json';
+  // ที่อยู่ไฟล์ news.json: อ่านชื่อบัญชี/รีโปจากลิงก์ของหน้าเว็บเอง (เปลี่ยนชื่อรีโปภายหลังก็ยังใช้ได้)
+  const GH_OWNER = /\.github\.io$/.test(location.hostname) ? location.hostname.split('.')[0] : 'OI-GOLD-PRO';
+  const GH_REPO = (/\.github\.io$/.test(location.hostname) && location.pathname.split('/')[1]) || 'oi-gold';
+  const NEWS_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/news.json`;
   let news = [];
   async function loadNews() {
     try {
-      const r = await fetch(NEWS_URL + '?t=' + Math.floor(Date.now() / 300000), { cache: 'no-store' });
+      let r = await fetch(NEWS_URL + '?t=' + Math.floor(Date.now() / 300000), { cache: 'no-store' }).catch(() => null);
+      if (!r || !r.ok) r = await fetch('news.json?t=' + Math.floor(Date.now() / 300000), { cache: 'no-store' });
       if (!r.ok) return;
       const j = await r.json();
       news = (j.events || []).map(e => ({ ...e, ms: Date.parse(e.date) })).filter(e => isFinite(e.ms)).sort((a, b) => a.ms - b.ms);

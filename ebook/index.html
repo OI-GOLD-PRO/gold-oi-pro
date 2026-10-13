@@ -193,8 +193,10 @@
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
   /* ---------- page-by-page reader ---------- */
-  body.pgmode #findBtn, body.pgmode #zoomBtn { display: inline-flex; }
-  body:not(.pgmode) #findBtn, body:not(.pgmode) #zoomBtn { display: none; }
+  body.pgmode #findBtn, body.pgmode #zoomBtn, body.pgmode #refBtn { display: inline-flex; }
+  #refBtn.spin svg { animation: refspin .8s linear infinite; }
+  @keyframes refspin { to { transform: rotate(360deg); } }
+  body:not(.pgmode) #findBtn, body:not(.pgmode) #zoomBtn, body:not(.pgmode) #refBtn { display: none; }
   body.pgmode #setBtn { display: none; }
   body.pgmode.guest #findBtn { display: none; }
   #book { position: fixed; inset: 0; z-index: 5; background: #0C0A07; }
@@ -269,6 +271,7 @@
   <header id="topbar">
     <button class="ib" id="back" aria-label="กลับไปชั้นหนังสือ"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg><span>ชั้น</span></button>
     <div class="title" id="rtitle"></div>
+    <button class="ib" id="refBtn" aria-label="โหลดข้อมูลใหม่"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg></button>
     <button class="ib" id="findBtn" aria-label="ค้นหา"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
     <button class="ib" id="zoomBtn" aria-label="ขยายหน้า" aria-pressed="false"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5M8.5 11h5M11 8.5v5"/></svg></button>
     <button class="ib" id="setBtn" aria-label="ตั้งค่าการอ่าน" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 19l5-14 5 14M6 14h6M17 9v10M14 12h6" /></svg></button>
@@ -636,7 +639,7 @@
   function pageLabel(p) {
     const off = S.man.offset || 0; if (p <= off) return p === 1 ? 'ปก' : 'หน้านำ'; return 'หน้า ' + (p - off);
   }
-  const ver = () => (S.man && S.man.built) ? '?v=' + encodeURIComponent(S.man.built) : '';
+  const ver = () => ((S.man && S.man.built) ? '?v=' + encodeURIComponent(S.man.built) : '?v=0') + (S.bust ? '&r=' + S.bust : '');
   const pgPath = p => S.book.folder + '/pages/p' + String(p).padStart(3, '0') + '.bin' + ver();
   function getPage(p) {
     let e = PG.cache.get(p); if (e) return e;
@@ -677,6 +680,29 @@
     [last + 1, last + 2, last + 3, sp[0] - 1, sp[0] - 2].forEach(q => { if (q >= 1 && q <= n) getPage(q).catch(() => {}); });
     trimCache(PG.cur);
   }
+  // refresh: re-check access, reload manifest, drop cached pages and redraw the current page
+  async function refreshBook() {
+    const b = S.book; if (!b || $('refBtn').classList.contains('spin')) return;
+    $('refBtn').classList.add('spin'); toast('กำลังโหลดข้อมูลใหม่…');
+    try {
+      S.bust = Date.now();
+      if (S.guest) {
+        S.man = await fetch(b.sample + '?r=' + S.bust, { cache: 'reload' }).then(r => { if (!r.ok) throw new Error('sample'); return r.json(); });
+      } else {
+        const k = await api({ api: 'key', code: S.code, book: b.id });
+        if (!k.ok) { if (k.reason === 'expired') { showLogin('รหัสผ่านนี้หมดอายุแล้ว'); return; } throw new Error('key'); }
+        S.key = await importKey(k.key);
+        S.man = await loadEnc(b.folder + '/manifest.bin?r=' + S.bust);
+      }
+      PG.cache.forEach(v => v.then(u => { if (String(u).startsWith('blob:')) URL.revokeObjectURL(u); }).catch(() => {}));
+      PG.cache.clear(); S.search = null;
+      $('rtitle').textContent = S.man.title;
+      await showPage(Math.min(PG.cur, S.man.pages));
+      toast('โหลดข้อมูลล่าสุดแล้ว');
+    } catch (e) { toast('โหลดไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง'); }
+    finally { $('refBtn').classList.remove('spin'); }
+  }
+  $('refBtn').addEventListener('click', refreshBook);
   function pgNext() { const sp = spreadOf(PG.cur); const q = sp[sp.length - 1] + 1; if (q <= S.man.pages) showPage(q, 'fwd'); else if (S.guest) $('sampleEnd').hidden = false; }
   function pgPrev() { const q = PG.cur - 1; if (q >= 1) showPage(q, 'bwd'); }
   $('pNext').addEventListener('click', pgNext); $('pPrev').addEventListener('click', pgPrev);
@@ -708,7 +734,7 @@
   async function runSearch(q) {
     const list = $('tlist'); q = q.trim().toLowerCase();
     if (!q) { buildToc(); return; }
-    if (!S.search) { list.innerHTML = '<div class="nores">กำลังโหลด…</div>'; try { S.search = JSON.parse(new TextDecoder().decode(await loadRaw(S.book.folder + '/search.bin'))); } catch (e) { list.innerHTML = '<div class="nores">ค้นหาไม่ได้ ลองใหม่อีกครั้ง</div>'; return; } }
+    if (!S.search) { list.innerHTML = '<div class="nores">กำลังโหลด…</div>'; try { S.search = JSON.parse(new TextDecoder().decode(await loadRaw(S.book.folder + '/search.bin' + ver()))); } catch (e) { list.innerHTML = '<div class="nores">ค้นหาไม่ได้ ลองใหม่อีกครั้ง</div>'; return; } }
     const out = []; const off = S.man.offset;
     for (let i = 0; i < S.search.length && out.length < 60; i++) {
       const t = S.search[i], k = t.toLowerCase().indexOf(q); if (k < 0) continue;

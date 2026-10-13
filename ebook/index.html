@@ -636,10 +636,11 @@
   function pageLabel(p) {
     const off = S.man.offset || 0; if (p <= off) return p === 1 ? 'ปก' : 'หน้านำ'; return 'หน้า ' + (p - off);
   }
-  const pgPath = p => S.book.folder + '/pages/p' + String(p).padStart(3, '0') + '.bin';
+  const ver = () => (S.man && S.man.built) ? '?v=' + encodeURIComponent(S.man.built) : '';
+  const pgPath = p => S.book.folder + '/pages/p' + String(p).padStart(3, '0') + '.bin' + ver();
   function getPage(p) {
     let e = PG.cache.get(p); if (e) return e;
-    if (S.guest) { e = Promise.resolve(S.book.folder + '/sample/p' + String(p).padStart(3, '0') + '.webp'); PG.cache.set(p, e); return e; }
+    if (S.guest) { e = Promise.resolve(S.book.folder + '/sample/p' + String(p).padStart(3, '0') + '.webp' + ver()); PG.cache.set(p, e); return e; }
     e = loadRaw(pgPath(p)).then(buf => URL.createObjectURL(new Blob([buf], { type: 'image/webp' })));
     e.catch(() => PG.cache.delete(p)); PG.cache.set(p, e); return e;
   }

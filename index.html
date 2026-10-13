@@ -89,7 +89,7 @@
     <form class="card" id="loginForm" autocomplete="on">
       <h1>OI Gold</h1>
       <p>ใส่รหัสผ่านเพื่อเข้าดูกราฟ</p>
-      <input id="code" name="password" type="password" inputmode="text" autocomplete="current-password" placeholder="รหัสผ่าน" autocapitalize="characters" spellcheck="false">
+      <input id="code" name="password" type="password" inputmode="text" autocomplete="current-password" placeholder="รหัสผ่าน" autocapitalize="off" autocorrect="off" spellcheck="false">
       <button type="submit" id="loginBtn">เข้าสู่ระบบ</button>
       <div class="err" id="loginErr"></div>
       <div class="ver" id="loginVer"></div>
@@ -134,7 +134,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.2.00';
+  const APP_VER = '1.2.01';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -215,7 +215,7 @@
     chips.push(ok ? `<span class="chip" id="offchip"></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
     chips.push(`<span class="chip" id="rawchip"></span>`);
     chips.push(`<span class="chip" id="newschip" hidden></span>`);
-    if (authExpire) chips.push(`<span class="chip">ใช้ได้ถึง <b>${esc(fmtExpire(authExpire))}</b></span>`);
+    if (authExpire) chips.push(`<span class="chip">${expLabel(authExpire)} <b>${esc(fmtExpire(authExpire))}</b></span>`);
     $('chips').innerHTML = chips.join('');
     paintRaw(); paintNextNews();
     if (ok && (carry === null || !adjSet)) applyAdj(-off); else paintOff();
@@ -840,7 +840,9 @@
 
   // ---------- เข้าสู่ระบบด้วยรหัสผ่าน (ตรวจกับแท็บ users ในชีตผ่าน Apps Script) ----------
   let authCode = null, authExpire = null, started = false;
+  const expLabel = s => String(s) >= '9999' ? 'อายุใช้งาน' : 'ใช้ได้ถึง';
   function fmtExpire(s) {
+    if (String(s) >= '9999') return 'ไม่จำกัด';
     const d = new Date(s + 'T00:00:00+07:00');
     return isNaN(d) ? s : d.toLocaleDateString('th-TH-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' });
   }
@@ -858,7 +860,7 @@
     $('login').hidden = true;
     if (!started) { started = true; loadTF(tf); loadNews(); setInterval(loadNews, 15 * 60 * 1000); }
     loadSheet();
-    if (expire) showToast(`เข้าสู่ระบบแล้ว · ใช้ได้ถึง <b>${esc(fmtExpire(expire))}</b>`);
+    if (expire) showToast(`เข้าสู่ระบบแล้ว · ${expLabel(expire)} <b>${esc(fmtExpire(expire))}</b>`);
   }
   // ตรวจรหัสกับเซิร์ฟเวอร์: คืน {ok, expire} / {ok:false, reason} / {legacy:true} ถ้าสคริปต์ยังเป็นรุ่นเก่า
   async function checkLogin(code) {
@@ -878,11 +880,17 @@
     } finally { clearTimeout(timer); }
   }
   async function tryLogin(code, silent) {
-    code = String(code || '').trim().toUpperCase();
+    code = String(code || '').trim();
     if (!code) { $('loginErr').textContent = 'กรุณาใส่รหัสผ่าน'; return; }
     $('loginBtn').disabled = true; $('loginBtn').textContent = 'กำลังตรวจสอบ…'; $('loginErr').textContent = '';
     try {
-      const res = await checkLogin(code);
+      // รหัสในชีตตรงตัวพิมพ์เล็ก/ใหญ่: ลองตามที่พิมพ์ก่อน แล้วลองตัวพิมพ์ใหญ่/เล็ก
+      let res = await checkLogin(code);
+      for (const alt of [code.toUpperCase(), code.toLowerCase()]) {
+        if (res.ok || res.legacy || res.reason === 'expired' || alt === code) continue;
+        const r2 = await checkLogin(alt);
+        if (r2.ok || r2.reason === 'expired') { res = r2; code = alt; }
+      }
       if (res.legacy) { enterApp(code, null); return; }
       if (res.ok) { enterApp(code, res.expire); return; }
       showLogin(res.reason === 'expired' ? `รหัสผ่านนี้หมดอายุแล้ว${res.expire ? ' (' + fmtExpire(res.expire) + ')' : ''}` : 'รหัสผ่านไม่ถูกต้อง');

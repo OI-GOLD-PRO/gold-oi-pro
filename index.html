@@ -48,7 +48,19 @@
   @keyframes sirenBlink { 0% { opacity: 1; filter: drop-shadow(0 0 6px #ff3b3b); } 100% { opacity: .25; } }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
   .dot.live { background: var(--live); box-shadow: 0 0 6px var(--live); }
-  button.icon { background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; width: 38px; height: 38px; font-size: 18px; flex: none; }
+  button.icon { background: var(--panel); border: 1px solid var(--line); color: var(--fg); border-radius: 10px; width: 34px; height: 34px; font-size: 16px; flex: none; }
+  header { gap: 8px !important; }
+  /* หน้าเข้าสู่ระบบ: ทับทั้งจอจนกว่าจะใส่รหัสผ่านถูก */
+  #login { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+  #login .card { width: 100%; max-width: 340px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px 20px; text-align: center; }
+  #login h1 { margin: 0 0 4px; font: 600 22px var(--mono); color: var(--gold); letter-spacing: .03em; }
+  #login p { margin: 0 0 18px; font-size: 13px; color: var(--muted); }
+  #login input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: 600 16px var(--mono); text-align: center; letter-spacing: .12em; outline: none; }
+  #login input:focus { border-color: var(--gold); }
+  #login button { width: 100%; margin-top: 12px; padding: 12px; border: 0; border-radius: 10px; background: var(--gold); color: #1a1405; font: 600 15px var(--sans); }
+  #login button:disabled { opacity: .6; }
+  #login .err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--put); }
+  #login .ver { margin-top: 14px; font: 11px var(--mono); color: var(--muted); }
   button.icon:active { transform: scale(.95); }
   .chips { display: flex; gap: 6px; padding: 0 14px 8px; overflow-x: auto; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
@@ -73,6 +85,16 @@
 </style>
 </head>
 <body>
+  <div id="login">
+    <form class="card" id="loginForm" autocomplete="on">
+      <h1>OI Gold</h1>
+      <p>ใส่รหัสผ่านเพื่อเข้าดูกราฟ</p>
+      <input id="code" name="password" type="password" inputmode="text" autocomplete="current-password" placeholder="รหัสผ่าน" autocapitalize="characters" spellcheck="false">
+      <button type="submit" id="loginBtn">เข้าสู่ระบบ</button>
+      <div class="err" id="loginErr"></div>
+      <div class="ver" id="loginVer"></div>
+    </form>
+  </div>
   <header>
     <span class="dot" id="dot"></span>
     <div class="sym"><b>XAUUSD</b><span id="src">OI</span></div>
@@ -80,6 +102,7 @@
     <div class="px"><div id="price">–</div><div id="chg">กำลังโหลด</div></div>
     <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือนโซน OI">🔕</button>
     <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่">⟳</button>
+    <button class="icon" id="logout" aria-label="ออกจากระบบ">⏻</button>
   </header>
   <div class="chips" id="chips"><span class="chip">กำลัง Sync Data…</span></div>
   <div class="tfs" id="tfs">
@@ -111,7 +134,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.1.02';
+  const APP_VER = '1.2.00';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -192,6 +215,7 @@
     chips.push(ok ? `<span class="chip" id="offchip"></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
     chips.push(`<span class="chip" id="rawchip"></span>`);
     chips.push(`<span class="chip" id="newschip" hidden></span>`);
+    if (authExpire) chips.push(`<span class="chip">ใช้ได้ถึง <b>${esc(fmtExpire(authExpire))}</b></span>`);
     $('chips').innerHTML = chips.join('');
     paintRaw(); paintNextNews();
     if (ok && (carry === null || !adjSet)) applyAdj(-off); else paintOff();
@@ -203,22 +227,26 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); }
 
   // ข้อมูล OI ดึงจาก Apps Script (?api=data) ซึ่งอ่านชีตให้
-  const API = 'https://script.google.com/macros/s/AKfycbwQrp29KWhUCVO0ojjS73SiLtDKe1QKx69KOOF90QQOlV3csHXqxfOGUYKYw2D6nZp0tw/exec?api=data';
+  const API_BASE = 'https://script.google.com/macros/s/AKfycbwQrp29KWhUCVO0ojjS73SiLtDKe1QKx69KOOF90QQOlV3csHXqxfOGUYKYw2D6nZp0tw/exec';
+  const apiData = () => `${API_BASE}?api=data&code=${encodeURIComponent(authCode || '')}`;
 
   // Sync ข้อมูลจากชีต: หมดเวลา 15 วินาทีต่อครั้ง ลองใหม่สูงสุด 3 ครั้ง
   // ถ้ามีข้อมูลชุดเดิมอยู่แล้ว จะไม่ล้างชิปทิ้งระหว่างโหลด (เส้น OI ยังแสดงต่อ)
   let syncing = false;
   async function loadSheet() {
-    if (syncing) return;
+    if (syncing || !authCode) return;
     syncing = true;
     if (!oi) $('chips').innerHTML = '<span class="chip">กำลัง Sync Data…</span>';
     let err = null;
     for (let i = 0; i < 3; i++) {
       const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 15000);
       try {
-        const r = await fetch(API + '&t=' + Date.now(), { cache: 'no-store', signal: ac.signal });
+        const r = await fetch(apiData() + '&t=' + Date.now(), { cache: 'no-store', signal: ac.signal });
         if (!r.ok) throw new Error('HTTP ' + r.status);
-        buildOI(await r.json());
+        const d = await r.json();
+        if (d.error === 'auth') { syncing = false; showLogin(d.reason === 'expired' ? 'รหัสผ่านนี้หมดอายุแล้ว' : 'รหัสผ่านใช้ไม่ได้แล้ว กรุณาเข้าสู่ระบบใหม่'); return; }
+        if (d.auth && d.auth.expire) authExpire = d.auth.expire;
+        buildOI(d);
         err = null; break;
       } catch (e) {
         err = e.name === 'AbortError' ? 'หมดเวลา' : (e.message || e);
@@ -799,7 +827,7 @@
 
   // กลับมาเปิดแอปจากหน้าจอโฮม: ต่อ websocket ใหม่และเติมแท่งที่ขาด
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') { loadTF(tf); if (!oi) loadSheet(); keepAwake(); try { actx && actx.resume(); } catch (e) {} }
+    if (document.visibilityState === 'visible') { if (started) loadTF(tf); if (!oi && authCode) loadSheet(); keepAwake(); try { actx && actx.resume(); } catch (e) {} }
   });
 
   setInterval(() => {
@@ -810,10 +838,62 @@
   $('tfs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) loadTF(b.dataset.tf); });
   $('reload').addEventListener('click', loadSheet);
 
+  // ---------- เข้าสู่ระบบด้วยรหัสผ่าน (ตรวจกับแท็บ users ในชีตผ่าน Apps Script) ----------
+  let authCode = null, authExpire = null, started = false;
+  function fmtExpire(s) {
+    const d = new Date(s + 'T00:00:00+07:00');
+    return isNaN(d) ? s : d.toLocaleDateString('th-TH-u-ca-gregory', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' });
+  }
+  function showLogin(msg) {
+    try { localStorage.removeItem('oi_code'); } catch (e) {}
+    authCode = null; authExpire = null; oi = null; dirty = true;
+    $('loginErr').textContent = msg || '';
+    $('loginVer').textContent = 'V' + APP_VER;
+    $('login').hidden = false;
+    $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ';
+  }
+  function enterApp(code, expire) {
+    authCode = code; authExpire = expire || null;
+    try { localStorage.setItem('oi_code', code); } catch (e) {}
+    $('login').hidden = true;
+    if (!started) { started = true; loadTF(tf); loadNews(); setInterval(loadNews, 15 * 60 * 1000); }
+    loadSheet();
+    if (expire) showToast(`เข้าสู่ระบบแล้ว · ใช้ได้ถึง <b>${esc(fmtExpire(expire))}</b>`);
+  }
+  // ตรวจรหัสกับเซิร์ฟเวอร์: คืน {ok, expire} / {ok:false, reason} / {legacy:true} ถ้าสคริปต์ยังเป็นรุ่นเก่า
+  async function checkLogin(code) {
+    const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 15000);
+    try {
+      const r = await fetch(`${API_BASE}?api=login&code=${encodeURIComponent(code)}&t=${Date.now()}`, { cache: 'no-store', signal: ac.signal });
+      const t = await r.text();
+      try { return JSON.parse(t); } catch (e) { return { legacy: true }; }
+    } finally { clearTimeout(timer); }
+  }
+  async function tryLogin(code, silent) {
+    code = String(code || '').trim().toUpperCase();
+    if (!code) { $('loginErr').textContent = 'กรุณาใส่รหัสผ่าน'; return; }
+    $('loginBtn').disabled = true; $('loginBtn').textContent = 'กำลังตรวจสอบ…'; $('loginErr').textContent = '';
+    try {
+      const res = await checkLogin(code);
+      if (res.legacy) { enterApp(code, null); return; }
+      if (res.ok) { enterApp(code, res.expire); return; }
+      showLogin(res.reason === 'expired' ? `รหัสผ่านนี้หมดอายุแล้ว${res.expire ? ' (' + fmtExpire(res.expire) + ')' : ''}` : 'รหัสผ่านไม่ถูกต้อง');
+    } catch (e) {
+      $('login').hidden = false;
+      $('loginErr').textContent = 'เชื่อมต่อไม่ได้ ลองใหม่อีกครั้ง';
+      $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ';
+      if (silent) $('code').value = code;
+    }
+  }
+  $('loginForm').addEventListener('submit', e => { e.preventDefault(); tryLogin($('code').value, false); });
+  $('logout').addEventListener('click', () => { $('code').value = ''; showLogin('ออกจากระบบแล้ว'); });
+
   if (!tfSec[tf]) tf = '5m';
-  loadSheet();
-  loadTF(tf);
-  loadNews(); setInterval(loadNews, 15 * 60 * 1000);
+  // เปิดแอป: ถ้าเคยใส่รหัสผ่านไว้ ตรวจซ้ำอัตโนมัติ ไม่ต้องกรอกใหม่
+  $('loginVer').textContent = 'V' + APP_VER;
+  let saved = null;
+  try { saved = localStorage.getItem('oi_code'); } catch (e) {}
+  if (saved) { $('login').hidden = true; $('chips').innerHTML = '<span class="chip">กำลังตรวจสอบรหัสผ่าน…</span>'; tryLogin(saved, true); }
 })();
 </script>
 </body>

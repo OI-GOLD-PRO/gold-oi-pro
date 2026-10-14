@@ -143,7 +143,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.3.03';
+  const APP_VER = '1.4.00';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -158,7 +158,7 @@
   // adj = (perp − spot) − carry  โดย carry = GC − spot จากชีต (วัดตอนอัพเดท) และรีเฟรชทุก 1 ชม.
   // ถ้าไม่มี carry ในชีต ใช้ adj = −offset (ราคา perp + offset)
   let adj = 0, basisEma = null, rawBars = [], rawClose = null, offRaw = null, carry = null, adjSet = false, adjAt = null;
-  const REFRESH_MS = 60 * 60 * 1000;
+  const REFRESH_MS = 60 * 1000; // Sync ชีตและคำนวณ offset ใหม่ทุก 1 นาที
 
   // ---------- กราฟ ----------
   const chartEl = $('chart');
@@ -434,7 +434,7 @@
       if (!r || !r.ok) r = await fetch('news.json?t=' + Math.floor(Date.now() / 300000), { cache: 'no-store' });
       if (!r.ok) return;
       const j = await r.json();
-      news = (j.events || []).map(e => ({ ...e, ms: Date.parse(e.date) })).filter(e => isFinite(e.ms)).sort((a, b) => a.ms - b.ms);
+      news = (j.events || []).filter(e => e.c === 'USD').map(e => ({ ...e, i: e.i || 'H', ms: Date.parse(e.date) })).filter(e => isFinite(e.ms)).sort((a, b) => a.ms - b.ms);
       dirty = true; paintNextNews(); paintSiren();
     } catch (e) {}
   }
@@ -451,6 +451,14 @@
     return xl + (t - lastBarTime) / sec * sp;
   }
   const NEWS_H = 14;
+  const newsCol = e => e.i === 'H' ? '#ef4444' : '#f59e0b'; // แดง = High, ส้ม = Medium
+  const thDay = ms => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  // วันที่ไทย: ถ้าเป็นวันนี้แสดง "วันนี้ !!"
+  const newsWhen = ms => {
+    const hm = new Date(ms).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' });
+    if (thDay(ms) === thDay(Date.now())) return `<b style="color:#3ddc84">วันนี้ !!</b> ${hm}`;
+    return new Date(ms).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', timeZone: 'Asia/Bangkok' }) + ' ' + hm;
+  };
   // เส้นแบ่งวันเทรด: CME ปิดรายวัน 17:00 ET แล้วเริ่มวันใหม่ 18:00 ET
   const etDayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
   const dayCache = new Map();
@@ -490,20 +498,23 @@
   setInterval(paintSiren, 15000);
   $('siren').addEventListener('click', () => {
     if (!$('toast').hidden) { hideToast(); return; } // แตะไซเรนซ้ำ = ปิดกล่องข่าว
-    const now = Date.now() - 5 * 60000;
-    const up = news.filter(e => e.ms >= now).slice(0, 6);
-    const fmtT = ms => new Date(ms).toLocaleString('th-TH', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' });
-    showToast(up.length ? '🚨 ข่าวแดงถัดไป<br>' + up.map(e => `<b>${esc(e.c)}</b> ${esc(e.title)} · ${fmtT(e.ms)} น.`).join('<br>') : 'ยังไม่มีข่าวแดงที่กำลังจะออก');
+    // ข่าว USD ทั้งสัปดาห์ (จันทร์–อาทิตย์ เวลาไทย) ข่าวที่ผ่านไปแล้วแสดงจาง
+    const d = new Date(Date.now() + 7 * 3600e3), dow = (d.getUTCDay() + 6) % 7;
+    const wkStart = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - dow) - 7 * 3600e3, wkEnd = wkStart + 7 * 86400e3;
+    const list = news.filter(e => e.ms >= wkStart && e.ms < wkEnd);
+    const now = Date.now();
+    const rows = list.map(e => `<div style="padding:2px 0;${e.ms < now - 5 * 60000 ? 'opacity:.45' : ''}"><span style="color:${newsCol(e)}">●</span> ${esc(e.title)} · ${newsWhen(e.ms)} น.${e.forecast ? ' <span style="opacity:.7">(คาด ' + esc(e.forecast) + ')</span>' : ''}</div>`).join('');
+    showToast(list.length ? `🚨 ข่าว USD สัปดาห์นี้ <span style="font-size:11px;opacity:.7"><span style="color:#ef4444">●</span> แดง <span style="color:#f59e0b">●</span> ส้ม</span><div style="max-height:52vh;overflow:auto;margin-top:4px">${rows}</div>` : 'สัปดาห์นี้ไม่มีข่าว USD สีแดง/ส้ม', 30000);
   });
   // ชิปบอกข่าวแดง USD ถัดไป (ข่าวในอนาคตอาจอยู่นอกจอกราฟ)
   function paintNextNews() {
     const el = $('newschip'); if (!el) return;
     const now = Date.now() - 5 * 60000;
-    const nx = news.find(e => e.ms >= now && e.c === 'USD') || news.find(e => e.ms >= now);
+    const nx = news.find(e => e.ms >= now && e.i === 'H') || news.find(e => e.ms >= now);
     if (!nx) { el.hidden = true; return; }
     const same = news.filter(e => e.ms === nx.ms && e.c === nx.c).length;
     const t = new Date(nx.ms).toLocaleString('th-TH', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' });
-    el.innerHTML = `<span style="color:#ef4444">●</span> ${esc(nx.c)} ${esc(nx.title)}${same > 1 ? ' +' + (same - 1) : ''} <b>${t}</b>`;
+    el.innerHTML = `<span style="color:${newsCol(nx)}">●</span> ${esc(nx.c)} ${esc(nx.title)}${same > 1 ? ' +' + (same - 1) : ''} <b>${thDay(nx.ms) === thDay(Date.now()) ? 'วันนี้ !! ' + new Date(nx.ms).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }) : t}</b>`;
     el.hidden = false;
   }
   setInterval(paintNextNews, 60000);
@@ -519,11 +530,11 @@
     news.forEach(e => {
       const x = newsX(e.ms);
       if (x === null || x < 0 || x > plotW) return;
-      const usd = e.c === 'USD', col = usd ? '#ef4444' : '#f97316';
+      const hi = e.i === 'H', col = newsCol(e);
       // เส้นแนวตั้งจาง ๆ ตรงเวลาข่าว
-      ctx.globalAlpha = usd ? 0.35 : 0.2; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+      ctx.globalAlpha = hi ? 0.35 : 0.22; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
       ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, 0); ctx.lineTo(Math.round(x) + .5, y); ctx.stroke(); ctx.setLineDash([]);
-      if (Math.abs(x - lastX) < 22) return; // ข่าวเวลาเดียวกันวาดป้ายเดียว
+      if (Math.abs(x - lastX) < 22 && !hi) return; // ข่าวเวลาเดียวกันวาดป้ายเดียว (ให้ข่าวแดงทับส้ม)
       lastX = x;
       const bw = 22;
       ctx.globalAlpha = 0.95; ctx.fillStyle = col;
@@ -728,7 +739,7 @@
   }
   setInterval(updateBasis, 30000);
   // ทุก 1 ชั่วโมง: อ่านชีตใหม่ (OI/carry ล่าสุด) แล้วคำนวณ offset ใหม่
-  setInterval(() => { loadSheet().then(() => refreshAdj(false)); }, REFRESH_MS);
+  setInterval(() => { if (document.visibilityState === 'visible') loadSheet().then(() => refreshAdj(false)); }, REFRESH_MS);
 
   // ตลาดทอง CME ปิด: ศุกร์ 17:00 ET ถึงอาทิตย์ 18:00 ET และพักทุกวัน 17:00–18:00 ET
   // perp เทรดตลอด 24 ชม. จึงตัดแท่งช่วงนี้ทิ้ง ให้กราฟตรงกับกราฟฟิวเจอร์

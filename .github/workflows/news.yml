@@ -1,4 +1,4 @@
-# ดึงข่าวแดง (High impact) จาก Forex Factory ทุกชั่วโมง แล้วบันทึกเป็น news.json ให้หน้าแอปอ่าน
+# ดึงข่าว USD ระดับแดง (High) และส้ม (Medium) จาก Forex Factory ทุกชั่วโมง แล้วบันทึกเป็น news.json ให้หน้าแอปอ่าน
 name: ff-news
 on:
   schedule:
@@ -22,8 +22,8 @@ jobs:
             if curl -fsSL -A 'Mozilla/5.0 (oi-gold news bot)' "https://nfs.faireconomy.media/ff_calendar_${wk}.json" -o "/tmp/${wk}.json"; then ok=1; else echo '[]' > "/tmp/${wk}.json"; fi
           done
           [ "$ok" = 1 ] || { echo "fetch failed"; exit 0; }
-          jq -s 'add | map(select(.impact == "High"))
-                 | map({date, c: .country, title, forecast, previous})
+          jq -s 'add | map(select(.country == "USD" and (.impact == "High" or .impact == "Medium")))
+                 | map({date, c: .country, i: (if .impact == "High" then "H" else "M" end), title, forecast, previous})
                  | unique_by([.date, .c, .title]) | sort_by(.date)' /tmp/thisweek.json /tmp/nextweek.json > /tmp/high.json
           jq -n --slurpfile ev /tmp/high.json '{source: "Forex Factory", events: $ev[0]}' > news.json
           cat news.json | head -c 600

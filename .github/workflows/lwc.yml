@@ -1,0 +1,12 @@
+name: tmp-lwc
+on: { push: { branches: [tmp-lwc] } }
+permissions: { contents: write }
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          curl -fsSL https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js -o lwc.js
+          git config user.name bot; git config user.email bot@x
+          git rm -q .github/workflows/lwc.yml; git add lwc.js; git commit -qm lwc; git push

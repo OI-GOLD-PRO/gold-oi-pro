@@ -1,29 +1,15 @@
 {
-  "source": "Forex Factory",
+  "source": "Forex Factory + FXStreet (actual)",
   "events": [
-    {
-      "date": "2026-10-14T08:30:00-04:00",
-      "c": "USD",
-      "i": "H",
-      "title": "CPI m/m",
-      "forecast": "0.6%",
-      "previous": "0.4%"
-    },
-    {
-      "date": "2026-10-14T08:30:00-04:00",
-      "c": "USD",
-      "i": "H",
-      "title": "CPI y/y",
-      "forecast": "3.6%",
-      "previous": "3.4%"
-    },
     {
       "date": "2026-10-14T08:30:00-04:00",
       "c": "USD",
       "i": "H",
       "title": "Core CPI m/m",
       "forecast": "0.2%",
-      "previous": "0.3%"
+      "previous": "0.3%",
+      "actual": "0.3%",
+      "better": true
     },
     {
       "date": "2026-10-14T08:30:00-04:00",
@@ -31,7 +17,29 @@
       "i": "H",
       "title": "Core CPI y/y",
       "forecast": "2.5%",
-      "previous": "2.4%"
+      "previous": "2.4%",
+      "actual": "2.6%",
+      "better": true
+    },
+    {
+      "date": "2026-10-14T08:30:00-04:00",
+      "c": "USD",
+      "i": "H",
+      "title": "CPI m/m",
+      "forecast": "0.6%",
+      "previous": "0.4%",
+      "actual": "0.6%",
+      "better": null
+    },
+    {
+      "date": "2026-10-14T08:30:00-04:00",
+      "c": "USD",
+      "i": "H",
+      "title": "CPI y/y",
+      "forecast": "3.6%",
+      "previous": "3.4%",
+      "actual": "3.7%",
+      "better": true
     },
     {
       "date": "2026-10-15T08:30:00-04:00",
@@ -60,18 +68,18 @@
     {
       "date": "2026-10-15T08:30:00-04:00",
       "c": "USD",
-      "i": "M",
-      "title": "Philly Fed Manufacturing Index",
-      "forecast": "28.2",
-      "previous": "37.8"
-    },
-    {
-      "date": "2026-10-15T08:30:00-04:00",
-      "c": "USD",
       "i": "H",
       "title": "Retail Sales m/m",
       "forecast": "0.3%",
       "previous": "1.2%"
+    },
+    {
+      "date": "2026-10-15T08:30:00-04:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Philly Fed Manufacturing Index",
+      "forecast": "28.2",
+      "previous": "37.8"
     },
     {
       "date": "2026-10-15T08:30:00-04:00",

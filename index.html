@@ -78,6 +78,13 @@
   .tfs { display: flex; gap: 3px; padding: 0 14px 6px; }
   .tfs button { flex: 1; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 3px 0; font: 600 10.5px var(--mono); }
   .tfs button.on { background: var(--gold); border-color: var(--gold); color: #1a1405; }
+  .tfs button#indBtn { flex: none; padding: 3px 9px; font-style: italic; }
+  .tfs button#indBtn.has { border-color: var(--gold); color: var(--gold); }
+  #indMenu { position: absolute; right: 8px; top: 6px; z-index: 6; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: grid; gap: 5px; box-shadow: 0 6px 20px rgba(0,0,0,.45); min-width: 170px; }
+  #indMenu .t { font: 600 11px var(--sans); color: var(--muted); padding: 0 2px 2px; }
+  #indMenu button { display: flex; align-items: center; gap: 8px; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 7px; padding: 6px 9px; font: 600 12px var(--mono); text-align: left; }
+  #indMenu button i { width: 14px; height: 3px; border-radius: 2px; flex: none; }
+  #indMenu button.on { color: var(--fg); border-color: var(--gold); background: rgba(224,180,76,.12); }
   #wrap { position: relative; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
   #chart, #ov { position: absolute; inset: 0; }
   #ov { pointer-events: none; z-index: 2; }
@@ -122,12 +129,14 @@
     <button data-tf="1h">H1</button>
     <button data-tf="4h">H4</button>
     <button data-tf="1d">D1</button>
+    <button id="indBtn" aria-label="เลือกอินดิเคเตอร์">ƒx</button>
   </div>
   <div id="wrap">
     <div id="chart"></div>
     <canvas id="ov"></canvas>
     <div id="tip" hidden></div>
     <div id="toast" hidden></div>
+    <div id="indMenu" hidden></div>
     <div id="msg">กำลังโหลดกราฟ…</div>
   </div>
   <div class="legend">
@@ -143,7 +152,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.5.02';
+  const APP_VER = '1.6.00';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -387,7 +396,8 @@
     const plotW = chart.timeScale().width();
     const plotH = h - chart.timeScale().height();
     const barMax = Math.min(plotW * 0.32, 150);
-    const pts = oi.rows.map(r => ({ r, y: series.priceToCoordinate(r.price) })).filter(o => o.y !== null && o.y > 2 && o.y < plotH - 2);
+    const yMax = plotH * (1 - oscFrac) - 2;
+    const pts = oi.rows.map(r => ({ r, y: series.priceToCoordinate(r.price) })).filter(o => o.y !== null && o.y > 2 && o.y < yMax);
     if (!pts.length) return;
     let gap = Infinity;
     for (let i = 1; i < pts.length; i++) gap = Math.min(gap, Math.abs(pts[i].y - pts[i - 1].y));
@@ -922,7 +932,7 @@
   }
   function applyAdj(next) {
     adj = Math.round(next * 100) / 100; adjSet = true; adjAt = new Date();
-    if (rawBars.length) { try { series.setData(rawBars.map(toBar)); } catch (e) {} }
+    if (rawBars.length) { try { series.setData(rawBars.map(toBar)); } catch (e) {} indRefresh(); }
     if (rawClose !== null) lastClose = rawClose - adj;
     dirty = true; showPrice(); paintOff();
     if (typeof resetArming === 'function' && lastClose !== null) resetArming(lastClose);
@@ -1001,6 +1011,7 @@
         rawBars = rows;
         const bars = rows.map(toBar);
         series.setData(bars);
+        indRefresh();
         rawClose = rows[rows.length - 1][4];
         lastClose = rawClose - adj;
         lastBarTime = bars[bars.length - 1].time;
@@ -1044,11 +1055,116 @@
         } catch (e) {}
       });
       showPrice();
+      indTick();
       checkAlerts(lastClose);
     };
     ws.onclose = () => { clearInterval(pingTimer); $('dot').classList.remove('live'); wsTimer = setTimeout(openWS, 3000); };
     ws.onerror = () => { try { ws.close(); } catch (e) {} };
   }
+
+  // ---------- อินดิเคเตอร์พื้นฐาน (กดปุ่ม ƒx เลือกเปิด/ปิด จำค่าไว้ในเครื่อง) ----------
+  // คำนวณจากแท่งที่แสดงบนกราฟ (สเกล GC หลังบวก offset)
+  const IND = [
+    { id: 'ema20', name: 'EMA 20', col: '#f5d76e' },
+    { id: 'ema50', name: 'EMA 50', col: '#4fc3f7' },
+    { id: 'ema200', name: 'EMA 200', col: '#ba68c8' },
+    { id: 'bb', name: 'Bollinger 20,2', col: '#90a4ae' },
+    { id: 'rsi', name: 'RSI 14', col: '#ffb74d', osc: true },
+    { id: 'macd', name: 'MACD 12,26,9', col: '#4fc3f7', osc: true },
+  ];
+  let indOn = {};
+  try { indOn = JSON.parse(localStorage.getItem('oi_ind') || '{}') || {}; } catch (e) { indOn = {}; }
+  const indSeries = {};
+  let oscFrac = 0; // สัดส่วนความสูงล่างที่ออสซิลเลเตอร์ใช้ (ไม่วาดแท่ง OI ทับ)
+  const lineOpt = (col, extra) => Object.assign({ color: col, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }, extra || {});
+  function emaArr(v, n) { const k = 2 / (n + 1), out = []; let e = null; v.forEach((x, i) => { e = e === null ? x : x * k + e * (1 - k); out.push(i >= n - 1 ? e : null); }); return out; }
+  function ensureSeries() {
+    const want = new Set();
+    IND.forEach(d => { if (indOn[d.id]) want.add(d.id); });
+    // ล้างซีรีส์ของอินดิเคเตอร์ที่ปิด
+    Object.keys(indSeries).forEach(id => { if (!want.has(id)) { indSeries[id].forEach(sr => chart.removeSeries(sr)); delete indSeries[id]; } });
+    const add = (o) => chart.addLineSeries(o);
+    if (want.has('ema20') && !indSeries.ema20) indSeries.ema20 = [add(lineOpt('#f5d76e'))];
+    if (want.has('ema50') && !indSeries.ema50) indSeries.ema50 = [add(lineOpt('#4fc3f7'))];
+    if (want.has('ema200') && !indSeries.ema200) indSeries.ema200 = [add(lineOpt('#ba68c8', { lineWidth: 2 }))];
+    if (want.has('bb') && !indSeries.bb) indSeries.bb = [add(lineOpt('#90a4ae', { lineStyle: 2 })), add(lineOpt('#90a4ae', { lineStyle: 0 })), add(lineOpt('#90a4ae', { lineStyle: 2 }))];
+    // ออสซิลเลเตอร์อยู่ด้านล่างของกราฟ แยกสเกลราคา
+    const oscs = ['rsi', 'macd'].filter(id => want.has(id));
+    const H = 0.17, gapB = 0.05;
+    oscs.forEach((id, i) => {
+      const bottom = gapB + (oscs.length - 1 - i) * (H + 0.01), top = 1 - bottom - H;
+      if (!indSeries[id]) {
+        if (id === 'rsi') indSeries.rsi = [add(lineOpt('#ffb74d', { priceScaleId: 'rsi', lastValueVisible: true, priceFormat: { type: 'price', precision: 1, minMove: 0.1 } }))];
+        else indSeries.macd = [
+          chart.addHistogramSeries({ priceScaleId: 'macd', priceLineVisible: false, lastValueVisible: false, priceFormat: { type: 'price', precision: 2, minMove: 0.01 } }),
+          add(lineOpt('#4fc3f7', { priceScaleId: 'macd', lastValueVisible: true })), add(lineOpt('#ff8a65', { priceScaleId: 'macd' }))];
+      }
+      chart.priceScale(id).applyOptions({ scaleMargins: { top, bottom }, borderVisible: false });
+    });
+    if (indSeries.rsi && !indSeries.rsi.lines) {
+      indSeries.rsi.lines = [70, 30].map(v => indSeries.rsi[0].createPriceLine({ price: v, color: 'rgba(255,183,77,.45)', lineWidth: 1, lineStyle: 2, axisLabelVisible: false }));
+    }
+    // ย่อพื้นที่แท่งเทียนเมื่อมีออสซิลเลเตอร์
+    const bot = oscs.length ? gapB + oscs.length * (H + 0.01) + 0.02 : 0.08;
+    chart.priceScale('right').applyOptions({ scaleMargins: { top: .08, bottom: bot } });
+    oscFrac = oscs.length ? bot - 0.02 : 0;
+    $('indBtn').classList.toggle('has', want.size > 0);
+  }
+  function indRefresh() {
+    try {
+      ensureSeries();
+      if (!rawBars.length || !Object.keys(indSeries).length) { dirty = true; return; }
+      const bars = rawBars.map(toBar), T = bars.map(b => b.time), C = bars.map(b => b.close);
+      const line = (arr) => arr.map((v, i) => v === null || !isFinite(v) ? { time: T[i] } : { time: T[i], value: v });
+      if (indSeries.ema20) indSeries.ema20[0].setData(line(emaArr(C, 20)));
+      if (indSeries.ema50) indSeries.ema50[0].setData(line(emaArr(C, 50)));
+      if (indSeries.ema200) indSeries.ema200[0].setData(line(emaArr(C, 200)));
+      if (indSeries.bb) {
+        const n = 20, up = [], mid = [], lo = [];
+        C.forEach((_, i) => {
+          if (i < n - 1) { up.push(null); mid.push(null); lo.push(null); return; }
+          const w = C.slice(i - n + 1, i + 1), m = w.reduce((a, b) => a + b, 0) / n;
+          const sd = Math.sqrt(w.reduce((a, b) => a + (b - m) * (b - m), 0) / n);
+          up.push(m + 2 * sd); mid.push(m); lo.push(m - 2 * sd);
+        });
+        indSeries.bb[0].setData(line(up)); indSeries.bb[1].setData(line(mid)); indSeries.bb[2].setData(line(lo));
+      }
+      if (indSeries.rsi) {
+        const n = 14, out = [null]; let ag = 0, al = 0;
+        for (let i = 1; i < C.length; i++) {
+          const d = C[i] - C[i - 1], g = Math.max(d, 0), l = Math.max(-d, 0);
+          if (i <= n) { ag += g / n; al += l / n; out.push(i === n ? (al === 0 ? 100 : 100 - 100 / (1 + ag / al)) : null); }
+          else { ag = (ag * (n - 1) + g) / n; al = (al * (n - 1) + l) / n; out.push(al === 0 ? 100 : 100 - 100 / (1 + ag / al)); }
+        }
+        indSeries.rsi[0].setData(line(out));
+      }
+      if (indSeries.macd) {
+        const e12 = emaArr(C, 12), e26 = emaArr(C, 26);
+        const mac = C.map((_, i) => e12[i] !== null && e26[i] !== null ? e12[i] - e26[i] : null);
+        const first = mac.findIndex(v => v !== null);
+        const sig = mac.map(() => null);
+        if (first >= 0) emaArr(mac.slice(first), 9).forEach((v, j) => { sig[first + j] = v; });
+        indSeries.macd[0].setData(mac.map((v, i) => v === null || sig[i] === null ? { time: T[i] } : { time: T[i], value: v - sig[i], color: v - sig[i] >= 0 ? 'rgba(38,166,154,.55)' : 'rgba(239,83,80,.55)' }));
+        indSeries.macd[1].setData(line(mac)); indSeries.macd[2].setData(line(sig));
+      }
+      dirty = true;
+    } catch (e) { console.warn('indicator', e); }
+  }
+  // ราคาเปลี่ยนจาก websocket: คำนวณใหม่ไม่เกินวินาทีละครั้ง
+  let indT = 0;
+  function indTick() { if (!Object.keys(indSeries).length) return; const n = Date.now(); if (n - indT < 1000) return; indT = n; indRefresh(); }
+  function paintIndMenu() {
+    $('indMenu').innerHTML = '<div class="t">อินดิเคเตอร์</div>' + IND.map(d => `<button data-ind="${d.id}" class="${indOn[d.id] ? 'on' : ''}"><i style="background:${d.col}"></i>${d.name}</button>`).join('');
+  }
+  $('indBtn').addEventListener('click', e => { e.stopPropagation(); const m = $('indMenu'); m.hidden = !m.hidden; if (!m.hidden) paintIndMenu(); });
+  $('indMenu').addEventListener('click', e => {
+    e.stopPropagation();
+    const b = e.target.closest('button[data-ind]'); if (!b) return;
+    indOn[b.dataset.ind] = !indOn[b.dataset.ind];
+    try { localStorage.setItem('oi_ind', JSON.stringify(indOn)); } catch (err) {}
+    paintIndMenu(); indRefresh();
+  });
+  document.addEventListener('click', e => { if (!$('indMenu').hidden && !e.target.closest('#indMenu') && !e.target.closest('#indBtn')) $('indMenu').hidden = true; });
 
   // ราคา XAUUSD จริงจากแหล่งที่ดึงกราฟ (ก่อนบวก offset)
   function paintRaw() {
@@ -1091,7 +1207,7 @@
     $('clock').textContent = d.toLocaleTimeString('th-TH', { hour12: false, timeZone: 'Asia/Bangkok' }) + ' น.';
   }, 1000);
 
-  $('tfs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) loadTF(b.dataset.tf); });
+  $('tfs').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.tf) loadTF(b.dataset.tf); });
   $('reload').addEventListener('click', loadSheet);
 
   // ---------- เข้าสู่ระบบด้วยรหัสผ่าน (ตรวจกับแท็บ users ในชีตผ่าน Apps Script) ----------

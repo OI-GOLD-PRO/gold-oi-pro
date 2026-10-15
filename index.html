@@ -143,7 +143,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.5.00';
+  const APP_VER = '1.5.01';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -288,7 +288,7 @@
 
   // ---------- แกนราคา spot (ปัดแกนราคาขวาไปทางซ้ายเพื่อเปิด ปัดกลับเพื่อปิด) ----------
   // ราคา spot = ราคา XAUUSD ของแหล่งกราฟก่อนบวก offset = ราคาบนกราฟ + adj
-  let spotAxisOn = false;
+  let spotAxisOn = false, spotW = 80;
   try { spotAxisOn = localStorage.getItem('oi_spotaxis') === '1'; } catch (e) {}
   function niceStep(range, n) {
     const raw = range / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
@@ -302,6 +302,7 @@
     if (top === null || bot === null) return;
     ctx.font = `11px ${C('--mono')}`;
     const aw = Math.ceil(ctx.measureText('0000.00').width) + 12, x0 = plotW - aw;
+    spotW = aw;
     ctx.globalAlpha = 0.94; ctx.fillStyle = C('--panel'); ctx.fillRect(x0, 0, aw, plotH);
     ctx.globalAlpha = 1; ctx.strokeStyle = C('--gold'); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x0 + .5, 0); ctx.lineTo(x0 + .5, plotH); ctx.stroke();
@@ -359,9 +360,10 @@
     const bars = Math.round(bl - meas.al);
     const mins = Math.abs(bars) * (tfSec[tf] || 60) / 60;
     const dur = mins >= 1440 ? (mins / 1440).toFixed(1).replace(/\.0$/, '') + ' วัน' : mins >= 60 ? Math.floor(mins / 60) + ' ชม.' + (mins % 60 ? ' ' + Math.round(mins % 60) + ' น.' : '') : Math.round(mins) + ' นาที';
-    const lines = [`${up ? '+' : '−'}${Math.abs(d).toFixed(2)} $  (${up ? '+' : '−'}${Math.abs(d / meas.ap * 100).toFixed(2)}%)`, `${Math.abs(bars)} แท่ง · ${dur}`, `${meas.ap.toFixed(2)} → ${bp.toFixed(2)}`];
+    const pts = Math.round(Math.abs(d) * 100); // ทอง 2 ทศนิยม: $1 = 100 จุด
+    const lines = [`${up ? '+' : '−'}${Math.abs(d).toFixed(2)} $  (${up ? '+' : '−'}${Math.abs(d / meas.ap * 100).toFixed(2)}%)`, `${up ? '+' : '−'}${pts.toLocaleString('en-US')} จุด`, `${Math.abs(bars)} แท่ง · ${dur}`, `${meas.ap.toFixed(2)} → ${bp.toFixed(2)}`];
     ctx.font = `bold 12px ${C('--mono')}`;
-    const tw = Math.max(...lines.map(s => ctx.measureText(s).width)) + 16, th = 54;
+    const tw = Math.max(...lines.map(s => ctx.measureText(s).width)) + 16, th = 70;
     let tx = meas.bx - tw / 2, ty = up ? meas.by - th - 34 : meas.by + 34;
     tx = Math.max(4, Math.min(ts.width() - tw - 4, tx)); ty = Math.max(4, Math.min(plotH - th - 4, ty));
     ctx.globalAlpha = .95; ctx.fillStyle = col;
@@ -369,7 +371,9 @@
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(lines[0], tx + tw / 2, ty + 11);
     ctx.font = `11px ${C('--mono')}`;
-    ctx.fillText(lines[1], tx + tw / 2, ty + 27); ctx.fillText(lines[2], tx + tw / 2, ty + 43);
+    ctx.font = `bold 11px ${C('--mono')}`; ctx.fillText(lines[1], tx + tw / 2, ty + 27);
+    ctx.font = `11px ${C('--mono')}`;
+    ctx.fillText(lines[2], tx + tw / 2, ty + 43); ctx.fillText(lines[3], tx + tw / 2, ty + 59);
     ctx.textAlign = 'left'; ctx.globalAlpha = 1;
   }
   function barSp() {
@@ -770,8 +774,8 @@
       const p = ptOf(t);
       if (!g1) {
         clearTimeout(measClear); if (meas) { meas = null; dirty = true; }
-        const axisX = chart.timeScale().width() - (spotAxisOn ? 80 : 0);
-        g1 = { id: t.identifier, x0: p.x, y0: p.y, x: p.x, y: p.y, axis: p.x >= axisX, moved: false };
+        const pw = chart.timeScale().width(), axisX = pw - (spotAxisOn ? spotW : 0);
+        g1 = { id: t.identifier, x0: p.x, y0: p.y, x: p.x, y: p.y, axis: p.x >= axisX, inSpot: spotAxisOn && p.x >= axisX && p.x < pw, moved: false, t0: Date.now() };
         clearTimeout(lpTimer);
         if (!g1.axis) lpTimer = setTimeout(() => { if (g1 && !g1.moved) startMeasure(g1); }, LONG_MS);
       } else if (meas && meas.bId === null && t.identifier !== g1.id) {
@@ -785,6 +789,10 @@
       if (g1 && t.identifier === g1.id) {
         g1.x = p.x; g1.y = p.y;
         if (Math.hypot(p.x - g1.x0, p.y - g1.y0) > MOVE_TOL) { g1.moved = true; if (!meas) clearTimeout(lpTimer); }
+        if (meas) { // นิ้วแรกขยับ = ย้ายจุดเริ่มตามนิ้ว
+          const ap = series.coordinateToPrice(p.y), al = chart.timeScale().coordinateToLogical(p.x);
+          if (ap !== null && al !== null) { meas.ap = ap; meas.al = al; meas.ax = p.x; meas.ay = p.y; dirty = true; }
+        }
       } else if (meas && t.identifier === meas.bId) {
         meas.bx = p.x; meas.by = p.y; dirty = true;
       }
@@ -798,6 +806,7 @@
         // ปัดแนวนอนบนแกนราคาขวา: ซ้าย = เปิดแกน spot, ขวา = ปิด
         const dx = g1.x - g1.x0, dy = g1.y - g1.y0;
         if (g1.axis && !meas && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) setSpotAxis(dx < 0);
+        else if (g1.inSpot && !g1.moved && Date.now() - g1.t0 < 400) setSpotAxis(false); // แตะแถบ SPOT 1 ครั้ง = ปิด
         g1 = null;
         if (meas) endMeasure(6000);
       } else if (meas && t.identifier === meas.bId) {

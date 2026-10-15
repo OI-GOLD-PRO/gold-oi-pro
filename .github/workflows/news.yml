@@ -1,11 +1,12 @@
-# ดึงข่าว USD ระดับแดง (High) และส้ม (Medium) จาก Forex Factory ทุกชั่วโมง แล้วบันทึกเป็น news.json ให้หน้าแอปอ่าน
+# ดึงข่าว USD แดง/ส้มจาก Forex Factory + ผลข่าวจริงจาก FXStreet ทุก 5 นาที บันทึกเป็น news.json
+# ราคา GC จาก Yahoo ดึงชั่วโมงละครั้ง (ข้ามถ้า gc.json ยังอายุไม่ถึง 55 นาที)
 name: ff-news
 on:
   schedule:
-    - cron: '7 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
   push:
-    paths: ['.github/workflows/news.yml']
+    paths: ['.github/workflows/news.yml', 'scripts/news.py']
 permissions:
   contents: write
 concurrency: ff-news
@@ -14,22 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch Forex Factory calendar
-        run: |
-          set -e
-          ok=0
-          for wk in thisweek nextweek; do
-            if curl -fsSL -A 'Mozilla/5.0 (oi-gold news bot)' "https://nfs.faireconomy.media/ff_calendar_${wk}.json" -o "/tmp/${wk}.json"; then ok=1; else echo '[]' > "/tmp/${wk}.json"; fi
-          done
-          [ "$ok" = 1 ] || { echo "fetch failed"; exit 0; }
-          jq -s 'add | map(select(.country == "USD" and (.impact == "High" or .impact == "Medium")))
-                 | map({date, c: .country, i: (if .impact == "High" then "H" else "M" end), title, forecast, previous})
-                 | unique_by([.date, .c, .title]) | sort_by(.date)' /tmp/thisweek.json /tmp/nextweek.json > /tmp/high.json
-          jq -n --slurpfile ev /tmp/high.json '{source: "Forex Factory", events: $ev[0]}' > news.json
-          cat news.json | head -c 600
+      - name: Fetch news (Forex Factory) + actual results (FXStreet)
+        run: python3 scripts/news.py
       - name: Fetch GC futures 5m history (Yahoo)
         run: |
           set +e
+          age=$(( $(date +%s) - $(jq -r '.updated // 0' gc.json 2>/dev/null || echo 0) ))
+          if [ "$age" -lt 3300 ]; then echo "gc.json fresh (${age}s), skip"; exit 0; fi
           for host in query1 query2; do
             curl -fsSL -A 'Mozilla/5.0' "https://${host}.finance.yahoo.com/v8/finance/chart/GC=F?interval=5m&range=5d" -o /tmp/gc.json && break
           done

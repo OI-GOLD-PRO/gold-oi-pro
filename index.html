@@ -143,7 +143,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.4.00';
+  const APP_VER = '1.5.00';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -281,6 +281,103 @@
     ctx.clearRect(0, 0, w, h);
     drawSessions(w, h);
     drawNews(w, h);
+    drawOIBars(w, h);
+    drawSpotAxis(w, h);
+    drawMeasure(w, h);
+  }
+
+  // ---------- แกนราคา spot (ปัดแกนราคาขวาไปทางซ้ายเพื่อเปิด ปัดกลับเพื่อปิด) ----------
+  // ราคา spot = ราคา XAUUSD ของแหล่งกราฟก่อนบวก offset = ราคาบนกราฟ + adj
+  let spotAxisOn = false;
+  try { spotAxisOn = localStorage.getItem('oi_spotaxis') === '1'; } catch (e) {}
+  function niceStep(range, n) {
+    const raw = range / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
+    for (const m of [1, 2, 2.5, 5, 10]) if (raw <= m * p) return m * p;
+    return 10 * p;
+  }
+  function drawSpotAxis(w, h) {
+    if (!spotAxisOn || !rawBars.length) return;
+    const plotW = chart.timeScale().width(), plotH = h - chart.timeScale().height();
+    const top = series.coordinateToPrice(0), bot = series.coordinateToPrice(plotH);
+    if (top === null || bot === null) return;
+    ctx.font = `11px ${C('--mono')}`;
+    const aw = Math.ceil(ctx.measureText('0000.00').width) + 12, x0 = plotW - aw;
+    ctx.globalAlpha = 0.94; ctx.fillStyle = C('--panel'); ctx.fillRect(x0, 0, aw, plotH);
+    ctx.globalAlpha = 1; ctx.strokeStyle = C('--gold'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0 + .5, 0); ctx.lineTo(x0 + .5, plotH); ctx.stroke();
+    const sTop = top + adj, sBot = bot + adj, step = niceStep(sTop - sBot, Math.max(3, plotH / 45));
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = C('--fg');
+    for (let v = Math.ceil(sBot / step) * step; v <= sTop; v += step) {
+      const y = series.priceToCoordinate(v - adj);
+      if (y === null || y < 22 || y > plotH - 8) continue;
+      ctx.globalAlpha = .55; ctx.beginPath(); ctx.moveTo(x0, Math.round(y) + .5); ctx.lineTo(x0 + 4, Math.round(y) + .5); ctx.stroke();
+      ctx.globalAlpha = .85; ctx.fillText(v.toFixed(2), x0 + 6, y);
+    }
+    ctx.globalAlpha = 1;
+    // ราคาล่าสุด
+    if (rawClose !== null && lastClose !== null) {
+      const y = series.priceToCoordinate(lastClose);
+      if (y !== null && y > 0 && y < plotH) {
+        ctx.fillStyle = C('--gold'); ctx.fillRect(x0 + 1, y - 8, aw - 1, 16);
+        ctx.fillStyle = '#000'; ctx.fillText(rawClose.toFixed(2), x0 + 6, y + .5);
+      }
+    }
+    ctx.fillStyle = C('--gold'); ctx.font = `bold 10px ${C('--mono')}`; ctx.textAlign = 'center';
+    ctx.fillText('SPOT', x0 + aw / 2, 9);
+    ctx.textAlign = 'left';
+  }
+  function setSpotAxis(on) {
+    if (spotAxisOn === on) return;
+    spotAxisOn = on; dirty = true;
+    try { localStorage.setItem('oi_spotaxis', on ? '1' : '0'); } catch (e) {}
+  }
+
+  // ---------- วัดระยะ: นิ้วแรกแตะค้าง แล้วนิ้วที่สองแตะค้าง/ลากเพื่อวัด ----------
+  let meas = null; // {ax, ay, ap, al, bx, by, armed}
+  function drawMeasure(w, h) {
+    if (!meas) return;
+    const ts = chart.timeScale(), plotH = h - ts.height();
+    const ay = series.priceToCoordinate(meas.ap), ax = ts.logicalToCoordinate(Math.round(meas.al));
+    const axx = ax === null ? meas.ax : ax + (meas.al - Math.round(meas.al)) * barSp();
+    const ayy = ay === null ? meas.ay : ay;
+    ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(axx, ayy, 5, 0, Math.PI * 2); ctx.globalAlpha = .9; ctx.stroke();
+    ctx.setLineDash([3, 3]); ctx.globalAlpha = .4;
+    ctx.beginPath(); ctx.moveTo(0, Math.round(ayy) + .5); ctx.lineTo(ts.width(), Math.round(ayy) + .5); ctx.stroke();
+    ctx.setLineDash([]);
+    if (meas.bx === null) { ctx.globalAlpha = 1; return; }
+    const bp = series.coordinateToPrice(meas.by), bl = ts.coordinateToLogical(meas.bx);
+    if (bp === null || bl === null) { ctx.globalAlpha = 1; return; }
+    const d = bp - meas.ap, up = d >= 0, col = up ? C('--up') : C('--down');
+    // กล่องพื้นที่ระหว่างสองจุด
+    ctx.globalAlpha = .16; ctx.fillStyle = col;
+    ctx.fillRect(Math.min(axx, meas.bx), Math.min(ayy, meas.by), Math.abs(meas.bx - axx), Math.abs(meas.by - ayy));
+    ctx.globalAlpha = .95; ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(axx, ayy); ctx.lineTo(meas.bx, meas.by); ctx.stroke();
+    ctx.beginPath(); ctx.arc(meas.bx, meas.by, 5, 0, Math.PI * 2); ctx.stroke();
+    // ข้อความ: ระยะราคา, %, จำนวนแท่ง และเวลา
+    const bars = Math.round(bl - meas.al);
+    const mins = Math.abs(bars) * (tfSec[tf] || 60) / 60;
+    const dur = mins >= 1440 ? (mins / 1440).toFixed(1).replace(/\.0$/, '') + ' วัน' : mins >= 60 ? Math.floor(mins / 60) + ' ชม.' + (mins % 60 ? ' ' + Math.round(mins % 60) + ' น.' : '') : Math.round(mins) + ' นาที';
+    const lines = [`${up ? '+' : '−'}${Math.abs(d).toFixed(2)} $  (${up ? '+' : '−'}${Math.abs(d / meas.ap * 100).toFixed(2)}%)`, `${Math.abs(bars)} แท่ง · ${dur}`, `${meas.ap.toFixed(2)} → ${bp.toFixed(2)}`];
+    ctx.font = `bold 12px ${C('--mono')}`;
+    const tw = Math.max(...lines.map(s => ctx.measureText(s).width)) + 16, th = 54;
+    let tx = meas.bx - tw / 2, ty = up ? meas.by - th - 34 : meas.by + 34;
+    tx = Math.max(4, Math.min(ts.width() - tw - 4, tx)); ty = Math.max(4, Math.min(plotH - th - 4, ty));
+    ctx.globalAlpha = .95; ctx.fillStyle = col;
+    ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(tx, ty, tw, th, 6); else ctx.rect(tx, ty, tw, th); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(lines[0], tx + tw / 2, ty + 11);
+    ctx.font = `11px ${C('--mono')}`;
+    ctx.fillText(lines[1], tx + tw / 2, ty + 27); ctx.fillText(lines[2], tx + tw / 2, ty + 43);
+    ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+  }
+  function barSp() {
+    const ts = chart.timeScale(), a = ts.logicalToCoordinate(1), b = ts.logicalToCoordinate(2);
+    return (a !== null && b !== null) ? b - a : 6;
+  }
+
+  function drawOIBars(w, h) {
     if (!oi || oi.offset === null || !oi.rows.length) return;
 
     const plotW = chart.timeScale().width();
@@ -427,6 +524,7 @@
   const GH_OWNER = /\.github\.io$/.test(location.hostname) ? location.hostname.split('.')[0] : 'OI-GOLD-PRO';
   const GH_REPO = (/\.github\.io$/.test(location.hostname) && location.pathname.split('/')[1]) || 'oi-gold';
   const NEWS_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/news.json`;
+  // หมายเหตุ: raw.githubusercontent แคชไฟล์ราว 5 นาที
   let news = [];
   async function loadNews() {
     try {
@@ -435,9 +533,15 @@
       if (!r.ok) return;
       const j = await r.json();
       news = (j.events || []).filter(e => e.c === 'USD').map(e => ({ ...e, i: e.i || 'H', ms: Date.parse(e.date) })).filter(e => isFinite(e.ms)).sort((a, b) => a.ms - b.ms);
-      dirty = true; paintNextNews(); paintSiren();
+      dirty = true; paintNextNews(); paintSiren(); refreshBoard();
     } catch (e) {}
   }
+  // ช่วงหลังข่าวออก (ภายใน 2 ชม.) ที่ยังไม่มีผล: ดึงใหม่ทุก 2 นาที, ปกติทุก 10 นาที
+  function newsPollMs() {
+    const now = Date.now();
+    return news.some(e => e.ms <= now && now - e.ms < 2 * 3600e3 && !e.actual && (e.forecast || e.previous)) ? 120000 : 600000;
+  }
+  function scheduleNews() { setTimeout(() => { if (document.visibilityState === 'visible') loadNews(); scheduleNews(); }, newsPollMs()); }
   // แปลงเวลาข่าวเป็นตำแหน่ง x บนกราฟ (รองรับข่าวในอนาคตที่ยังไม่มีแท่ง)
   function newsX(ms) {
     const sec = tfSec[tf], ts = chart.timeScale();
@@ -496,15 +600,39 @@
     $('siren').classList.toggle('on', soon);
   }
   setInterval(paintSiren, 15000);
-  $('siren').addEventListener('click', () => {
-    if (!$('toast').hidden) { hideToast(); return; } // แตะไซเรนซ้ำ = ปิดกล่องข่าว
-    // ข่าว USD ทั้งสัปดาห์ (จันทร์–อาทิตย์ เวลาไทย) ข่าวที่ผ่านไปแล้วแสดงจาง
+  // ผลข่าว: ตัวเลขจริง + ลูกศรเทียบค่าคาด สีเขียว = ดีต่อ USD, แดง = แย่ต่อ USD (ตาม FXStreet)
+  const numOf = s => { const m = String(s || '').replace(/,/g, '').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
+  function newsResult(e) {
+    if (e.actual) {
+      const a = numOf(e.actual), f = numOf(e.forecast);
+      const arrow = (a !== null && f !== null && a !== f) ? (a > f ? ' ▲' : ' ▼') : '';
+      const col = e.better === true ? '#3ddc84' : e.better === false ? '#ff6b6b' : '#fff';
+      const tag = e.better === true ? ' ดีต่อ USD' : e.better === false ? ' แย่ต่อ USD' : '';
+      return ` · ผล <b style="color:${col}">${esc(e.actual)}${arrow}</b>${tag ? `<span style="color:${col};font-size:11px">${tag}</span>` : ''}`;
+    }
+    if (e.ms <= Date.now() && Date.now() - e.ms < 3 * 3600e3 && (e.forecast || e.previous)) return ' · <span style="opacity:.7">รอผล…</span>';
+    return '';
+  }
+  // กระดานข่าว USD สัปดาห์นี้: ตัดข่าวของวันก่อนหน้าออก (นับวันตามเวลาไทย) ข่าววันนี้ที่ออกแล้วแสดงผล
+  let boardOpen = false;
+  function boardHTML() {
     const d = new Date(Date.now() + 7 * 3600e3), dow = (d.getUTCDay() + 6) % 7;
     const wkStart = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - dow) - 7 * 3600e3, wkEnd = wkStart + 7 * 86400e3;
-    const list = news.filter(e => e.ms >= wkStart && e.ms < wkEnd);
+    const today = thDay(Date.now());
+    const list = news.filter(e => e.ms < wkEnd && thDay(e.ms) >= today);
     const now = Date.now();
-    const rows = list.map(e => `<div style="padding:2px 0;${e.ms < now - 5 * 60000 ? 'opacity:.45' : ''}"><span style="color:${newsCol(e)}">●</span> ${esc(e.title)} · ${newsWhen(e.ms)} น.${e.forecast ? ' <span style="opacity:.7">(คาด ' + esc(e.forecast) + ')</span>' : ''}</div>`).join('');
-    showToast(list.length ? `🚨 ข่าว USD สัปดาห์นี้ <span style="font-size:11px;opacity:.7"><span style="color:#ef4444">●</span> แดง <span style="color:#f59e0b">●</span> ส้ม</span><div style="max-height:52vh;overflow:auto;margin-top:4px">${rows}</div>` : 'สัปดาห์นี้ไม่มีข่าว USD สีแดง/ส้ม', 30000);
+    const rows = list.map(e => `<div style="padding:2px 0;${e.ms < now - 5 * 60000 && !e.actual ? 'opacity:.6' : ''}"><span style="color:${newsCol(e)}">●</span> ${esc(e.title)} · ${newsWhen(e.ms)} น.${e.forecast ? ' <span style="opacity:.7">(คาด ' + esc(e.forecast) + ')</span>' : ''}${newsResult(e)}</div>`).join('');
+    return list.length ? `🚨 ข่าว USD สัปดาห์นี้ <span style="font-size:11px;opacity:.7"><span style="color:#ef4444">●</span> แดง <span style="color:#f59e0b">●</span> ส้ม</span><div id="newsboard" style="max-height:52vh;overflow:auto;margin-top:4px">${rows}</div>` : 'สัปดาห์นี้ไม่มีข่าว USD สีแดง/ส้มที่เหลืออยู่';
+  }
+  function refreshBoard() {
+    if (!boardOpen || $('toast').hidden) { boardOpen = false; return; }
+    const sc = $('newsboard') ? $('newsboard').scrollTop : 0;
+    $('toast').innerHTML = boardHTML() + '<div style="margin-top:6px;font-size:11px;opacity:.6">แตะเพื่อปิด</div>';
+    if ($('newsboard')) $('newsboard').scrollTop = sc;
+  }
+  $('siren').addEventListener('click', () => {
+    if (!$('toast').hidden) { hideToast(); boardOpen = false; return; } // แตะไซเรนซ้ำ = ปิดกล่องข่าว
+    showToast(boardHTML(), 60000); boardOpen = true;
   });
   // ชิปบอกข่าวแดง USD ถัดไป (ข่าวในอนาคตอาจอยู่นอกจอกราฟ)
   function paintNextNews() {
@@ -517,7 +645,7 @@
     el.innerHTML = `<span style="color:${newsCol(nx)}">●</span> ${esc(nx.c)} ${esc(nx.title)}${same > 1 ? ' +' + (same - 1) : ''} <b>${thDay(nx.ms) === thDay(Date.now()) ? 'วันนี้ !! ' + new Date(nx.ms).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' }) : t}</b>`;
     el.hidden = false;
   }
-  setInterval(paintNextNews, 60000);
+  setInterval(() => { paintNextNews(); refreshBoard(); }, 60000);
   function newsHits(px) {
     return news.map(e => ({ e, x: newsX(e.ms) })).filter(o => o.x !== null && Math.abs(o.x - px) <= 12);
   }
@@ -563,7 +691,7 @@
       const hs = newsHits(param.point.x);
       if (hs.length) {
         const fmtT = ms => new Date(ms).toLocaleString('th-TH', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Bangkok' });
-        tip.innerHTML = hs.slice(0, 5).map(({ e }) => `<b>${esc(e.c)}</b> ${esc(e.title)}<br><span style="opacity:.75">${fmtT(e.ms)} น.${e.forecast ? ' · คาด ' + esc(e.forecast) : ''}${e.previous ? ' · ก่อนหน้า ' + esc(e.previous) : ''}</span>`).join('<br>');
+        tip.innerHTML = hs.slice(0, 5).map(({ e }) => `<b>${esc(e.c)}</b> ${esc(e.title)}<br><span style="opacity:.75">${fmtT(e.ms)} น.${e.forecast ? ' · คาด ' + esc(e.forecast) : ''}${e.previous ? ' · ก่อนหน้า ' + esc(e.previous) : ''}${e.actual ? ' · <b>ผล ' + esc(e.actual) + '</b>' : ''}</span>`).join('<br>');
         tip.hidden = false; return;
       }
     }
@@ -610,12 +738,75 @@
 
   // กล่องข้อความ: แตะที่กล่องหรือที่กราฟเพื่อปิด, ปิดเองหลัง ms (ค่าเริ่ม 8 วินาที)
   function showToast(html, ms) {
+    boardOpen = false;
     const el = $('toast'); el.innerHTML = html + '<div style="margin-top:6px;font-size:11px;opacity:.6">แตะเพื่อปิด</div>'; el.hidden = false;
     clearTimeout(showToast.t); showToast.t = setTimeout(hideToast, ms || 8000);
   }
   function hideToast() { clearTimeout(showToast.t); $('toast').hidden = true; }
   $('toast').addEventListener('click', hideToast);
   chartEl.addEventListener('pointerdown', () => { if (!$('toast').hidden) hideToast(); });
+
+  // ---------- ท่าทางสัมผัส: ปัดแกนราคา (เปิด/ปิดแกน spot) และวัดระยะสองนิ้ว ----------
+  const LONG_MS = 450, MOVE_TOL = 10;
+  let g1 = null, lpTimer = null, measClear = null;
+  const ptOf = t => { const r = chartEl.getBoundingClientRect(); return { x: t.clientX - r.left, y: t.clientY - r.top }; };
+  const lockChart = on => chart.applyOptions({ handleScroll: !on, handleScale: !on });
+  function startMeasure(p) {
+    const ap = series.coordinateToPrice(p.y), al = chart.timeScale().coordinateToLogical(p.x);
+    if (ap === null || al === null) return;
+    meas = { ap, al, ax: p.x, ay: p.y, bx: null, by: null, bId: null };
+    lockChart(true); dirty = true;
+    try { navigator.vibrate && navigator.vibrate(15); } catch (e) {}
+  }
+  function endMeasure(keepMs) {
+    lockChart(false);
+    clearTimeout(measClear);
+    if (meas && meas.bx !== null && keepMs) { measClear = setTimeout(() => { meas = null; dirty = true; }, keepMs); }
+    else { meas = null; }
+    dirty = true;
+  }
+  chartEl.addEventListener('touchstart', e => {
+    for (const t of e.changedTouches) {
+      const p = ptOf(t);
+      if (!g1) {
+        clearTimeout(measClear); if (meas) { meas = null; dirty = true; }
+        const axisX = chart.timeScale().width() - (spotAxisOn ? 80 : 0);
+        g1 = { id: t.identifier, x0: p.x, y0: p.y, x: p.x, y: p.y, axis: p.x >= axisX, moved: false };
+        clearTimeout(lpTimer);
+        if (!g1.axis) lpTimer = setTimeout(() => { if (g1 && !g1.moved) startMeasure(g1); }, LONG_MS);
+      } else if (meas && meas.bId === null && t.identifier !== g1.id) {
+        meas.bId = t.identifier; meas.bx = p.x; meas.by = p.y; dirty = true;
+      }
+    }
+  }, { passive: true, capture: true });
+  chartEl.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) {
+      const p = ptOf(t);
+      if (g1 && t.identifier === g1.id) {
+        g1.x = p.x; g1.y = p.y;
+        if (Math.hypot(p.x - g1.x0, p.y - g1.y0) > MOVE_TOL) { g1.moved = true; if (!meas) clearTimeout(lpTimer); }
+      } else if (meas && t.identifier === meas.bId) {
+        meas.bx = p.x; meas.by = p.y; dirty = true;
+      }
+    }
+    if (meas) e.preventDefault();
+  }, { passive: false, capture: true });
+  const touchEnd = e => {
+    for (const t of e.changedTouches) {
+      if (g1 && t.identifier === g1.id) {
+        clearTimeout(lpTimer);
+        // ปัดแนวนอนบนแกนราคาขวา: ซ้าย = เปิดแกน spot, ขวา = ปิด
+        const dx = g1.x - g1.x0, dy = g1.y - g1.y0;
+        if (g1.axis && !meas && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) setSpotAxis(dx < 0);
+        g1 = null;
+        if (meas) endMeasure(6000);
+      } else if (meas && t.identifier === meas.bId) {
+        meas.bId = null; // ยกนิ้วที่สอง: ค้างผลไว้ แตะนิ้วที่สองใหม่เพื่อวัดจุดอื่นได้
+      }
+    }
+  };
+  chartEl.addEventListener('touchend', touchEnd, { capture: true });
+  chartEl.addEventListener('touchcancel', touchEnd, { capture: true });
 
   function fire(r, price) {
     hit = { strike: r.strike, until: Date.now() + 60000 }; dirty = true;
@@ -875,7 +1066,7 @@
 
   // กลับมาเปิดแอปจากหน้าจอโฮม: ต่อ websocket ใหม่และเติมแท่งที่ขาด
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') { if (started) loadTF(tf); if (!oi && authCode) loadSheet(); keepAwake(); try { actx && actx.resume(); } catch (e) {} }
+    if (document.visibilityState === 'visible') { if (started) { loadTF(tf); loadNews(); } if (!oi && authCode) loadSheet(); keepAwake(); try { actx && actx.resume(); } catch (e) {} }
   });
 
   setInterval(() => {
@@ -906,7 +1097,7 @@
     authCode = code; authExpire = expire || null;
     try { localStorage.setItem('oi_code', code); } catch (e) {}
     $('login').hidden = true;
-    if (!started) { started = true; loadTF(tf); loadNews(); setInterval(loadNews, 15 * 60 * 1000); }
+    if (!started) { started = true; loadTF(tf); loadNews(); scheduleNews(); }
     loadSheet();
     if (expire) showToast(`สวัสดี <b>${esc(name || '')}</b> วันนี้คือวันที่ดีสำหรับคุณ<br>${expLabel(expire)} <b>${esc(fmtExpire(expire))}</b>`);
   }

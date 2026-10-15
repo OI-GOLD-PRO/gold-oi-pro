@@ -143,7 +143,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.5.01';
+  const APP_VER = '1.5.02';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -714,7 +714,7 @@
   // ---------- แจ้งเตือนเมื่อราคาเข้าใกล้โซน OI ----------
   const ALERT_MIN_OI = 50;   // เฉพาะ strike ที่ Put หรือ Call มี OI ตั้งแต่ 50
   const ALERT_TOL = 1.5;     // ห่างจากเส้นไม่เกิน $1.5 ถือว่าเข้าโซน
-  const REARM = ALERT_TOL * 3; // ต้องออกห่าง $4.5 ก่อนจึงเตือนโซนเดิมซ้ำ
+  const REARM = 8;          // ต้องออกห่างเส้น $8 (ถือว่าทะลุโซนจริง) ก่อนจึงเตือนโซนเดิมซ้ำ
   let alertsOn = false;
   try { alertsOn = localStorage.getItem('oi_alert') === '1'; } catch (e) {}
   let actx = null, wakeLock = null, hit = null;
@@ -727,16 +727,24 @@
     alertZones().forEach(r => armed.set(r.strike, price === null || Math.abs(price - r.price) > ALERT_TOL));
   }
 
+  // เสียงเตือนดัง: คลื่นสี่เหลี่ยม 2 ความถี่ ผ่านตัวบีบเสียงให้ดังสุด เป็นจังหวะ 2 ชุด ๆ ละ 3 ครั้ง (ราว 2 วินาที)
   function beep() {
     if (!actx) return;
     const t = actx.currentTime;
-    [0, 0.22, 0.44].forEach(d => {
-      const o = actx.createOscillator(), g = actx.createGain();
-      o.frequency.value = 880; o.connect(g); g.connect(actx.destination);
-      g.gain.setValueAtTime(0.0001, t + d);
-      g.gain.exponentialRampToValueAtTime(0.35, t + d + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.18);
-      o.start(t + d); o.stop(t + d + 0.2);
+    const comp = actx.createDynamicsCompressor();
+    comp.threshold.value = -30; comp.knee.value = 0; comp.ratio.value = 12; comp.attack.value = 0.002; comp.release.value = 0.1;
+    const master = actx.createGain(); master.gain.value = 1.0;
+    comp.connect(master); master.connect(actx.destination);
+    [0, 0.18, 0.36, 0.9, 1.08, 1.26].forEach(d => {
+      [1046, 1568].forEach((f, i) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'square'; o.frequency.value = f; o.connect(g); g.connect(comp);
+        g.gain.setValueAtTime(0.0001, t + d);
+        g.gain.exponentialRampToValueAtTime(i ? 0.6 : 1.0, t + d + 0.01);
+        g.gain.setValueAtTime(i ? 0.6 : 1.0, t + d + 0.13);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.15);
+        o.start(t + d); o.stop(t + d + 0.16);
+      });
     });
   }
 

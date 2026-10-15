@@ -1,0 +1,23 @@
+name: news-source-test
+on:
+  push:
+    paths: ['.github/workflows/newstest.yml']
+permissions:
+  contents: write
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set +e
+          UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
+          out=debug_news.txt; : > $out
+          t(){ echo "== $1" >> $out; code=$(curl -sS -o /tmp/r -w '%{http_code}' -A "$UA" "${@:2}"); echo "http $code size $(wc -c </tmp/r)" >> $out; head -c 1500 /tmp/r | tr -d '\000' >> $out; echo >> $out; }
+          t ff_html "https://www.forexfactory.com/calendar?day=oct14.2026"
+          t fxstreet -H 'Referer: https://www.fxstreet.com/' -H 'Origin: https://www.fxstreet.com' "https://calendar-api.fxstreet.com/en/api/v1/eventDates/2026-10-14T00:00:00Z/2026-10-15T00:00:00Z?volatilities=HIGH&countries=US"
+          t myfx "https://www.myfxbook.com/forex-economic-calendar"
+          t te "https://api.tradingeconomics.com/calendar/country/united%20states/2026-10-14/2026-10-14?c=guest:guest&f=json"
+          t nasdaq -H 'Accept: application/json' "https://api.nasdaq.com/api/calendar/economicevents?date=2026-10-14"
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $out; git commit -m "news source test"; git pull --rebase -q; git push

@@ -166,7 +166,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.7.02';
+  const APP_VER = '1.7.03';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -738,6 +738,8 @@
   // ---------- แจ้งเตือนเมื่อราคาเข้าใกล้โซน OI ----------
   const ALERT_MIN_OI = 50;   // เฉพาะ strike ที่ Put หรือ Call มี OI ตั้งแต่ 50
   const ALERT_TOL = 1.5;     // ห่างจากเส้นไม่เกิน $1.5 ถือว่าเข้าโซน
+  const ALERT_ZONE_COOL = 10 * 60000; // โซนเดียวกันเตือนซ้ำได้หลัง 10 นาที
+  const ALERT_ANY_COOL = 60000;        // เว้นอย่างน้อย 60 วินาทีระหว่างการเตือน
   const REARM = 8;          // ต้องออกห่างเส้น $8 (ถือว่าทะลุโซนจริง) ก่อนจึงเตือนโซนเดิมซ้ำ
   let alertsOn = false;
   try { alertsOn = localStorage.getItem('oi_alert') === '1'; } catch (e) {}
@@ -746,12 +748,18 @@
 
   const alertZones = () => (oi && oi.offset !== null) ? oi.rows.filter(r => Math.max(r.p, r.c) >= ALERT_MIN_OI) : [];
 
-  function resetArming(price) {
-    armed.clear();
-    alertZones().forEach(r => armed.set(r.strike, price === null || Math.abs(price - r.price) > ALERT_TOL));
+  // จำสถานะโซนไว้ตลอด: ซิงก์ชีต/ปรับ offset ทุกนาทีจะไม่รีเซ็ตโซนที่เพิ่งเตือนไป
+  // force = true ใช้ตอนกดเปิดกระดิ่งใหม่เท่านั้น
+  const lastFire = new Map();
+  let lastAnyFire = 0;
+  function resetArming(price, force) {
+    const zones = alertZones(), keep = new Set(zones.map(r => r.strike));
+    [...armed.keys()].forEach(k => { if (!keep.has(k)) armed.delete(k); });
+    zones.forEach(r => {
+      if (force || !armed.has(r.strike)) armed.set(r.strike, price === null || Math.abs(price - r.price) > ALERT_TOL);
+    });
   }
 
-  // เสียงเตือนดัง: คลื่นสี่เหลี่ยม 2 ความถี่ ผ่านตัวบีบเสียงให้ดังสุด เป็นจังหวะ 2 ชุด ๆ ละ 3 ครั้ง (ราว 2 วินาที)
   function beep() {
     if (!actx) return;
     const t = actx.currentTime;
@@ -802,7 +810,7 @@
     dirty = true;
   }
   chartEl.addEventListener('touchstart', e => {
-    if (drawTool) return;
+    if (drawTool || clickMeas) return;
     for (const t of e.changedTouches) {
       const p = ptOf(t);
       if (!g1) {
@@ -833,7 +841,7 @@
     if (meas || drawTool) e.preventDefault();
   }, { passive: false, capture: true });
   const touchEnd = e => {
-    if (drawTool) { g1 = null; return; }
+    if (drawTool || clickMeas) { g1 = null; return; }
     for (const t of e.changedTouches) {
       if (g1 && t.identifier === g1.id) {
         clearTimeout(lpTimer);
@@ -864,7 +872,14 @@
     alertZones().forEach(r => {
       const d = Math.abs(price - r.price);
       if (d <= ALERT_TOL) {
-        if (armed.get(r.strike) !== false) { armed.set(r.strike, false); fire(r, price); }
+        if (armed.get(r.strike) !== false) {
+          armed.set(r.strike, false);
+          const now = Date.now();
+          // โซนเดิมเตือนซ้ำได้หลัง 10 นาที และเว้นอย่างน้อย 60 วินาทีระหว่างการเตือนใด ๆ
+          if (now - (lastFire.get(r.strike) || 0) >= ALERT_ZONE_COOL && now - lastAnyFire >= ALERT_ANY_COOL) {
+            lastFire.set(r.strike, now); lastAnyFire = now; fire(r, price);
+          }
+        }
       } else if (d >= REARM) {
         armed.set(r.strike, true);
       }
@@ -884,7 +899,7 @@
     try { localStorage.setItem('oi_alert', alertsOn ? '1' : '0'); } catch (e) {}
     if (alertsOn) {
       try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) {}
-      resetArming(lastClose);
+      resetArming(lastClose, true);
       beep();
       keepAwake();
       showToast(`🔔 เปิดแจ้งเตือนแล้ว: ${alertZones().length} โซน (OI ≥ ${ALERT_MIN_OI}) ห่างเส้นไม่เกิน $${ALERT_TOL} · เปิดแอปค้างไว้เพื่อให้เตือนได้`);
@@ -1255,7 +1270,7 @@
   // เก็บจุดเป็น เวลา + ราคา (สเกล GC) จึงอยู่ตำแหน่งเดิมเมื่อเปลี่ยนไทม์เฟรม/เลื่อนกราฟ
   const DRAW_TOOLS = [
     { k: 'hline', name: '─ แนวนอน' }, { k: 'trend', name: '╱ เทรนด์' }, { k: 'ray', name: '→ เส้นยาว' },
-    { k: 'rect', name: '▭ โซน' }, { k: 'fib', name: 'Fibo' }, { k: 'erase', name: '⌫ ยางลบ' },
+    { k: 'rect', name: '▭ โซน' }, { k: 'fib', name: 'Fibo' }, { k: 'measure', name: '📏 วัดระยะ' }, { k: 'erase', name: '⌫ ยางลบ' },
   ];
   const FIB = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
   let drawings = [];
@@ -1354,7 +1369,7 @@
   function setTool(k) {
     drawTool = k; drawTmp = null;
     lockChart(!!k); paintDrawBar(); $('drawBtn').classList.toggle('has', !!k || drawings.length > 0);
-    if (k) showToast(k === 'erase' ? 'แตะที่เส้นที่ต้องการลบ' : k === 'hline' ? 'แตะที่ราคาที่ต้องการวางเส้น' : 'แตะค้างที่จุดแรก แล้วลากไปจุดที่สอง', 2500);
+    if (k) showToast(k === 'measure' ? 'แตะ/คลิกจุดแรก แล้วแตะ/คลิกจุดที่สอง (คอมใช้ Shift+คลิก ได้เลย · Esc ยกเลิก)' : k === 'erase' ? 'แตะที่เส้นที่ต้องการลบ' : k === 'hline' ? 'แตะที่ราคาที่ต้องการวางเส้น' : 'แตะค้างที่จุดแรก แล้วลากไปจุดที่สอง', 2500);
   }
   $('drawBtn').addEventListener('click', e => {
     e.stopPropagation(); const b = $('drawBar'); b.hidden = !b.hidden; $('indMenu').hidden = true;
@@ -1369,10 +1384,38 @@
     saveDraw(); dirty = true; $('drawBtn').classList.toggle('has', !!drawTool || drawings.length > 0);
   });
   $('drawBtn').classList.toggle('has', drawings.length > 0);
+  // วัดระยะแบบคลิกสองจุด: ใช้กับคอม (Shift+คลิก) หรือเครื่องมือ 📏
+  let clickMeas = false;
+  function measClick(p) {
+    if (!clickMeas) {
+      const ap = series.coordinateToPrice(p.y), al = chart.timeScale().coordinateToLogical(p.x);
+      if (ap === null || al === null) return;
+      clearTimeout(measClear);
+      meas = { ap, al, ax: p.x, ay: p.y, bx: p.x, by: p.y, bId: null };
+      clickMeas = true; lockChart(true); dirty = true;
+    } else {
+      meas.bx = p.x; meas.by = p.y; clickMeas = false;
+      if (drawTool === 'measure') { drawTool = null; paintDrawBar(); }
+      endMeasure(15000);
+    }
+  }
+  chartEl.addEventListener('pointerdown', e => {
+    if (!(clickMeas || drawTool === 'measure' || (e.shiftKey && e.pointerType === 'mouse'))) return;
+    e.preventDefault(); e.stopPropagation();
+    measClick(ptOf(e));
+  }, { capture: true });
+  chartEl.addEventListener('pointermove', e => {
+    if (!clickMeas || !meas) return;
+    const p = ptOf(e); meas.bx = p.x; meas.by = p.y; dirty = true;
+  }, { capture: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { clickMeas = false; if (drawTool) setTool(null); meas = null; lockChart(false); dirty = true; }
+  });
+
   // วาดด้วย pointer (ใช้ได้ทั้งนิ้วและเมาส์)
   let drawPid = null;
   chartEl.addEventListener('pointerdown', e => {
-    if (!drawTool) return;
+    if (!drawTool || drawTool === 'measure') return;
     const p = ptOf(e), q = ptAt(p); if (!q) return;
     e.preventDefault(); e.stopPropagation();
     if (drawTool === 'erase') { const i = hitDrawing(p); if (i >= 0) { drawings.splice(i, 1); saveDraw(); dirty = true; } return; }

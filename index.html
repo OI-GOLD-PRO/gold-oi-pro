@@ -41,6 +41,8 @@
   [hidden] { display: none !important; }
   html, body { height: 100%; height: 100dvh; margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); -webkit-tap-highlight-color: transparent; }
   body { display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); overflow: hidden; }
+  /* เต็มจอจริงบน iPhone (แอปจากหน้าโฮมบางรุ่นคิด 100dvh สั้นกว่าจอ ทำให้มีช่องว่างด้านล่าง) */
+  body { position: fixed; top: 0; left: 0; right: 0; bottom: 0; height: auto; box-sizing: border-box; }
   header { display: flex; align-items: center; gap: 12px; padding: 10px 14px 6px; }
   .sym { display: flex; flex-direction: column; min-width: 0; }
   .sym b { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
@@ -164,11 +166,14 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.7.01';
+  const APP_VER = '1.7.02';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
   const $ = id => document.getElementById(id);
+  // บางเครื่องความสูงจอไม่ตรงกับ CSS: ตั้งความสูง body ตามหน้าต่างจริงทุกครั้งที่หมุนจอ/ปรับขนาด
+  const fitH = () => { document.body.style.height = window.innerHeight + 'px'; };
+  fitH(); window.addEventListener('resize', fitH); window.addEventListener('orientationchange', () => setTimeout(fitH, 300));
   const css = getComputedStyle(document.documentElement);
   const C = k => css.getPropertyValue(k).trim();
 

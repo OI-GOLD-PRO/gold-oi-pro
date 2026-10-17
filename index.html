@@ -92,6 +92,12 @@
   #indMenu label { display: flex; flex-direction: column; font: 9.5px var(--sans); color: var(--muted); }
   #indMenu input { width: 46px; padding: 3px 4px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: 600 12px var(--mono); }
   #indMenu .reset { justify-content: center; font: 600 11px var(--sans); }
+  /* Gold Scalping ในเมนู ƒx */
+  #indMenu .gsbox { display: grid; gap: 5px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  #indMenu .gsbox .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  #indMenu .gsbox .gsb { padding: 5px 8px; font: 600 11px var(--sans); }
+  #indMenu .gsbox .gsinfo { font: 10px var(--sans); color: var(--muted); }
+  #indMenu .gsbox select { padding: 3px 2px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: 600 11px var(--mono); }
   #indMenu { position: absolute; right: 8px; top: 6px; z-index: 6; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: grid; gap: 5px; box-shadow: 0 6px 20px rgba(0,0,0,.45); min-width: 170px; }
   #indMenu .t { font: 600 11px var(--sans); color: var(--muted); padding: 0 2px 2px; }
   #indMenu button { display: flex; align-items: center; gap: 8px; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 7px; padding: 6px 9px; font: 600 12px var(--mono); text-align: left; }
@@ -166,7 +172,7 @@
 (function () {
   const SYMBOL = 'XAUUSDT';
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.7.03';
+  const APP_VER = '1.8.00';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -296,6 +302,7 @@
   // ---------- overlay แท่ง OI ----------
   const ov = $('ov'), ctx = ov.getContext('2d');
   let dirty = true, lastKey = '';
+  const overlayHooks = []; // ส่วนเสริม (เช่น goldscalp.js) วาดทับกราฟได้
 
   function drawOverlay() {
     const w = chartEl.clientWidth, h = chartEl.clientHeight, dpr = window.devicePixelRatio || 1;
@@ -311,6 +318,7 @@
     drawSpotAxis(w, h);
     drawDrawings(w, h);
     drawMeasure(w, h);
+    overlayHooks.forEach(f => { try { f(ctx, w, h); } catch (e) { console.error(e); } });
   }
 
   // ---------- แกนราคา spot (ปัดแกนราคาขวาไปทางซ้ายเพื่อเปิด ปัดกลับเพื่อปิด) ----------
@@ -1555,8 +1563,15 @@
   $('loginVer').textContent = 'V' + APP_VER;
   let saved = null;
   try { saved = localStorage.getItem('oi_code'); } catch (e) {}
+  window.OI = {
+    chart, series, chartEl, hooks: overlayHooks,
+    get oi() { return oi; }, get lastClose() { return lastClose; },
+    showToast, hideToast, lockChart,
+    markDirty() { dirty = true; },
+  };
   if (saved) { $('login').hidden = true; $('chips').innerHTML = '<span class="chip">กำลังตรวจสอบรหัสผ่าน…</span>'; tryLogin(saved, true); }
 })();
 </script>
+<script src="goldscalp.js"></script>
 </body>
 </html>

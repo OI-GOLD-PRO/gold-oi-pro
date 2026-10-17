@@ -188,11 +188,11 @@
 <script>
 (function () {
   // สัญลักษณ์ที่เลือกได้: แต่ละตัวมีแท็บ OI/offset ในชีตของตัวเอง (ทอง = แท็บเดิม)
-  // tol/rearm = ระยะเตือนโซน (หน่วยราคา), mult = ตัวคูณสัญญาออปชันสำหรับ MM P/L, tick = 1 จุด
+  // tol/rearm = ระยะเตือนโซน (หน่วยราคา), mult = ตัวคูณสัญญาออปชันสำหรับ MM P/L (US30: ใช้ออปชัน DIA 1 สัญญา = $1 ต่อ 1 จุด Dow), tick = 1 จุด
   const SYMS = {
     gold: { name: 'XAUUSD', label: 'ทองคำ', ico: '🥇', perp: 'XAUUSDT', dec: 2, tick: 0.01, tol: 1.5, rearm: 8, mult: 100, carry: true, note: 'GC' },
     oil: { name: 'WTI', label: 'น้ำมัน', ico: '🛢️', perp: 'CLUSDT', dec: 2, tick: 0.01, tol: 0.15, rearm: 0.8, mult: 1000, carry: false, note: 'CL' },
-    us30: { name: 'US30', label: 'US30', ico: '📈', perp: null, yahoo: 'YM', dec: 0, tick: 1, tol: 15, rearm: 80, mult: 5, carry: false, note: 'YM' },
+    us30: { name: 'US30', label: 'US30', ico: '📈', perp: null, yahoo: 'YM', dec: 0, tick: 1, tol: 15, rearm: 80, mult: 1, carry: false, note: 'YM' },
   };
   let SYM = 'gold';
   try { const q = new URLSearchParams(location.search).get('sym') || localStorage.getItem('oi_sym'); if (SYMS[q]) SYM = q; } catch (e) {}

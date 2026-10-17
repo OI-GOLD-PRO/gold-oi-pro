@@ -14,9 +14,11 @@
     trend: false, trendLen: 200, trendType: 'SMA',
     ribbon: false, ribLen: 60, ribType: 'HMA',
   };
+  if (O.cfg && O.cfg.tol) DEF.dist = Math.round(O.cfg.tol * 2 * 100) / 100; // ใกล้โซน = 2 เท่าของระยะเตือน (ทอง $3)
+  const KEY = 'oi_gs' + (O.sfx || '');
   let cfg = Object.assign({}, DEF);
-  try { Object.assign(cfg, JSON.parse(localStorage.getItem('oi_gs') || '{}')); } catch (e) {}
-  const save = () => { try { localStorage.setItem('oi_gs', JSON.stringify(cfg)); } catch (e) {} };
+  try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
 
   // ---------- maths (same as Pine) ----------
   const smaArr = (v, n) => { const o = []; let s = 0, c = 0; v.forEach((x, i) => { s += x; if (i >= n) s -= v[i - n]; o.push(i >= n - 1 ? s / n : null); }); return o; };
@@ -220,7 +222,7 @@
     d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-gst="on"><i style="background:#60f0b9"></i>Gold Scalping</button><span id="gsInfo" class="gsinfo"></span></div>` +
       (cfg.on ? `
       <div class="row"><button class="gsb${cfg.mode === 'normal' ? ' on' : ''}" data-gsm="normal">ปกติ (ตามโค้ด)</button><button class="gsb${cfg.mode === 'oi' ? ' on' : ''}" data-gsm="oi">เฉพาะใกล้โซน OI</button></div>
-      ${cfg.mode === 'oi' ? `<div class="row ps">${num('dist', 'ใกล้ ($)', 0.5)}${chk('walls', 'กำแพง OI')}${chk('vol', 'วอลลุ่ม')}</div>` : ''}
+      ${cfg.mode === 'oi' ? `<div class="row ps">${num('dist', 'ใกล้ (จุดราคา)', O.cfg && O.cfg.tick < 1 ? 0.05 : 5)}${chk('walls', 'กำแพง OI')}${chk('vol', 'วอลลุ่ม')}</div>` : ''}
       <div class="row ps">${num('rsiLen', 'RSI')}${num('mid', 'MID')}${sel('maType', 'RSI MA')}${num('out', 'OUT')}${num('inn', 'IN')}</div>
       <div class="row ps">${chk('trend', 'MA Trend')}${cfg.trend ? num('trendLen', 'คาบ') + sel('trendType', 'ชนิด') : ''}</div>
       <div class="row ps">${chk('ribbon', 'MA Ribbon')}${cfg.ribbon ? num('ribLen', 'คาบ') + sel('ribType', 'ชนิด') : ''}</div>` : '');

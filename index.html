@@ -87,8 +87,8 @@
   .tfs { display: flex; gap: 3px; padding: 0 14px 6px; }
   .tfs button { flex: 1; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; padding: 3px 0; font: 600 10.5px var(--mono); }
   .tfs button.on { background: var(--gold); border-color: var(--gold); color: #1a1405; }
-  .tfs button#indBtn, .tfs button#drawBtn { flex: none; padding: 3px 9px; font-style: italic; }
-  .tfs button#indBtn.has, .tfs button#drawBtn.has { border-color: var(--gold); color: var(--gold); }
+  .tfs button#oiBtn, .tfs button#indBtn, .tfs button#drawBtn { flex: none; padding: 3px 9px; font-style: italic; }
+  .tfs button#oiBtn.has, .tfs button#indBtn.has, .tfs button#drawBtn.has { border-color: var(--gold); color: var(--gold); }
   #drawBar { position: absolute; left: 8px; right: 8px; top: 6px; z-index: 6; display: flex; flex-wrap: wrap; gap: 5px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
   #drawBar button { background: transparent; border: 1px solid var(--line); color: var(--fg); border-radius: 7px; padding: 6px 8px; font: 600 11.5px var(--sans); }
   #drawBar button.on { background: var(--gold); border-color: var(--gold); color: #1a1405; }
@@ -163,6 +163,7 @@
     <button data-tf="1h">H1</button>
     <button data-tf="4h">H4</button>
     <button data-tf="1d">D1</button>
+    <button id="oiBtn" class="has" aria-label="เปิด/ปิดข้อมูล OI บนกราฟ">OI</button>
     <button id="indBtn" aria-label="เลือกอินดิเคเตอร์">ƒx</button>
     <button id="drawBtn" aria-label="เครื่องมือวาดกราฟ">✏️</button>
   </div>
@@ -199,7 +200,7 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.9.00';
+  const APP_VER = '1.9.01';
   const ZONE_HALF = 2.5; // ครึ่งความกว้างโซนกำแพง OI ($) รวมเป็นโซน $5
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -444,7 +445,10 @@
     return (a !== null && b !== null) ? b - a : 6;
   }
 
+  let oiOn = true;
+  try { oiOn = localStorage.getItem('oi_show') !== '0'; } catch (e) {}
   function drawOIBars(w, h) {
+    if (!oiOn) return;
     if (!oi || oi.offset === null || !oi.rows.length) return;
 
     const plotW = chart.timeScale().width();
@@ -1524,6 +1528,19 @@
     const f = v => `<span class="${v < 0 ? 'neg' : 'pos'}">${v < 0 ? '−' : '+'}$${(Math.abs(v) / 1e6).toFixed(2)}M</span>`;
     el.innerHTML = `MM vs MP · C ${f(dc)} P ${f(dp)} = ${f(net)}`;
   }
+  function applyOiToggle() {
+    const b = $('oiBtn'); b.classList.toggle('has', oiOn);
+    b.style.opacity = oiOn ? '' : '.55';
+    $('mmpl').style.visibility = oiOn ? '' : 'hidden';
+    document.querySelectorAll('.legend > span:not(.rt)').forEach(e => { e.style.display = oiOn ? '' : 'none'; });
+    dirty = true;
+  }
+  $('oiBtn').addEventListener('click', () => {
+    oiOn = !oiOn;
+    try { localStorage.setItem('oi_show', oiOn ? '1' : '0'); } catch (e) {}
+    applyOiToggle();
+  });
+  applyOiToggle();
   function showPrice() {
     paintRaw(); paintMM();
     if (lastClose === null) return;

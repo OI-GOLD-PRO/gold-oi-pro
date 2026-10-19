@@ -121,10 +121,19 @@
   /* เลย์เอาต์ 2 กราฟ */
   #main { position: relative; display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; min-width: 0; }
   #paneB { flex: 1 1 0; min-height: 0; min-width: 0; border: 0; background: var(--bg); }
-  body.lay-v #paneB { border-top: 2px solid var(--gold); }
   body.lay-h { flex-direction: row; }
-  body.lay-h #paneB { border-left: 2px solid var(--gold); }
-  .embed header, .embed .chips, .embed .legend { display: none !important; }
+  .embed .chips, .embed .legend { display: none !important; }
+  .embed header { padding: 6px 10px 2px; gap: 8px; }
+  .embed header .siren, .embed header button.icon, .embed .sym span { display: none !important; }
+  .embed .px #price { font-size: 17px; } .embed .px #chg { font-size: 10px; }
+  .embed .px { margin-left: auto; }
+  /* แถบลากปรับขนาดสองกราฟ */
+  #splitter { flex: none; position: relative; background: var(--panel); touch-action: none; z-index: 5; }
+  #splitter::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--gold); border-radius: 3px; opacity: .85; }
+  body.lay-v #splitter { height: 14px; cursor: row-resize; border-top: 1px solid var(--gold); border-bottom: 1px solid var(--line); }
+  body.lay-v #splitter::after { width: 44px; height: 4px; }
+  body.lay-h #splitter { width: 14px; cursor: col-resize; border-left: 1px solid var(--gold); border-right: 1px solid var(--line); }
+  body.lay-h #splitter::after { width: 4px; height: 44px; }
   .embed body { padding-top: 0; padding-bottom: 0; }
   .embed .tfs { padding-top: 4px; }
   body.half .tfs, body.half .chips { overflow-x: auto; scrollbar-width: none; }
@@ -207,6 +216,7 @@
     <span class="rt"><span id="mmpl"></span> <span id="clock"></span></span>
   </div>
   </div>
+  <div id="splitter" hidden role="separator" aria-label="ลากเพื่อปรับขนาดกราฟ"></div>
   <iframe id="paneB" title="กราฟที่ 2" hidden></iframe>
 
 <script>
@@ -229,7 +239,7 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.10.00';
+  const APP_VER = '1.10.01';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1674,19 +1684,29 @@
   document.addEventListener('click', e => { if (!e.target.closest('#symMenu')) $('symMenu').hidden = true; });
   $('symMenu').addEventListener('click', e => {
     const b = e.target.closest('[data-sym]'); if (!b) return;
-    if (b.dataset.sym !== SYM) { try { localStorage.setItem('oi_sym', b.dataset.sym); } catch (e2) {} location.href = location.pathname; }
+    if (b.dataset.sym !== SYM) {
+      if (EMBED) { try { localStorage.setItem('oi_sym_b', b.dataset.sym); } catch (e2) {} location.href = `${location.pathname}?pane=b&lay=${LAY}&sym=${b.dataset.sym}`; }
+      else { try { localStorage.setItem('oi_sym', b.dataset.sym); } catch (e2) {} location.href = location.pathname; }
+    }
     else $('symMenu').hidden = true;
   });
   // ---------- เลย์เอาต์ 2 กราฟ (กดปุ่ม ▭ วนรอบ: 1 กราฟ → บน/ล่าง → ซ้าย/ขวา) ----------
+  // สัดส่วนกราฟที่ 1 (0.2–0.8) แยกเก็บตามแนวบน/ล่าง กับ ซ้าย/ขวา
+  const getSplit = () => { try { const v = parseFloat(localStorage.getItem('oi_split_' + LAY)); if (v >= .2 && v <= .8) return v; } catch (e) {} return .5; };
+  function applySplit(r) {
+    r = r || getSplit();
+    $('main').style.flex = `${r} 1 0`; $('paneB').style.flex = `${1 - r} 1 0`;
+  }
   const LAY_ICO = { '': '▭', v: '⬒', h: '◫' };
   function applyLayout() {
-    const f = $('paneB');
+    const f = $('paneB'), sp = $('splitter');
     document.body.classList.toggle('lay-v', LAY === 'v'); document.body.classList.toggle('lay-h', LAY === 'h');
     document.body.classList.toggle('half', LAY === 'h');
     $('layBtn').textContent = LAY_ICO[LAY]; $('layBtn').classList.toggle('on', !!LAY);
-    if (!LAY) { f.hidden = true; f.removeAttribute('src'); return; }
-    const url = `${location.pathname}?pane=b&lay=${LAY}&sym=${SYM}`;
-    f.hidden = false;
+    if (!LAY) { f.hidden = true; sp.hidden = true; f.removeAttribute('src'); $('main').style.flex = ''; return; }
+    let symB = SYM; try { const q = localStorage.getItem('oi_sym_b'); if (SYMS[q]) symB = q; } catch (e) {}
+    const url = `${location.pathname}?pane=b&lay=${LAY}&sym=${symB}`;
+    f.hidden = false; sp.hidden = false; applySplit();
     if (f.getAttribute('src') !== url) f.src = url;
   }
   if (EMBED) { if (LAY === 'h') document.body.classList.add('half'); $('layBtn').hidden = true; }
@@ -1697,6 +1717,26 @@
       applyLayout();
     });
     applyLayout();
+    const sp = $('splitter');
+    let drag = null;
+    sp.addEventListener('pointerdown', e => {
+      const box = document.body.getBoundingClientRect();
+      drag = { box, v: LAY === 'v' }; sp.setPointerCapture(e.pointerId); $('paneB').style.pointerEvents = 'none'; e.preventDefault();
+    });
+    sp.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const { box, v } = drag, spSize = v ? sp.offsetHeight : sp.offsetWidth;
+      const total = (v ? box.height : box.width) - spSize, pos = (v ? e.clientY - box.top : e.clientX - box.left) - spSize / 2;
+      const r = Math.max(.2, Math.min(.8, pos / total));
+      drag.r = r; applySplit(r);
+    });
+    const end = () => {
+      if (!drag) return;
+      if (drag.r) { try { localStorage.setItem('oi_split_' + LAY, String(drag.r)); } catch (e) {} }
+      drag = null; $('paneB').style.pointerEvents = '';
+    };
+    sp.addEventListener('pointerup', end); sp.addEventListener('pointercancel', end);
+    sp.addEventListener('dblclick', () => { try { localStorage.removeItem('oi_split_' + LAY); } catch (e) {} applySplit(.5); });
   }
   window.OI = {
     fetchTF: async (t, n) => {

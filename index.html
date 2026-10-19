@@ -118,6 +118,25 @@
   #indMenu button { display: flex; align-items: center; gap: 8px; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 7px; padding: 6px 9px; font: 600 12px var(--mono); text-align: left; }
   #indMenu button i { width: 14px; height: 3px; border-radius: 2px; flex: none; }
   #indMenu button.on { color: var(--fg); border-color: var(--gold); background: rgba(224,180,76,.12); }
+  /* เลย์เอาต์ 2 กราฟ */
+  #main { position: relative; display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; min-width: 0; }
+  #paneB { flex: 1 1 0; min-height: 0; min-width: 0; border: 0; background: var(--bg); }
+  body.lay-v #paneB { border-top: 2px solid var(--gold); }
+  body.lay-h { flex-direction: row; }
+  body.lay-h #paneB { border-left: 2px solid var(--gold); }
+  .embed header, .embed .chips, .embed .legend { display: none !important; }
+  .embed body { padding-top: 0; padding-bottom: 0; }
+  .embed .tfs { padding-top: 4px; }
+  body.half .tfs, body.half .chips { overflow-x: auto; scrollbar-width: none; }
+  body.half .tfs button { flex: none; padding: 3px 8px; }
+  body.half header { gap: 5px !important; padding: 8px 8px 4px; }
+  body.half header { flex-wrap: wrap; row-gap: 4px; }
+  body.half button.icon { width: 28px; height: 28px; font-size: 13px; border-radius: 8px; }
+  body.half .px { margin-left: auto; }
+  body.half .siren, body.half .sym span { display: none; }
+  body.half .px #price { font-size: 16px; }
+  body.half .px #chg { font-size: 9px; }
+  body.half .chips, body.half .tfs, body.half #gsTbl { padding-left: 8px; padding-right: 8px; }
   #wrap { position: relative; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
   #chart, #ov { position: absolute; inset: 0; }
   #ov { pointer-events: none; z-index: 2; }
@@ -144,6 +163,7 @@
       <div class="ver" id="loginVer"></div>
     </form>
   </div>
+  <div id="main">
   <header>
     <span class="dot" id="dot"></span>
     <div class="sym"><button id="symBtn" class="symbtn" aria-label="เลือกสัญลักษณ์"><b id="symName">XAUUSD</b><i>▾</i></button><span id="src">OI</span></div>
@@ -151,6 +171,7 @@
     <button class="siren" id="siren" aria-label="ข่าวแดงที่กำลังจะออก"><span class="bulb">🚨</span><span class="new">new!!</span></button>
     <div class="px"><div id="price">–</div><div id="chg">กำลังโหลด</div></div>
     <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือนโซน OI">🔕</button>
+    <button class="icon" id="layBtn" aria-label="เลย์เอาต์กราฟ: 1 กราฟ / บนล่าง / ซ้ายขวา">▭</button>
     <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่">⟳</button>
     <button class="icon" id="logout" aria-label="ออกจากระบบ">⏻</button>
   </header>
@@ -185,6 +206,8 @@
     <span><i style="background:repeating-linear-gradient(90deg,var(--mp) 0 4px,transparent 4px 6px)"></i>Max Pain</span>
     <span class="rt"><span id="mmpl"></span> <span id="clock"></span></span>
   </div>
+  </div>
+  <iframe id="paneB" title="กราฟที่ 2" hidden></iframe>
 
 <script>
 (function () {
@@ -195,12 +218,18 @@
     oil: { name: 'WTI', label: 'น้ำมัน', ico: '🛢️', perp: 'CLUSDT', dec: 2, tick: 0.01, tol: 0.15, rearm: 0.8, mult: 1000, carry: false, zone: 0.15, note: 'CL' },
     us30: { name: 'US30', label: 'US30', ico: '📈', perp: null, yahoo: 'YM', dec: 0, tick: 1, tol: 15, rearm: 80, mult: 1, carry: false, zone: 2.5, note: 'YM' },
   };
+  // ---- เลย์เอาต์ 2 กราฟ: กราฟที่ 2 = iframe ของแอปเดียวกัน (?pane=b) แยก TF/อินดิเคเตอร์/OI/วาด ด้วย key ต่อท้าย _b ----
+  const QS = new URLSearchParams(location.search);
+  const EMBED = QS.get('pane') === 'b', PSFX = EMBED ? '_b' : '';
+  let LAY = ''; // '' = กราฟเดียว, 'v' = บน/ล่าง, 'h' = ซ้าย/ขวา
+  if (EMBED) { LAY = QS.get('lay') || ''; document.documentElement.classList.add('embed'); }
+  else { try { LAY = localStorage.getItem('oi_layout') || ''; } catch (e) {} if (LAY !== 'v' && LAY !== 'h') LAY = ''; }
   let SYM = 'gold';
   try { const q = new URLSearchParams(location.search).get('sym') || localStorage.getItem('oi_sym'); if (SYMS[q]) SYM = q; } catch (e) {}
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.9.04';
+  const APP_VER = '1.10.00';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -212,7 +241,7 @@
   const C = k => css.getPropertyValue(k).trim();
 
   let tf = '5m';
-  try { tf = localStorage.getItem('oi_tf') || '5m'; } catch (e) { /* ใช้ค่าเริ่มต้น */ }
+  try { tf = localStorage.getItem('oi_tf' + PSFX) || '5m'; } catch (e) { /* ใช้ค่าเริ่มต้น */ }
   let ws = null, wsTimer = null, lastClose = null, dayOpen = null;
   // ปรับราคากราฟ perpetual ให้เท่าราคา GC (ทองฟิวเจอร์): ราคาที่แสดง = ราคา perp − adj
   // adj = (perp − spot) − carry  โดย carry = GC − spot จากชีต (วัดตอนอัพเดท) และรีเฟรชทุก 1 ชม.
@@ -356,7 +385,7 @@
   // ---------- แกนราคา spot (ปัดแกนราคาขวาไปทางซ้ายเพื่อเปิด ปัดกลับเพื่อปิด) ----------
   // ราคา spot = ราคา XAUUSD ของแหล่งกราฟก่อนบวก offset = ราคาบนกราฟ + adj
   let spotAxisOn = false, spotW = 80;
-  try { spotAxisOn = localStorage.getItem('oi_spotaxis') === '1'; } catch (e) {}
+  try { spotAxisOn = localStorage.getItem('oi_spotaxis' + PSFX) === '1'; } catch (e) {}
   function niceStep(range, n) {
     const raw = range / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
     for (const m of [1, 2, 2.5, 5, 10]) if (raw <= m * p) return m * p;
@@ -397,7 +426,7 @@
   function setSpotAxis(on) {
     if (spotAxisOn === on) return;
     spotAxisOn = on; dirty = true;
-    try { localStorage.setItem('oi_spotaxis', on ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('oi_spotaxis' + PSFX, on ? '1' : '0'); } catch (e) {}
   }
 
   // ---------- วัดระยะ: นิ้วแรกแตะค้าง แล้วนิ้วที่สองแตะค้าง/ลากเพื่อวัด ----------
@@ -449,7 +478,7 @@
   }
 
   let oiOn = true;
-  try { oiOn = localStorage.getItem('oi_show') !== '0'; } catch (e) {}
+  try { oiOn = localStorage.getItem('oi_show' + PSFX) !== '0'; } catch (e) {}
   function drawOIBars(w, h) {
     if (!oiOn) return;
     if (!oi || oi.offset === null || !oi.rows.length) return;
@@ -784,7 +813,7 @@
   const ALERT_ANY_COOL = 60000;        // เว้นอย่างน้อย 60 วินาทีระหว่างการเตือน
   const REARM = SC.rearm;          // ต้องออกห่างเส้น $8 (ถือว่าทะลุโซนจริง) ก่อนจึงเตือนโซนเดิมซ้ำ
   let alertsOn = false;
-  try { alertsOn = localStorage.getItem('oi_alert') === '1'; } catch (e) {}
+  if (!EMBED) try { alertsOn = localStorage.getItem('oi_alert') === '1'; } catch (e) {}
   let actx = null, wakeLock = null, hit = null;
   const armed = new Map();
 
@@ -1082,7 +1111,7 @@
 
   async function loadTF(next) {
     tf = next;
-    try { localStorage.setItem('oi_tf', tf); } catch (e) {}
+    try { localStorage.setItem('oi_tf' + PSFX, tf); } catch (e) {}
     document.querySelectorAll('#tfs button').forEach(b => b.classList.toggle('on', b.dataset.tf === tf));
     $('msg').hidden = false; $('msg').textContent = 'กำลังโหลดกราฟ…';
     const order = prov ? [prov, ...PROVIDERS.filter(p => p !== prov)] : PROVIDERS;
@@ -1181,9 +1210,9 @@
   const PLABEL = { n: 'คาบ', k: 'ตัวคูณ', ob: 'บน', os: 'ล่าง', f: 'เร็ว', s: 'ช้า', g: 'สัญญาณ', sm: 'smooth' };
   const PLABEL_STOCH = { k: '%K', d: '%D', sm: 'smooth', ob: 'บน', os: 'ล่าง' };
   let indCfg = {};
-  try { indCfg = JSON.parse(localStorage.getItem('oi_ind2') || 'null') || {}; } catch (e) { indCfg = {}; }
+  try { indCfg = JSON.parse(localStorage.getItem('oi_ind2' + PSFX) || 'null') || {}; } catch (e) { indCfg = {}; }
   // ย้ายค่าจากรุ่นก่อน (V1.6.00)
-  try {
+  if (!EMBED) try {
     const old = JSON.parse(localStorage.getItem('oi_ind') || '{}') || {};
     const map = { ema20: 'ema1', ema50: 'ema2', ema200: 'ema3', bb: 'bb', rsi: 'rsi', macd: 'macd' };
     let moved = false;
@@ -1192,7 +1221,7 @@
     localStorage.removeItem('oi_ind');
   } catch (e) {}
   const cfgOf = d => { const c = indCfg[d.id] || {}; return { on: !!c.on, p: Object.assign({}, d.p, c.p || {}) }; };
-  const saveInd = () => { try { localStorage.setItem('oi_ind2', JSON.stringify(indCfg)); } catch (e) {} };
+  const saveInd = () => { try { localStorage.setItem('oi_ind2' + PSFX, JSON.stringify(indCfg)); } catch (e) {} };
   const indSeries = {};
   let oscFrac = 0; // สัดส่วนความสูงล่างที่ออสซิลเลเตอร์ใช้ (ไม่วาดแท่ง OI ทับ)
   const lineOpt = (col, extra) => Object.assign({ color: col, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }, extra || {});
@@ -1344,8 +1373,8 @@
   ];
   const FIB = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
   let drawings = [];
-  try { drawings = JSON.parse(localStorage.getItem('oi_draw' + SYMSFX) || '[]') || []; } catch (e) { drawings = []; }
-  const saveDraw = () => { try { localStorage.setItem('oi_draw' + SYMSFX, JSON.stringify(drawings)); } catch (e) {} };
+  try { drawings = JSON.parse(localStorage.getItem('oi_draw' + SYMSFX + PSFX) || '[]') || []; } catch (e) { drawings = []; }
+  const saveDraw = () => { try { localStorage.setItem('oi_draw' + SYMSFX + PSFX, JSON.stringify(drawings)); } catch (e) {} };
   let drawTool = null, drawTmp = null;
   function barTimes() { return rawBars.map(k => Math.floor(k[0] / 1000) + TZ_SHIFT); }
   // x → เวลา (รองรับพื้นที่ว่างด้านขวาของแท่งล่าสุด)
@@ -1539,7 +1568,7 @@
   }
   $('oiBtn').addEventListener('click', () => {
     oiOn = !oiOn;
-    try { localStorage.setItem('oi_show', oiOn ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem('oi_show' + PSFX, oiOn ? '1' : '0'); } catch (e) {}
     applyOiToggle();
   });
   applyOiToggle();
@@ -1587,9 +1616,9 @@
     authCode = code; authExpire = expire || null;
     try { localStorage.setItem('oi_code', code); } catch (e) {}
     $('login').hidden = true;
-    if (!started) { started = true; loadTF(tf); loadNews(); scheduleNews(); }
+    if (!started) { started = true; loadTF(tf); if (!EMBED) { loadNews(); scheduleNews(); } }
     loadSheet();
-    if (expire) showToast(`สวัสดี <b>${esc(name || '')}</b> วันนี้คือวันที่ดีสำหรับคุณ<br>${expLabel(expire)} <b>${esc(fmtExpire(expire))}</b>`);
+    if (expire && !EMBED) showToast(`สวัสดี <b>${esc(name || '')}</b> วันนี้คือวันที่ดีสำหรับคุณ<br>${expLabel(expire)} <b>${esc(fmtExpire(expire))}</b>`);
   }
   // ตรวจรหัสกับเซิร์ฟเวอร์: คืน {ok, expire} / {ok:false, reason} / {legacy:true} ถ้าสคริปต์ยังเป็นรุ่นเก่า
   async function checkLogin(code) {
@@ -1648,13 +1677,34 @@
     if (b.dataset.sym !== SYM) { try { localStorage.setItem('oi_sym', b.dataset.sym); } catch (e2) {} location.href = location.pathname; }
     else $('symMenu').hidden = true;
   });
+  // ---------- เลย์เอาต์ 2 กราฟ (กดปุ่ม ▭ วนรอบ: 1 กราฟ → บน/ล่าง → ซ้าย/ขวา) ----------
+  const LAY_ICO = { '': '▭', v: '⬒', h: '◫' };
+  function applyLayout() {
+    const f = $('paneB');
+    document.body.classList.toggle('lay-v', LAY === 'v'); document.body.classList.toggle('lay-h', LAY === 'h');
+    document.body.classList.toggle('half', LAY === 'h');
+    $('layBtn').textContent = LAY_ICO[LAY]; $('layBtn').classList.toggle('on', !!LAY);
+    if (!LAY) { f.hidden = true; f.removeAttribute('src'); return; }
+    const url = `${location.pathname}?pane=b&lay=${LAY}&sym=${SYM}`;
+    f.hidden = false;
+    if (f.getAttribute('src') !== url) f.src = url;
+  }
+  if (EMBED) { if (LAY === 'h') document.body.classList.add('half'); $('layBtn').hidden = true; }
+  else {
+    $('layBtn').addEventListener('click', () => {
+      LAY = LAY === '' ? 'v' : LAY === 'v' ? 'h' : '';
+      try { localStorage.setItem('oi_layout', LAY); } catch (e) {}
+      applyLayout();
+    });
+    applyLayout();
+  }
   window.OI = {
     fetchTF: async (t, n) => {
       const order = prov ? [prov, ...PROVIDERS.filter(p => p !== prov)] : PROVIDERS;
       for (const p of order) { try { return (await fetchBars(p, t, n)).filter(k => !cmeClosed(k[0])).map(toBar); } catch (e) {} }
       return null;
     },
-    get tf() { return tf; }, sym: SYM, cfg: SC, sfx: SYMSFX,
+    get tf() { return tf; }, sym: SYM, cfg: SC, sfx: SYMSFX, psfx: PSFX,
     chart, series, chartEl, hooks: overlayHooks,
     get oi() { return oi; }, get lastClose() { return lastClose; },
     showToast, hideToast, lockChart,

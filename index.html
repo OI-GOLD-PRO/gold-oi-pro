@@ -239,7 +239,7 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.10.01';
+  const APP_VER = '1.11.00';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1747,6 +1747,18 @@
     get tf() { return tf; }, sym: SYM, cfg: SC, sfx: SYMSFX, psfx: PSFX,
     chart, series, chartEl, hooks: overlayHooks,
     get oi() { return oi; }, get lastClose() { return lastClose; },
+    // ดึงข้อมูลชีตของสัญลักษณ์ใดก็ได้ (ใช้ในแดชบอร์ด dash.js)
+    async fetchData(sym) {
+      const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 20000);
+      try {
+        const r = await fetch(`${API_BASE}?api=data&sym=${encodeURIComponent(sym)}&code=${encodeURIComponent(authCode || '')}&t=${Date.now()}`, { cache: 'no-store', signal: ac.signal });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        if (d.error) throw new Error(d.error === 'auth' ? 'รหัสผ่านใช้ไม่ได้' : d.error);
+        return d;
+      } catch (e) { throw new Error(e.name === 'AbortError' ? 'หมดเวลา' : (e.message || e)); }
+      finally { clearTimeout(timer); }
+    },
     showToast, hideToast, lockChart,
     markDirty() { dirty = true; },
   };
@@ -1754,5 +1766,6 @@
 })();
 </script>
 <script src="goldscalp.js"></script>
+<script src="dash.js"></script>
 </body>
 </html>

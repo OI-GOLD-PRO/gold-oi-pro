@@ -200,7 +200,7 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.9.03';
+  const APP_VER = '1.9.04';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -269,6 +269,9 @@
       .sort((a, b) => ((b.vc || 0) + (b.vp || 0)) - ((a.vc || 0) + (a.vp || 0))).slice(0, 5).map(r => r.strike);
     const top5P = [...rows].filter(r => r.p > 0).sort((a, b) => b.p - a.p).slice(0, 5).map(r => r.strike);
     const top5C = [...rows].filter(r => r.c > 0).sort((a, b) => b.c - a.c).slice(0, 5).map(r => r.strike);
+    // โซนกำแพง: อันดับ 1-5 ต่อฝั่ง = กว้างเต็ม, อันดับ 6-10 = กว้างครึ่งหนึ่ง
+    const rankMap = k => { const m = new Map(); [...rows].filter(r => r[k] > 0).sort((a, b) => b[k] - a[k]).slice(0, 10).forEach((r, i) => m.set(r.strike, i + 1)); return m; };
+    const rankP = rankMap('p'), rankC = rankMap('c');
     offRaw = ok ? off : null;
     // Max Pain: ราคาหมดอายุที่ผู้ถือ Call+Put ได้มูลค่ารวมน้อยที่สุด
     let maxPain = null, best = Infinity;
@@ -276,7 +279,7 @@
       const pay = rows.reduce((a, r) => a + r.c * Math.max(0, s.strike - r.strike) + r.p * Math.max(0, r.strike - s.strike), 0);
       if (pay < best) { best = pay; maxPain = s.strike; }
     });
-    oi = { top5P, top5C, rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC, topV, maxPain };
+    oi = { top5P, top5C, rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC, topV, maxPain, rankP, rankC };
 
     const cfg = d.cfg || {};
     const chips = [];
@@ -483,19 +486,18 @@
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 3]); hline(0, plotW); ctx.setLineDash([]);
       }
-      // กำแพง OI ใหญ่ 3 อันดับ (Call เขียว / Put แดง): เส้นทึบจากขอบขวาถึงกลางกราฟ
-      const isTopC = oi.topC.includes(r.strike) && r.c > 0, isTopP = oi.topP.includes(r.strike) && r.p > 0;
-      if (isTopC || isTopP) {
-        const wallC = (isTopC && (!isTopP || r.c >= r.p)) ? callC : putC;
-        // โซนราคา ±ZONE_HALF รอบเส้นกำแพง (สีเดียวกันแต่อ่อน) จากกลางกราฟถึงขอบขวา
-        const yTop = series.priceToCoordinate(r.price + ZONE_HALF), yBot = series.priceToCoordinate(r.price - ZONE_HALF);
+      // กำแพง OI 10 อันดับต่อฝั่ง (Call เขียว / Put แดง): อันดับ 1-5 โซนเต็ม + เส้นทึบ, อันดับ 6-10 โซนครึ่งความกว้าง (ไม่มีเส้นทึบ)
+      const rC = r.c > 0 ? (oi.rankC.get(r.strike) || 0) : 0, rP = r.p > 0 ? (oi.rankP.get(r.strike) || 0) : 0;
+      if (rC || rP) {
+        const useC = rC && (!rP || r.c >= r.p);
+        const rk = useC ? rC : rP, wallC = useC ? callC : putC;
+        const half = rk <= 5 ? ZONE_HALF : ZONE_HALF / 2;
+        const yTop = series.priceToCoordinate(r.price + half), yBot = series.priceToCoordinate(r.price - half);
         if (yTop !== null && yBot !== null) {
           ctx.globalAlpha = 0.16; ctx.fillStyle = wallC;
           ctx.fillRect(mid, Math.min(yTop, yBot), plotW - mid, Math.abs(yBot - yTop));
         }
-        ctx.globalAlpha = 0.95; ctx.lineWidth = 2;
-        ctx.strokeStyle = wallC;
-        hline(mid, plotW);
+        if (rk <= 5) { ctx.globalAlpha = 0.95; ctx.lineWidth = 2; ctx.strokeStyle = wallC; hline(mid, plotW); }
       }
       // Volume วันนี้ 5 อันดับ: เส้นทึบสีเหลืองจากขอบซ้ายถึงขอบขวาของกราฟ (เต็มจอ)
       if (oi.topV && oi.topV.includes(r.strike)) {

@@ -44,7 +44,12 @@
   /* เต็มจอจริงบน iPhone (แอปจากหน้าโฮมบางรุ่นคิด 100dvh สั้นกว่าจอ ทำให้มีช่องว่างด้านล่าง) */
   body { position: fixed; top: 0; left: 0; right: 0; bottom: 0; height: auto; box-sizing: border-box; }
   header { display: flex; align-items: center; gap: 12px; padding: 10px 14px 6px; }
-  .sym { display: flex; flex-direction: column; min-width: 0; }
+  .sym { display: flex; flex-direction: column; min-width: 0; flex: 0 1 auto; }
+  .sym b { white-space: nowrap; }
+  #src { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  header > * { flex: none; }
+  header > .sym { flex: 0 1 auto; min-width: 0; }
+  @media (max-width: 440px) { #src { display: none; } header { flex-wrap: wrap; gap: 6px !important; row-gap: 6px; } header > .sym { flex: 1 1 auto; } header > .px { margin-left: auto; } button.icon { width: 32px; height: 32px; font-size: 14px; } .siren .new { display: none; } }
   .sym b { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
   .symbtn { background: none; border: 0; color: inherit; padding: 0; display: flex; align-items: center; gap: 4px; font: inherit; text-align: left; }
   .symbtn i { font-style: normal; font-size: 10px; color: var(--gold); }
@@ -58,7 +63,7 @@
   .px #price { font-size: 22px; font-weight: 600; color: var(--gold); }
   .px #chg { font-size: 11px; color: var(--muted); }
   /* ไซเรนข่าวแดง: กระพริบเมื่อข่าวจะออกภายใน 30 นาที */
-  .siren { margin: 0 auto; display: flex; flex-direction: column; align-items: center; background: none; border: 0; padding: 0; color: inherit; font: inherit; line-height: 1; }
+  .siren { margin: 0 6px; flex: none; display: flex; flex-direction: column; align-items: center; background: none; border: 0; padding: 0; color: inherit; font: inherit; line-height: 1; }
   .siren .bulb { font-size: 22px; filter: grayscale(.85) brightness(.75); }
   .siren .new { margin-top: 2px; font: 700 9px var(--mono); color: #3ddc84; letter-spacing: .03em; }
   .siren.on .bulb { filter: none; animation: sirenBlink .6s steps(2, start) infinite; }
@@ -239,7 +244,7 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.11.00';
+  const APP_VER = '1.11.01';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 

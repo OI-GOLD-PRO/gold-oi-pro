@@ -154,7 +154,9 @@
   body.half .px #chg { font-size: 9px; }
   body.half .chips, body.half .tfs, body.half #gsTbl { padding-left: 8px; padding-right: 8px; }
   #wrap { position: relative; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
-  #chart, #ov { position: absolute; inset: 0; }
+  #chart, #ov, #bands { position: absolute; inset: 0; }
+  #bands { pointer-events: none; z-index: 0; }
+  #chart { z-index: 1; }
   #ov { pointer-events: none; z-index: 2; }
   #tip { position: absolute; left: 10px; top: 8px; z-index: 3; font-size: 12px; background: rgba(18,26,48,.92); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-family: var(--mono); pointer-events: none; }
   #tip .p { color: var(--put); } #tip .c { color: var(--call); }
@@ -206,6 +208,7 @@
   </div>
   <div id="gsTbl"></div>
   <div id="wrap">
+    <canvas id="bands"></canvas>
     <div id="chart"></div>
     <canvas id="ov"></canvas>
     <div id="tip" hidden></div>
@@ -246,7 +249,7 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.11.07';
+  const APP_VER = '1.11.08';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -269,7 +272,7 @@
   // ---------- กราฟ ----------
   const chartEl = $('chart');
   const chart = LightweightCharts.createChart(chartEl, {
-    layout: { background: { color: C('--bg') }, textColor: C('--muted'), fontFamily: C('--mono'), fontSize: 11 },
+    layout: { background: { color: 'rgba(0,0,0,0)' }, textColor: C('--muted'), fontFamily: C('--mono'), fontSize: 11 },
     grid: { vertLines: { visible: false }, horzLines: { visible: false } },
     rightPriceScale: { borderColor: C('--line'), scaleMargins: { top: .08, bottom: .08 } },
     timeScale: { borderColor: C('--line'), timeVisible: true, secondsVisible: false, rightOffset: 8 },
@@ -328,6 +331,7 @@
     oi = { top5P, top5C, rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC, topV, maxPain, rankP, rankC };
 
     const cfg = d.cfg || {};
+    ivInfo = parseIV(cfg); dirty = true;
     const chips = [];
     chips.push(`<span class="chip">สัญญา <b>${esc(cfg.contract || '–')}</b></span>`);
     chips.push(ok ? `<span class="chip" id="offchip"></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
@@ -382,8 +386,52 @@
   let dirty = true, lastKey = '';
   const overlayHooks = []; // ส่วนเสริม (เช่น goldscalp.js) วาดทับกราฟได้
 
+  // ---------- แถบ ±1σ ±2σ ±3σ ตาม ATM IV อยู่ใต้แท่งเทียน (ชั้น canvas #bands) ----------
+  // σ = ราคา × IV × √T โดย T = เวลาที่เหลือถึงหมดอายุ (ปี) คำนวณสดทุกเฟรม
+  // ชีต webapp: atm_iv (เช่น 46.13 หรือ 0.4613), iv_expiry (เวลาไทย เช่น 2026-10-22 00:30)
+  const bandsEl = $('bands'), bctx = bandsEl.getContext('2d');
+  let ivInfo = null;
+  function parseIV(cfg) {
+    let iv = Number(cfg && cfg.atm_iv);
+    if (!isFinite(iv) || iv <= 0) return null;
+    if (iv > 1) iv = iv / 100;
+    const ex = Date.parse(String((cfg && cfg.iv_expiry) || '').trim().replace(' ', 'T') + '+07:00');
+    if (!isFinite(ex)) return null;
+    return { iv, expiry: ex };
+  }
+  function drawBands(w, h) {
+    const dpr = window.devicePixelRatio || 1;
+    if (bandsEl.width !== Math.round(w * dpr) || bandsEl.height !== Math.round(h * dpr)) {
+      bandsEl.width = Math.round(w * dpr); bandsEl.height = Math.round(h * dpr);
+      bandsEl.style.width = w + 'px'; bandsEl.style.height = h + 'px';
+    }
+    bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    bctx.clearRect(0, 0, w, h);
+    bctx.fillStyle = C('--bg'); bctx.fillRect(0, 0, w, h);
+    if (!ivInfo || lastClose === null) return;
+    const T = (ivInfo.expiry - Date.now()) / (365 * 24 * 3600 * 1000);
+    if (!(T > 0)) return;
+    const P = lastClose, sig = P * ivInfo.iv * Math.sqrt(T);
+    const plotW = chart.timeScale().width(), plotH = h - chart.timeScale().height();
+    const y = p => series.priceToCoordinate(p);
+    // วาดกว้างสุด (3σ) ก่อน แล้วซ้อนแคบลง → ใกล้ราคาปัจจุบันเข้มสุด
+    [[3, 'rgba(90,140,255,0.06)'], [2, 'rgba(90,140,255,0.11)'], [1, 'rgba(90,140,255,0.18)']].forEach(([k, col]) => {
+      const yt = y(P + k * sig), yb = y(P - k * sig);
+      if (yt === null || yb === null) return;
+      bctx.fillStyle = col;
+      bctx.fillRect(0, Math.min(yt, yb), plotW, Math.abs(yb - yt));
+    });
+    bctx.font = `10px ${C('--mono')}`; bctx.fillStyle = C('--muted');
+    [1, 2, 3].forEach(k => {
+      const yt = y(P + k * sig), yb = y(P - k * sig);
+      if (yt !== null && yt >= 0 && yt <= plotH) bctx.fillText(`+${k}σ ${(k * sig).toFixed(SC.dec)}`, 6, yt - 3);
+      if (yb !== null && yb >= 0 && yb <= plotH) bctx.fillText(`−${k}σ ${(k * sig).toFixed(SC.dec)}`, 6, yb + 11);
+    });
+  }
+
   function drawOverlay() {
     const w = chartEl.clientWidth, h = chartEl.clientHeight, dpr = window.devicePixelRatio || 1;
+    drawBands(w, h);
     if (ov.width !== Math.round(w * dpr) || ov.height !== Math.round(h * dpr)) {
       ov.width = Math.round(w * dpr); ov.height = Math.round(h * dpr);
       ov.style.width = w + 'px'; ov.style.height = h + 'px';

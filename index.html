@@ -129,7 +129,7 @@
   body.lay-h { flex-direction: row; }
   .embed .chips, .embed .legend { display: none !important; }
   /* โหมด 2 กราฟ: ซ่อนคำอธิบายสีด้านล่าง ให้กราฟได้พื้นที่มากขึ้น */
-  body.lay-v .legend, body.lay-h .legend { display: none !important; }
+  body.lay-v .legend, body.lay-h .legend, body.lay-v .chips, body.lay-h .chips { display: none !important; }
   .embed header { padding: 6px 10px 2px; gap: 8px; }
   .embed header .siren, .embed header button.icon, .embed .sym span { display: none !important; }
   .embed .px #price { font-size: 17px; } .embed .px #chg { font-size: 10px; }
@@ -246,7 +246,7 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.11.05';
+  const APP_VER = '1.11.06';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 

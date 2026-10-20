@@ -44,9 +44,9 @@
   /* เต็มจอจริงบน iPhone (แอปจากหน้าโฮมบางรุ่นคิด 100dvh สั้นกว่าจอ ทำให้มีช่องว่างด้านล่าง) */
   body { position: fixed; top: 0; left: 0; right: 0; bottom: 0; height: auto; box-sizing: border-box; }
   header { display: flex; align-items: center; gap: 12px; padding: 10px 14px 6px; }
-  .sym { display: flex; flex-direction: column; min-width: 0; flex: 0 1 auto; }
+  .sym { display: flex; flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; flex: 0 1 auto; }
   .sym b { white-space: nowrap; }
-  #src { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  #src { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   header > * { flex: none; }
   header > .sym { flex: 0 1 auto; min-width: 0; }
   @media (max-width: 440px) { header { flex-wrap: wrap; gap: 6px !important; row-gap: 6px; } header > .sym { flex: 1 1 auto; } header > .px { margin-left: auto; } button.icon { width: 32px; height: 32px; font-size: 14px; } .siren .new { display: none; } }
@@ -244,7 +244,7 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.11.03';
+  const APP_VER = '1.11.04';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 

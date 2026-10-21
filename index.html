@@ -426,9 +426,9 @@
         bctx.fillRect(0, Math.min(ya, yb2), plotW, Math.abs(yb2 - ya));
       });
     };
-    ring(2, 3, 'rgba(90,140,255,0.05)');
-    ring(1, 2, 'rgba(90,140,255,0.11)');
-    ring(0, 1, 'rgba(90,140,255,0.22)');
+    ring(2, 3, 'rgba(90,140,255,0.08)');
+    ring(1, 2, 'rgba(90,140,255,0.18)');
+    ring(0, 1, 'rgba(90,140,255,0.35)');
     bctx.font = `10px ${C('--mono')}`; bctx.fillStyle = C('--muted');
     [1, 2, 3].forEach(k => {
       const yt = y(P + k * sig), yb = y(P - k * sig);

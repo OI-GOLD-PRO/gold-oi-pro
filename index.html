@@ -414,13 +414,18 @@
     const P = lastClose, sig = P * ivInfo.iv * Math.sqrt(T);
     const plotW = chart.timeScale().width(), plotH = h - chart.timeScale().height();
     const y = p => series.priceToCoordinate(p);
-    // วาดกว้างสุด (3σ) ก่อน แล้วซ้อนแคบลง → ใกล้ราคาปัจจุบันเข้มสุด
-    [[3, 'rgba(90,140,255,0.06)'], [2, 'rgba(90,140,255,0.11)'], [1, 'rgba(90,140,255,0.18)']].forEach(([k, col]) => {
-      const yt = y(P + k * sig), yb = y(P - k * sig);
-      if (yt === null || yb === null) return;
-      bctx.fillStyle = col;
-      bctx.fillRect(0, Math.min(yt, yb), plotW, Math.abs(yb - yt));
-    });
+    // แถบแยกกัน ไม่ซ้อนทับ: 1σ เข้มสุด, 2σ อ่อนลง, 3σ อ่อนสุด (ทั้งบนและล่างของราคา)
+    const ring = (kLo, kHi, col) => {
+      [[P + kLo * sig, P + kHi * sig], [P - kHi * sig, P - kLo * sig]].forEach(([a, b]) => {
+        const ya = y(a), yb2 = y(b);
+        if (ya === null || yb2 === null) return;
+        bctx.fillStyle = col;
+        bctx.fillRect(0, Math.min(ya, yb2), plotW, Math.abs(yb2 - ya));
+      });
+    };
+    ring(2, 3, 'rgba(90,140,255,0.05)');
+    ring(1, 2, 'rgba(90,140,255,0.11)');
+    ring(0, 1, 'rgba(90,140,255,0.22)');
     bctx.font = `10px ${C('--mono')}`; bctx.fillStyle = C('--muted');
     [1, 2, 3].forEach(k => {
       const yt = y(P + k * sig), yb = y(P - k * sig);

@@ -437,6 +437,39 @@
     });
   }
 
+  // ---------- กรอบเหลืองคลอบเลขราคาบนแกนขวา (เฉพาะกราฟทอง) ----------
+  // ไฮไลต์ราคาเต็มที่ลงท้ายด้วย 00, 25, 50, 27 โดยวาดทับป้ายแกนของ lightweight-charts
+  const GOLD_HL = ['00', '25', '50', '27'];
+  function drawGoldLevels(w, h) {
+    if (SYM !== "gold" || lastClose === null) return;
+    const plotH = h - chart.timeScale().height();
+    const top = series.coordinateToPrice(0), bot = series.coordinateToPrice(plotH);
+    if (top === null || bot === null) return;
+    const axW = chart.priceScale('right').width();
+    if (!axW) return;
+    const x0 = w - axW + 2, bw = axW - 4, bh = 16;
+    ctx.font = `11px ${C('--mono')}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    let n = 0;
+    for (let v = Math.ceil(bot); v <= Math.floor(top) && n < 60; v++) {
+      const tail = String(((v % 100) + 100) % 100).padStart(2, '0');
+      if (!GOLD_HL.includes(tail)) continue;
+      const y = series.priceToCoordinate(v);
+      if (y === null || y < bh / 2 || y > plotH - bh / 2) continue;
+      n++;
+      ctx.fillStyle = C('--bg');
+      ctx.fillRect(x0, y - bh / 2, bw, bh);
+      ctx.strokeStyle = '#ffd60a'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x0 + .5, y - bh / 2 + .5, bw - 1, bh - 1, 3);
+      else ctx.rect(x0 + .5, y - bh / 2 + .5, bw - 1, bh - 1);
+      ctx.stroke();
+      ctx.fillStyle = '#ffd60a';
+      ctx.fillText(v.toFixed(SC.dec), x0 + bw / 2, y + .5);
+    }
+    ctx.textAlign = 'left';
+  }
+
   function drawOverlay() {
     const w = chartEl.clientWidth, h = chartEl.clientHeight, dpr = window.devicePixelRatio || 1;
     drawBands(w, h);
@@ -450,6 +483,7 @@
     drawNews(w, h);
     drawOIBars(w, h);
     drawSpotAxis(w, h);
+    drawGoldLevels(w, h);
     drawDrawings(w, h);
     drawMeasure(w, h);
     overlayHooks.forEach(f => { try { f(ctx, w, h); } catch (e) { console.error(e); } });

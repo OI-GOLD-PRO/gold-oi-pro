@@ -438,8 +438,8 @@
   }
 
   // ---------- กรอบเหลืองคลอบเลขราคาบนแกนขวา (เฉพาะกราฟทอง) ----------
-  // ไฮไลต์ราคาเต็มที่ลงท้ายด้วย 00, 25, 50, 27 โดยวาดทับป้ายแกนของ lightweight-charts
-  const GOLD_HL = ['00', '25', '50', '27'];
+  // ไฮไลต์ราคาเต็มที่ลงท้ายด้วย 00, 25, 50, 75 โดยวาดทับป้ายแกนของ lightweight-charts
+  const GOLD_HL = ['00', '25', '50', '75'];
   function drawGoldLevels(w, h) {
     if (SYM !== "gold" || lastClose === null) return;
     const plotH = h - chart.timeScale().height();

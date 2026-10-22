@@ -417,7 +417,7 @@
     const P = lastClose, sig = P * ivInfo.iv * Math.sqrt(T);
     const plotW = chart.timeScale().width(), plotH = h - chart.timeScale().height();
     const y = p => series.priceToCoordinate(p);
-    // แถบแยกกัน ไม่ซ้อนทับ: 1σ เข้มสุด, 2σ อ่อนลง, 3σ อ่อนสุด (ทั้งบนและล่างของราคา)
+    // แถบ 2σ และ 3σ (ไม่มีแถบ 1σ แล้ว) ทั้งบนและล่างของราคา
     const ring = (kLo, kHi, col) => {
       [[P + kLo * sig, P + kHi * sig], [P - kHi * sig, P - kLo * sig]].forEach(([a, b]) => {
         const ya = y(a), yb2 = y(b);
@@ -428,7 +428,6 @@
     };
     ring(2, 3, 'rgba(90,140,255,0.35)');
     ring(1, 2, 'rgba(90,140,255,0.18)');
-    ring(0, 1, 'rgba(90,140,255,0.08)');
     bctx.font = `10px ${C('--mono')}`; bctx.fillStyle = C('--muted');
     [1, 2, 3].forEach(k => {
       const yt = y(P + k * sig), yb = y(P - k * sig);

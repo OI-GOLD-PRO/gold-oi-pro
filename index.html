@@ -249,7 +249,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.13.04';
+  const APP_VER = '1.13.05';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1087,7 +1087,12 @@
       }
       const b = j.bars && j.bars[t];
       if (!b || !b.length) throw new Error('ไม่มีข้อมูล Yahoo ' + t);
-      const rows = b.map(k => [k[0] * 1000, k[1], k[2], k[3], k[4]]);
+      const step = (tfSec[t] || 60) * 1000, rows = [];
+      b.forEach(k => { // แท่งสดของ Yahoo มีเวลาเป็นวินาทีที่ quote (ไม่ตรงต้นนาที) ปัดลงให้ตรงต้นแท่ง แล้วรวมแท่งซ้ำ
+        const T = Math.floor(k[0] * 1000 / step) * step, L = rows[rows.length - 1];
+        if (L && L[0] === T) { L[2] = Math.max(L[2], k[2]); L[3] = Math.min(L[3], k[3]); L[4] = k[4]; }
+        else if (!L || T > L[0]) rows.push([T, k[1], k[2], k[3], k[4]]);
+      });
       yc[t] = { at: Date.now(), rows }; return rows;
     }
     let perpIdx = 0; // จำแหล่ง perp ที่ใช้ได้ล่าสุด (บางเครือข่ายในไทยเข้า Bybit ไม่ได้) ลองตัวนั้นก่อน
@@ -1106,14 +1111,14 @@
         const ys = await yahooRows(t);
         let ps = null; try { ps = await perpRows(t, n > 300 ? n : 300); } catch (e) {}
         if (!ps || !ps.length) { hybOff = null; return ys; }
-        const T = ys[ys.length - 1][0], pm = new Map(ps.map(k => [k[0], k]));
-        const pT = pm.get(T);
-        if (!pT) return ys; // perp ไม่มีแท่งเวลานั้น (ช่วงปิดตลาด) ใช้ Yahoo ล้วน
-        const off = Math.round((ys[ys.length - 1][1] - pT[1]) * 100) / 100;
-        if (!isFinite(off) || Math.abs(off) > 40) return ys;
+        const pm = new Map(ps.map(k => [k[0], k]));
+        let i = ys.length - 1; while (i >= 0 && i >= ys.length - 5 && !pm.has(ys[i][0])) i--;
+        if (i < 0 || !pm.has(ys[i][0])) { hybOff = null; return ys; } // perp ไม่มีแท่งเวลานั้น (ช่วงปิดตลาด) ใช้ Yahoo ล้วน
+        const T = ys[i][0], pT = pm.get(T), yl = ys[i];
+        const off = Math.round((yl[1] - pT[1]) * 100) / 100;
+        if (!isFinite(off) || Math.abs(off) > 40) { hybOff = null; return ys; }
         hybOff = off; hybAt = T / 1000;
-        const out = ys.slice(0, -1);
-        const yl = ys[ys.length - 1];
+        const out = ys.slice(0, i);
         out.push([T, yl[1], Math.max(yl[2], pT[2] + off), Math.min(yl[3], pT[3] + off), pT[4] + off]);
         ps.filter(k => k[0] > T).forEach(k => out.push([k[0], k[1] + off, k[2] + off, k[3] + off, k[4] + off]));
         return out;

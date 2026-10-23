@@ -5,6 +5,7 @@ import json, os, sys, time, urllib.request
 
 SYM = sys.argv[1] if len(sys.argv) > 1 else 'YM=F'
 OUT = sys.argv[2] if len(sys.argv) > 2 else 'ym.json'
+ND = int(sys.argv[3]) if len(sys.argv) > 3 else 1   # ทศนิยมของราคา (ทอง = 2)
 # (ชื่อ TF ในแอป, interval ของ Yahoo, range)
 PLAN = [('1m', '1m', '1d'), ('5m', '5m', '5d'), ('15m', '15m', '15d'), ('30m', '30m', '30d'),
         ('1h', '60m', '60d'), ('1d', '1d', '1y')]
@@ -23,7 +24,7 @@ def fetch(interval, rng):
                 o, h, l, c = q['open'][i], q['high'][i], q['low'][i], q['close'][i]
                 if None in (o, h, l, c):
                     continue
-                out.append([t, round(o, 1), round(h, 1), round(l, 1), round(c, 1)])
+                out.append([t, round(o, ND), round(h, ND), round(l, ND), round(c, ND)])
             if out:
                 return out
         except Exception as e:

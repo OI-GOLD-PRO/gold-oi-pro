@@ -5,7 +5,7 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
   push:
-    paths: ['.github/workflows/gcm.yml', 'scripts/gc1m.py']
+    paths: ['.github/workflows/gcm.yml', 'scripts/gc1m.py', 'scripts/yf.py']
 permissions:
   contents: write
 concurrency: gc-m1
@@ -15,11 +15,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/gc1m.py
+      - name: GC=F candles all timeframes (chart option)
+        run: |
+          age=$(( $(date +%s) - $(jq -r '.updated // 0' gcy.json 2>/dev/null || echo 0) ))
+          if [ "$age" -lt 240 ]; then echo "gcy.json fresh (${age}s), skip"; exit 0; fi
+          python3 scripts/yf.py GC=F gcy.json 2
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add gcm.json
+          git add gcm.json gcy.json 2>/dev/null || git add gcm.json
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -m "Update gcm.json"
           for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 3; done

@@ -6,7 +6,7 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
   push:
-    paths: ['.github/workflows/news.yml', 'scripts/news.py', 'scripts/yf.py']
+    paths: ['.github/workflows/news.yml', 'scripts/news.py', 'scripts/yf.py', 'scripts/gc1m.py']
 permissions:
   contents: write
 concurrency: ff-news
@@ -37,11 +37,16 @@ jobs:
           age=$(( $(date +%s) - $(jq -r '.updated // 0' ym.json 2>/dev/null || echo 0) ))
           if [ "$age" -lt 240 ]; then echo "ym.json fresh (${age}s), skip"; exit 0; fi
           python3 scripts/yf.py YM=F ym.json
+      - name: Fetch GC=F 1m bars (Yahoo) for live offset pairing
+        run: |
+          age=$(( $(date +%s) - $(jq -r '.updated // 0' gcm.json 2>/dev/null || echo 0) ))
+          if [ "$age" -lt 150 ]; then echo "gcm.json fresh (${age}s), skip"; exit 0; fi
+          python3 scripts/gc1m.py
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add news.json gc.json ym.json 2>/dev/null || git add news.json
+          git add news.json gc.json ym.json gcm.json 2>/dev/null || git add news.json
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -m "Update news and GC history"
           git pull --rebase -q || true

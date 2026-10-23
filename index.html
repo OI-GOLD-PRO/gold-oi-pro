@@ -249,7 +249,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.13.03';
+  const APP_VER = '1.13.04';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -656,6 +656,7 @@
   // ที่อยู่ไฟล์ news.json: อ่านชื่อบัญชี/รีโปจากลิงก์ของหน้าเว็บเอง (เปลี่ยนชื่อรีโปภายหลังก็ยังใช้ได้)
   const GH_OWNER = /\.github\.io$/.test(location.hostname) ? location.hostname.split('.')[0] : 'OI-GOLD-PRO';
   const GH_REPO = (/\.github\.io$/.test(location.hostname) && location.pathname.split('/')[1]) || 'oi-gold';
+  const GC_WORKER = 'https://gc-yahoo.oigoldpro.workers.dev'; // Cloudflare Worker ดึง Yahoo GC=F สด (ล่าช้าเฉพาะที่ Yahoo ช้า ~10 น.)
   const NEWS_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/news.json`;
   // หมายเหตุ: raw.githubusercontent แคชไฟล์ราว 5 นาที
   let news = [];
@@ -1076,10 +1077,15 @@
     const withTimeout = (url, ms) => { const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms); return fetch(url, { cache: 'no-store', signal: ac.signal }).finally(() => clearTimeout(t)); };
     async function yahooRows(t) {
       const c = yc[t];
-      if (c && Date.now() - c.at < 60000) return c.rows;
-      const r = await withTimeout(`${Y_URL}?t=${Math.floor(Date.now() / 60000)}`, 7000);
-      if (!r.ok) throw new Error('Yahoo HTTP ' + r.status);
-      const j = await r.json(); const b = j.bars && j.bars[t];
+      if (c && Date.now() - c.at < 20000) return c.rows;
+      let j = null;
+      try { const w = await withTimeout(`${GC_WORKER}/?tf=${t}`, 7000); if (w.ok) j = await w.json(); } catch (e) {}
+      if (!j || !j.bars || !j.bars[t]) { // Worker ไม่ตอบ: ใช้ไฟล์จาก GitHub Actions (ช้ากว่า)
+        const r = await withTimeout(`${Y_URL}?t=${Math.floor(Date.now() / 60000)}`, 7000);
+        if (!r.ok) throw new Error('Yahoo HTTP ' + r.status);
+        j = await r.json();
+      }
+      const b = j.bars && j.bars[t];
       if (!b || !b.length) throw new Error('ไม่มีข้อมูล Yahoo ' + t);
       const rows = b.map(k => [k[0] * 1000, k[1], k[2], k[3], k[4]]);
       yc[t] = { at: Date.now(), rows }; return rows;
@@ -1094,7 +1100,7 @@
       throw last || new Error('perp ไม่ตอบ');
     }
     PROVIDERS.splice(0, PROVIDERS.length, {
-      id: 'yahoo', name: `Yahoo ${SC.yahoo} + สดจาก perp`,
+      id: 'yahoo', name: `Yahoo ${SC.yahoo} (Worker) + สดจาก perp`,
       pollMs: 5000,
       fetchRows: async (t, n) => {
         const ys = await yahooRows(t);
@@ -1143,8 +1149,9 @@
     if (SYM !== 'gold' || liveBusy || !prov || !oi) return;
     liveBusy = true;
     try {
-      const r = await fetch(GCY_URL + '?t=' + Math.floor(Date.now() / 60000), { cache: 'no-store' });
-      const bars = ((await r.json()).bars || {})['1m'] || [];   // [t(วินาที), o, h, l, c]
+      let bars = [];
+      try { const w = await fetch(`${GC_WORKER}/?tf=1m`, { cache: 'no-store' }); if (w.ok) bars = ((await w.json()).bars || {})['1m'] || []; } catch (e) {}
+      if (!bars.length) { const r = await fetch(GCY_URL + '?t=' + Math.floor(Date.now() / 60000), { cache: 'no-store' }); bars = ((await r.json()).bars || {})['1m'] || []; }   // [t(วินาที), o, h, l, c]
       const rows = await fetchBars(prov, '1m', 400);
       const pm = new Map(rows.map(k => [Math.floor(k[0] / 1000), k[4]])); // ราคาปิดแท่ง M1 ของ perp
       const nowS = Date.now() / 1000;

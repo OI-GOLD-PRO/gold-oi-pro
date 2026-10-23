@@ -1,6 +1,6 @@
 // แดชบอร์ดวิเคราะห์ตลาด (ทองคำ / น้ำมัน)
 // ข้อมูลมาจาก Apps Script (?api=data) ทุกครั้งที่เปิดหน้า:
-//   - levels + cfg.volume  → คำนวณ PCR, Max Pain, OI เปลี่ยน, ความแข็งของแนว, Volume × OI ในหน้าเว็บ
+//   - levels + cfg.volume  → คำนวณ PCR, Max Pain, ความแข็งของแนว, Volume × OI ในหน้าเว็บ
 //   - cfg.dash (JSON)      → ผลวิเคราะห์ที่เขียนจากแชททุกครั้งที่ "อัพเดท": แนวโน้ม คะแนน เข็มวัด แนวสำคัญ ความคิด MM ข่าว ประวัติ
 (() => {
   'use strict';
@@ -69,16 +69,6 @@
   #dash .lv.R .str i.on { background: var(--call); } #dash .lv.S .str i.on { background: var(--put); } #dash .lv.P .str i.on { background: var(--mp); }
   #dash .now { display: flex; align-items: center; gap: 8px; font: 600 12px var(--mono); color: var(--gold); padding: 2px 8px; }
   #dash .now::before, #dash .now::after { content: ''; flex: 1; height: 1px; background: var(--gold); opacity: .6; }
-  #dash .chgrow { display: grid; grid-template-columns: 1fr 58px 1fr; align-items: center; gap: 6px; height: 17px; }
-  #dash .chgrow .k { text-align: center; font: 11px var(--mono); color: var(--muted); }
-  #dash .chgrow .k.cur { color: var(--gold); font-weight: 600; }
-  #dash .chgrow .l, #dash .chgrow .r { position: relative; height: 10px; }
-  #dash .chgrow .l i, #dash .chgrow .r i { position: absolute; top: 0; height: 10px; border-radius: 2px; }
-  #dash .chgrow .l i { right: 0; } #dash .chgrow .r i { left: 0; }
-  #dash .chgrow i.pp { background: var(--put); } #dash .chgrow i.pn { background: var(--put); opacity: .35; }
-  #dash .chgrow i.cp { background: var(--call); } #dash .chgrow i.cn { background: var(--call); opacity: .35; }
-  #dash .chgrow span { position: absolute; top: -2px; font: 9.5px var(--mono); color: var(--muted); white-space: nowrap; }
-  #dash .chgleg { display: flex; justify-content: space-between; font: 10.5px var(--sans); color: var(--muted); margin-bottom: 6px; }
   #dash table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
   #dash th { text-align: left; font: 600 10.5px var(--sans); color: var(--muted); padding: 4px 4px; border-bottom: 1px solid var(--line); }
   #dash td { padding: 5px 4px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -137,22 +127,20 @@
   function calc(d) {
     const map = new Map();
     (d.levels || []).forEach(l => {
-      const r = map.get(l.strike) || { k: l.strike, c: 0, p: 0, dc: null, dp: null, vc: 0, vp: 0 };
-      const ch = (l.chg === null || l.chg === undefined || !isFinite(l.chg)) ? null : Number(l.chg);
-      if (l.type === 'P') { r.p += l.oi; if (ch !== null) r.dp = ch; } else { r.c += l.oi; if (ch !== null) r.dc = ch; }
+      const r = map.get(l.strike) || { k: l.strike, c: 0, p: 0, vc: 0, vp: 0 };
+      if (l.type === 'P') r.p += l.oi; else r.c += l.oi;
       map.set(l.strike, r);
     });
     let vol = {};
     try { vol = d.cfg && d.cfg.volume ? JSON.parse(d.cfg.volume) : {}; } catch (e) {}
     Object.keys(vol).forEach(s => {
       const k = Number(s), v = vol[s];
-      const r = map.get(k) || { k, c: 0, p: 0, dc: null, dp: null, vc: 0, vp: 0 };
+      const r = map.get(k) || { k, c: 0, p: 0, vc: 0, vp: 0 };
       r.vc = Number(v[0]) || 0; r.vp = Number(v[1]) || 0; map.set(k, r);
     });
     const rows = [...map.values()].sort((a, b) => a.k - b.k);
     const sum = f => rows.reduce((a, r) => a + (f(r) || 0), 0);
     const C = sum(r => r.c), P = sum(r => r.p), VC = sum(r => r.vc), VP = sum(r => r.vp);
-    const dC = sum(r => r.dc), dP = sum(r => r.dp);
     let mp = null, best = Infinity;
     rows.forEach(s => {
       if (!s.c && !s.p) return;
@@ -161,17 +149,13 @@
     });
     const maxOI = Math.max(1, ...rows.map(r => r.c + r.p)), maxV = Math.max(1, ...rows.map(r => r.vc + r.vp));
     rows.forEach(r => { r.str = Math.max(1, Math.min(5, Math.round(((r.c + r.p) / maxOI * .7 + (r.vc + r.vp) / maxV * .3) * 5 + .3))); });
-    return { rows, C, P, VC, VP, dC, dP, mp, maxOI, maxV, pcr: C ? P / C : null, vpcr: VC ? VP / VC : null, hasChg: rows.some(r => r.dc !== null || r.dp !== null) };
+    return { rows, C, P, VC, VP, mp, maxOI, maxV, pcr: C ? P / C : null, vpcr: VC ? VP / VC : null };
   }
 
-  // Volume × OI: ตีความแต่ละ strike
-  // OI เปลี่ยน = เทียบวันก่อน, Volume = วันนี้ จึงใช้สัดส่วน Volume ต่อ OI ที่เปลี่ยนเป็นตัวแยก
+  // Volume × OI: ตีความแต่ละ strike (ใช้สัดส่วน Volume ต่อ Volume สูงสุดของวัน)
   function classify(r, maxV) {
-    const v = r.vc + r.vp, ch = (r.dc || 0) + (r.dp || 0), hasCh = r.dc !== null || r.dp !== null;
-    if (!hasCh || ch === 0) return v >= maxV * .3 ? ['turn', 'เทรดหมุนเวียน'] : null;
-    if (ch < 0) return v >= Math.abs(ch) ? ['close', 'ปิดสถานะ / roll'] : ['close', 'OI ลดลง'];
-    if (v >= ch * 2) return ['new', 'เปิดใหม่ + เทรดหนัก'];
-    return ['hold', 'ถือยาว แนวแข็ง'];
+    const v = r.vc + r.vp;
+    return v >= maxV * .3 ? ['turn', 'เทรดหมุนเวียน'] : null;
   }
 
   // ---------- วาดหน้าจอ ----------
@@ -236,8 +220,6 @@
         <div class="tile"><small>Max Pain</small><b style="color:var(--mp)">${fmt(m.mp, S.dec)}</b><em>${dist === null ? '' : `ราคาอยู่${dist >= 0 ? 'เหนือ' : 'ใต้'} ${fmt(Math.abs(dist), S.pdec)}${S.unit}`}</em></div>
         <div class="tile"><small>Put/Call จาก OI</small><b>${fmt(m.pcr, 2)}</b><em>${pcrNote(m.pcr)}</em></div>
         <div class="tile"><small>Put/Call จาก Volume</small><b>${fmt(m.vpcr, 2)}</b><em>${pcrNote(m.vpcr)}</em></div>
-        <div class="tile"><small>OI เปลี่ยน Call</small><b style="color:var(--call)">${m.hasChg ? sgn(m.dC) : '–'}</b><em>รวม OI ${fmt(m.C, 0)}</em></div>
-        <div class="tile"><small>OI เปลี่ยน Put</small><b style="color:var(--put)">${m.hasChg ? sgn(m.dP) : '–'}</b><em>รวม OI ${fmt(m.P, 0)}</em></div>
       </div></div></div>`);
 
     // 4) แนวรับแนวต้าน (ความแข็ง)
@@ -255,24 +237,12 @@
       parts.push(`<div class="card"><h3>แนวรับ แนวต้าน และความแข็ง (คิดจาก OI 70% + Volume 30%)</h3><div class="ladder">${out.join('')}</div></div>`);
     }
 
-    // 5) OI เปลี่ยนเทียบเมื่อวาน (รอบราคา)
-    if (m.hasChg) {
-      const ref = price !== null ? price : (m.mp || 0);
-      const near = m.rows.filter(r => r.dc !== null || r.dp !== null).sort((a, b) => Math.abs(a.k - ref) - Math.abs(b.k - ref)).slice(0, 18).sort((a, b) => b.k - a.k);
-      const mx = Math.max(1, ...near.map(r => Math.max(Math.abs(r.dc || 0), Math.abs(r.dp || 0))));
-      const curK = near.reduce((b, r) => Math.abs(r.k - ref) < Math.abs(b.k - ref) ? r : b, near[0] || {}).k;
-      const bar = (v, side) => { if (!v) return ''; const w = Math.abs(v) / mx * 72; const cl = side === 'p' ? (v > 0 ? 'pp' : 'pn') : (v > 0 ? 'cp' : 'cn'); const lbl = side === 'p' ? `<span style="right:${w + 2}%">${sgn(v)}</span>` : `<span style="left:${w + 2}%">${sgn(v)}</span>`; return `<i class="${cl}" style="width:${w}%"></i>${lbl}`; };
-      parts.push(`<div class="card"><h3>OI เปลี่ยนเทียบเมื่อวาน ใกล้ราคา (บวก = เปิดใหม่ / จาง = ลดลง)</h3>
-        <div class="chgleg"><span style="color:var(--put)">◀ Put</span><span>strike</span><span style="color:var(--call)">Call ▶</span></div>
-        ${near.map(r => `<div class="chgrow"><div class="l">${bar(r.dp, 'p')}</div><div class="k ${r.k === curK ? 'cur' : ''}">${fmt(r.k, S.dec)}</div><div class="r">${bar(r.dc, 'c')}</div></div>`).join('')}</div>`);
-    }
-
     // 6) Volume × OI
     const act = m.rows.filter(r => r.vc + r.vp > 0).sort((a, b) => (b.vc + b.vp) - (a.vc + a.vp)).slice(0, 8).sort((a, b) => b.k - a.k);
     if (act.length) {
-      parts.push(`<div class="card"><h3>Volume × OI วันนี้ (8 strike ที่เทรดมากสุด)</h3><table><thead><tr><th>Strike</th><th>Vol C/P</th><th>OI เปลี่ยน C/P</th><th>ตีความ</th></tr></thead><tbody>
-        ${act.map(r => { const t = classify(r, m.maxV); return `<tr><td>${fmt(r.k, S.dec)}</td><td>${r.vc}/${r.vp}</td><td>${r.dc === null ? '–' : sgn(r.dc)}/${r.dp === null ? '–' : sgn(r.dp)}</td><td class="tag">${t ? `<span class="tg ${t[0]}">${t[1]}</span>` : '<span class="tg turn">ปกติ</span>'}</td></tr>`; }).join('')}
-        </tbody></table><div class="note" style="margin-top:6px">OI เปลี่ยนวัดเทียบวันก่อน ส่วน Volume เป็นของวันนี้ ระหว่างวันจึงใช้ดูทิศทางมากกว่าตัวเลขตายตัว</div></div>`);
+      parts.push(`<div class="card"><h3>Volume × OI วันนี้ (8 strike ที่เทรดมากสุด)</h3><table><thead><tr><th>Strike</th><th>Vol C/P</th><th>ตีความ</th></tr></thead><tbody>
+        ${act.map(r => { const t = classify(r, m.maxV); return `<tr><td>${fmt(r.k, S.dec)}</td><td>${r.vc}/${r.vp}</td><td class="tag">${t ? `<span class="tg ${t[0]}">${t[1]}</span>` : '<span class="tg turn">ปกติ</span>'}</td></tr>`; }).join('')}
+        </tbody></table></div>`);
     }
 
     // 7) ความคิด Market Maker

@@ -17,7 +17,9 @@
       "i": "M",
       "title": "Flash Manufacturing PMI",
       "forecast": "55.4",
-      "previous": "57.0"
+      "previous": "57.0",
+      "actual": "56.0",
+      "better": true
     },
     {
       "date": "2026-10-23T09:45:00-04:00",
@@ -25,7 +27,9 @@
       "i": "M",
       "title": "Flash Services PMI",
       "forecast": "57.9",
-      "previous": "58.7"
+      "previous": "58.7",
+      "actual": "57.9",
+      "better": null
     },
     {
       "date": "2026-10-23T10:00:00-04:00",
@@ -33,7 +37,9 @@
       "i": "M",
       "title": "Revised UoM Consumer Sentiment",
       "forecast": "46.3",
-      "previous": "46.3"
+      "previous": "46.3",
+      "actual": "48.0",
+      "better": true
     },
     {
       "date": "2026-10-23T10:00:00-04:00",
@@ -41,7 +47,9 @@
       "i": "M",
       "title": "Revised UoM Inflation Expectations",
       "forecast": "",
-      "previous": "4.7%"
+      "previous": "4.7%",
+      "actual": "4.7%",
+      "better": null
     }
   ]
 }

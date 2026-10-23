@@ -247,9 +247,9 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const DATA_SYM = SC.dataSym || SYM;         // gcy ใช้ OI/Volume ชุดเดียวกับทอง
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
-  const SYMBOL = SC.perp;
+  const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.13.00';
+  const APP_VER = '1.13.01';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1066,13 +1066,50 @@
       msg: (m, t) => (m.k && m.k.i === t) ? [[+m.k.t, +m.k.o, +m.k.h, +m.k.l, +m.k.c]] : null,
     },
   ];
-  // US30: ไม่มี perpetual ให้ดึง จึงใช้ราคา YM=F จาก Yahoo ที่ GitHub Actions เก็บไว้ใน ym.json (ช้าราว 5-10 นาที)
+  // กราฟ Yahoo (GC=F): ไฟล์จาก GitHub Actions ช้า ~10 นาที จึงผสม: แท่ง Yahoo จริงถึงแท่งล่าสุดที่ Yahoo มี
+  // แล้วต่อปลายกราฟด้วยแท่งสดของ perp (Bybit/Bitget/Binance) + offset (= เปิดแท่ง Yahoo ล่าสุด − เปิดแท่ง perp เวลาเดียวกัน)
+  let hybOff = null, hybAt = null;
   if (SC.yahoo) {
-    const YM_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/${SC.yfile || 'ym.json'}`;
+    const PERP = PROVIDERS.slice();
+    const Y_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/${SC.yfile || 'ym.json'}`;
+    const yc = {};
+    const withTimeout = (url, ms) => { const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms); return fetch(url, { cache: 'no-store', signal: ac.signal }).finally(() => clearTimeout(t)); };
+    async function yahooRows(t) {
+      const c = yc[t];
+      if (c && Date.now() - c.at < 60000) return c.rows;
+      const r = await withTimeout(`${Y_URL}?t=${Math.floor(Date.now() / 60000)}`, 7000);
+      if (!r.ok) throw new Error('Yahoo HTTP ' + r.status);
+      const j = await r.json(); const b = j.bars && j.bars[t];
+      if (!b || !b.length) throw new Error('ไม่มีข้อมูล Yahoo ' + t);
+      const rows = b.map(k => [k[0] * 1000, k[1], k[2], k[3], k[4]]);
+      yc[t] = { at: Date.now(), rows }; return rows;
+    }
+    async function perpRows(t, n) {
+      let last = null;
+      for (const q of PERP) {
+        try { const r = await withTimeout(q.rest(t, Math.min(n, 1000)), 6000); if (!r.ok) throw new Error('HTTP ' + r.status); return q.parse(await r.json(), t).sort((a, b) => a[0] - b[0]); } catch (e) { last = e; }
+      }
+      throw last || new Error('perp ไม่ตอบ');
+    }
     PROVIDERS.splice(0, PROVIDERS.length, {
-      id: 'yahoo', name: `Yahoo ${SC.yahoo} (ช้า ~10 น.)`,
-      rest: () => `${YM_URL}?t=${Math.floor(Date.now() / 60000)}`,
-      parse: (j, t) => { const b = j.bars && j.bars[t]; if (!b || !b.length) throw new Error('ไม่มีข้อมูล ' + t); return b.map(k => [k[0] * 1000, k[1], k[2], k[3], k[4]]); },
+      id: 'yahoo', name: `Yahoo ${SC.yahoo} + สดจาก perp`,
+      pollMs: 5000,
+      fetchRows: async (t, n) => {
+        const ys = await yahooRows(t);
+        let ps = null; try { ps = await perpRows(t, n > 300 ? n : 300); } catch (e) {}
+        if (!ps || !ps.length) { hybOff = null; return ys; }
+        const T = ys[ys.length - 1][0], pm = new Map(ps.map(k => [k[0], k]));
+        const pT = pm.get(T);
+        if (!pT) return ys; // perp ไม่มีแท่งเวลานั้น (ช่วงปิดตลาด) ใช้ Yahoo ล้วน
+        const off = Math.round((ys[ys.length - 1][1] - pT[1]) * 100) / 100;
+        if (!isFinite(off) || Math.abs(off) > 40) return ys;
+        hybOff = off; hybAt = T / 1000;
+        const out = ys.slice(0, -1);
+        const yl = ys[ys.length - 1];
+        out.push([T, yl[1], Math.max(yl[2], pT[2] + off), Math.min(yl[3], pT[3] + off), pT[4] + off]);
+        ps.filter(k => k[0] > T).forEach(k => out.push([k[0], k[1] + off, k[2] + off, k[3] + off, k[4] + off]));
+        return out;
+      },
       ws: null,
     });
   }
@@ -1085,6 +1122,7 @@
   function paintOff() {
     const el = $('offchip'); if (!el) return;
     const t = adjAt ? adjAt.toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
+    if (SC.yahoo) { el.innerHTML = hybOff === null ? 'กราฟ Yahoo' : `ปลายกราฟต่อด้วย perp <b>${hybOff >= 0 ? '+' : ''}${hybOff.toFixed(2)}</b> <small>· Yahoo ถึง ${new Date(hybAt * 1000).toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}</small>`; return; }
     el.innerHTML = `offset <b>${(-adj).toFixed(2)}</b>` + (liveAt !== null && SYM === 'gold' ? ` <small>· Yahoo ${new Date(liveAt * 1000).toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}</small>` : '');
   }
   function applyAdj(next) {
@@ -1158,6 +1196,7 @@
   }
 
   async function fetchBars(p, t, n) {
+    if (p.fetchRows) return p.fetchRows(t, n);
     const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 7000);
     try {
       const r = await fetch(p.rest(t, n), { cache: 'no-store', signal: ac.signal });
@@ -1202,6 +1241,7 @@
         updateBasis();
         setSource(p);
         showPrice();
+        if (SC.yahoo) paintOff();
         chart.timeScale().scrollToRealTime();
         $('msg').hidden = true;
         dirty = true;
@@ -1217,7 +1257,7 @@
     if (ws) { ws.onclose = null; ws.close(); }
     if (!prov) return;
     const p = prov, t = tf;
-    if (!p.ws) { // ไม่มี websocket: ดึงไฟล์ซ้ำทุก 30 วินาที
+    if (!p.ws) { // ไม่มี websocket: ดึงซ้ำเป็นระยะ (ค่าเริ่ม 30 วินาที, กราฟ Yahoo ผสม 5 วินาที)
       $('dot').classList.add('live');
       pollTimer = setInterval(async () => {
         if (document.visibilityState === 'hidden' || tf !== t) return;
@@ -1230,9 +1270,9 @@
             const lastRaw = rawBars[rawBars.length - 1];
             if (lastRaw && lastRaw[0] === k[0]) rawBars[rawBars.length - 1] = k; else rawBars.push(k);
           });
-          showPrice(); indTick(); checkAlerts(lastClose);
+          showPrice(); indTick(); checkAlerts(lastClose); if (SC.yahoo) paintOff();
         } catch (e) {}
-      }, 30000);
+      }, p.pollMs || 30000);
       return;
     }
     ws = new WebSocket(p.ws(t));

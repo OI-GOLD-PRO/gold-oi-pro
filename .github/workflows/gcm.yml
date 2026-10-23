@@ -1,0 +1,25 @@
+# ดึงแท่ง M1 ของ GC=F (Yahoo) ทุก 5 นาที เก็บเป็น gcm.json ให้แอปจับคู่ราคาเปิดแท่งเดียวกับ perp แล้วคำนวณ offset
+name: gc-m1
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/gcm.yml', 'scripts/gc1m.py']
+permissions:
+  contents: write
+concurrency: gc-m1
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/gc1m.py
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add gcm.json
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "Update gcm.json"
+          for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 3; done

@@ -249,7 +249,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.13.01';
+  const APP_VER = '1.13.02';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1132,25 +1132,27 @@
     dirty = true; showPrice(); paintOff();
     if (typeof resetArming === 'function' && lastClose !== null) resetArming(lastClose);
   }
-  // offset สด: ทุก 1 นาที เอาแท่ง 1 นาทีล่าสุดของ Yahoo GC=F (gcm.json จาก GitHub Actions) จับคู่กับแท่ง perp นาทีเดียวกัน
-  // offset = GC เปิดแท่ง M1 นั้น − perp เปิดแท่ง M1 นั้น (ค่าของอดีตราว 10-20 นาที แต่แม่นเพราะเทียบเวลาเดียวกัน) แล้วใช้กับราคาปัจจุบัน
+  // offset สด: ทุก 1 นาที เอาแท่ง M1 ที่ "ปิดแล้ว" ล่าสุดของ Yahoo GC=F (gcy.json จาก GitHub Actions)
+  // จับคู่กับแท่ง M1 ของ perp เวลาเดียวกัน offset = GC ปิดแท่งนั้น − perp ปิดแท่งนั้น แล้วปรับกราฟ XAUUSD
+  // (ค่าของอดีตราว 10-20 นาทีตาม Yahoo แต่แม่นเพราะเทียบเวลาเดียวกัน แล้วใช้กับราคาปัจจุบัน)
   let liveAt = null, liveBusy = false;
-  const GCM_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/gcm.json`;
+  const GCY_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/gcy.json`;
   async function pairYahoo() {
     if (SYM !== 'gold' || liveBusy || !prov || !oi) return;
     liveBusy = true;
     try {
-      const r = await fetch(GCM_URL + '?t=' + Date.now(), { cache: 'no-store' });
-      const bars = (await r.json()).bars || [];
+      const r = await fetch(GCY_URL + '?t=' + Math.floor(Date.now() / 60000), { cache: 'no-store' });
+      const bars = ((await r.json()).bars || {})['1m'] || [];   // [t(วินาที), o, h, l, c]
       const rows = await fetchBars(prov, '1m', 400);
-      const pm = new Map(rows.map(k => [Math.floor(k[0] / 1000), k[1]])); // ราคาเปิดแท่ง M1
-      // แท่ง Yahoo ล่าสุดที่ perp มีแท่งนาทีเดียวกัน
-      for (let i = bars.length - 1; i >= 0 && i >= bars.length - 30; i--) {
+      const pm = new Map(rows.map(k => [Math.floor(k[0] / 1000), k[4]])); // ราคาปิดแท่ง M1 ของ perp
+      const nowS = Date.now() / 1000;
+      for (let i = bars.length - 1; i >= 0 && i >= bars.length - 40; i--) {
         const t = Math.floor(bars[i][0] / 60) * 60;
+        if (t + 60 > nowS) continue;            // แท่งที่ยังไม่ปิด ข้าม
         if (!pm.has(t)) continue;
-        if (Date.now() / 1000 - t > 90 * 60) return; // ข้อมูลเก่าเกิน 90 นาที ไม่ใช้
-        const off = Math.round((bars[i][1] - pm.get(t)) * 100) / 100;
-        if (!isFinite(off) || Math.abs(off) > 30) return;
+        if (nowS - t > 90 * 60) return;         // ข้อมูลเก่าเกิน 90 นาที ไม่ใช้
+        const off = Math.round((bars[i][4] - pm.get(t)) * 100) / 100;
+        if (!isFinite(off) || Math.abs(off) > 40) return;
         if (liveAt === null || Math.abs(-off - adj) >= 0.01) { liveAt = t; applyAdj(-off); } else { liveAt = t; paintOff(); }
         return;
       }

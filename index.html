@@ -234,7 +234,6 @@
   const SYMS = {
     gold: { name: 'XAUUSD', label: 'ทองคำ', ico: '🥇', perp: 'XAUUSDT', dec: 2, tick: 0.01, tol: 1.5, rearm: 8, mult: 100, carry: true, zone: 2.5, note: 'GC' },
     oil: { name: 'WTI', label: 'น้ำมัน', ico: '🛢️', perp: 'CLUSDT', dec: 2, tick: 0.01, tol: 0.15, rearm: 0.8, mult: 1000, carry: false, zone: 0.15, note: 'CL' },
-    us30: { name: 'US30', label: 'US30', ico: '📈', perp: null, yahoo: 'YM', dec: 0, tick: 1, tol: 15, rearm: 80, mult: 1, carry: false, zone: 2.5, note: 'YM' },
   };
   // ---- เลย์เอาต์ 2 กราฟ: กราฟที่ 2 = iframe ของแอปเดียวกัน (?pane=b) แยก TF/อินดิเคเตอร์/OI/วาด ด้วย key ต่อท้าย _b ----
   const QS = new URLSearchParams(location.search);
@@ -247,7 +246,7 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.11.09';
+  const APP_VER = '1.12.00';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -861,26 +860,29 @@
 
   // ---------- แจ้งเตือนเมื่อราคาเข้าใกล้โซน OI ----------
   const ALERT_MIN_OI = 50;   // เฉพาะ strike ที่ Put หรือ Call มี OI ตั้งแต่ 50
-  const ALERT_TOL = SC.tol;     // ห่างจากเส้นไม่เกิน $1.5 ถือว่าเข้าโซน
-  const ALERT_ZONE_COOL = 10 * 60000; // โซนเดียวกันเตือนซ้ำได้หลัง 10 นาที
-  const ALERT_ANY_COOL = 60000;        // เว้นอย่างน้อย 60 วินาทีระหว่างการเตือน
-  const REARM = SC.rearm;          // ต้องออกห่างเส้น $8 (ถือว่าทะลุโซนจริง) ก่อนจึงเตือนโซนเดิมซ้ำ
+  // แจ้งเตือน 3 ขั้นต่อโซน: (1) ราคาถึงโซน -> คูลดาวน์ 1 ชม. (2) เบรกเอ้า = แท่ง M5 ปิดพ้นขอบบน/ล่างสุดของโซนเกิน $2 (ต้องผ่านขั้น 1 มาก่อน) -> คูลดาวน์ 30 นาที (3) หลังเบรก ถ้าราคากลับเข้าโซนเดิม เริ่มขั้น 1 ใหม่
+  const REACH_COOL = 60 * 60000, BREAK_COOL = 30 * 60000;
+  const BREAK_EXTRA = SYM === 'gold' ? 2 : SC.tol * (2 / 1.5); // เลยขอบโซน $2 (ทอง); น้ำมันสเกลตามสัดส่วนเดียวกับ tol
+  const M5_MS = 300000;
   let alertsOn = false;
   if (!EMBED) try { alertsOn = localStorage.getItem('oi_alert') === '1'; } catch (e) {}
   let actx = null, wakeLock = null, hit = null;
-  const armed = new Map();
+  const zst = new Map(); // strike -> { st: 'idle'|'reached'|'broken', inside, lastReach, lastBreak }
+  let m5Bucket = null, m5Last = null;
 
   const alertZones = () => (oi && oi.offset !== null) ? oi.rows.filter(r => Math.max(r.p, r.c) >= ALERT_MIN_OI) : [];
+  const zoneEdges = r => ({ lo: r.price - ZONE_HALF, hi: r.price + ZONE_HALF });
 
-  // จำสถานะโซนไว้ตลอด: ซิงก์ชีต/ปรับ offset ทุกนาทีจะไม่รีเซ็ตโซนที่เพิ่งเตือนไป
-  // force = true ใช้ตอนกดเปิดกระดิ่งใหม่เท่านั้น
-  const lastFire = new Map();
-  let lastAnyFire = 0;
+  // จำสถานะโซนไว้ตลอด: ซิงก์ชีต/ปรับ offset ทุกนาทีจะไม่รีเซ็ตสถานะ
+  // force = true ใช้ตอนกดเปิดกระดิ่งใหม่: โซนที่ราคาอยู่ข้างในตอนนั้นนับว่าแจ้งแล้ว (ไม่เตือนทันที)
   function resetArming(price, force) {
     const zones = alertZones(), keep = new Set(zones.map(r => r.strike));
-    [...armed.keys()].forEach(k => { if (!keep.has(k)) armed.delete(k); });
+    [...zst.keys()].forEach(k => { if (!keep.has(k)) zst.delete(k); });
     zones.forEach(r => {
-      if (force || !armed.has(r.strike)) armed.set(r.strike, price === null || Math.abs(price - r.price) > ALERT_TOL);
+      if (force || !zst.has(r.strike)) {
+        const { lo, hi } = zoneEdges(r), inside = price !== null && price >= lo && price <= hi;
+        zst.set(r.strike, { st: inside ? 'reached' : 'idle', inside, lastReach: inside ? Date.now() : 0, lastBreak: 0 });
+      }
     });
   }
 
@@ -983,29 +985,38 @@
   chartEl.addEventListener('touchend', touchEnd, { capture: true });
   chartEl.addEventListener('touchcancel', touchEnd, { capture: true });
 
-  function fire(r, price) {
+  function fire(r, price, kind) {
     hit = { strike: r.strike, until: Date.now() + 60000 }; dirty = true;
     beep();
     try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
     const side = r.c >= r.p ? 'แนวต้าน' : 'แนวรับ';
-    showToast(`🔔 ราคา <b>${price.toFixed(2)}</b> เข้าโซน ${side} strike <b>${r.strike}</b> (${SC.note} ${r.price.toFixed(SC.dec)}) · Call ${r.c} · Put ${r.p}`);
+    const info = `strike <b>${r.strike}</b> (${SC.note} ${r.price.toFixed(SC.dec)}) · Call ${r.c} · Put ${r.p}`;
+    if (kind === 'up' || kind === 'down') showToast(`🚀 <b>เบรกเอ้า${kind === 'up' ? 'ขึ้น' : 'ลง'}</b> M5 ปิด <b>${price.toFixed(SC.dec === 0 ? 0 : 2)}</b> พ้นโซน ${side} ${info}`);
+    else showToast(`🔔 ราคา <b>${price.toFixed(SC.dec === 0 ? 0 : 2)}</b> เข้าโซน ${side} ${info}`);
   }
 
   function checkAlerts(price) {
     if (!alertsOn || price === null) return;
+    const now = Date.now(), bucket = Math.floor(now / M5_MS);
+    // แท่ง M5 ปิดเมื่อข้ามช่วง 5 นาที: ใช้ราคาล่าสุดของช่วงก่อนหน้าเป็นราคาปิด
+    let m5Close = null;
+    if (m5Bucket !== null && bucket !== m5Bucket) m5Close = m5Last;
+    m5Bucket = bucket; m5Last = price;
     alertZones().forEach(r => {
-      const d = Math.abs(price - r.price);
-      if (d <= ALERT_TOL) {
-        if (armed.get(r.strike) !== false) {
-          armed.set(r.strike, false);
-          const now = Date.now();
-          // โซนเดิมเตือนซ้ำได้หลัง 10 นาที และเว้นอย่างน้อย 60 วินาทีระหว่างการเตือนใด ๆ
-          if (now - (lastFire.get(r.strike) || 0) >= ALERT_ZONE_COOL && now - lastAnyFire >= ALERT_ANY_COOL) {
-            lastFire.set(r.strike, now); lastAnyFire = now; fire(r, price);
-          }
-        }
-      } else if (d >= REARM) {
-        armed.set(r.strike, true);
+      let z = zst.get(r.strike);
+      if (!z) { resetArming(price); z = zst.get(r.strike); if (!z) return; }
+      const { lo, hi } = zoneEdges(r), inside = price >= lo && price <= hi;
+      // ขั้น 3: เบรกแล้วราคากลับเข้าโซนเดิม -> เริ่มขั้น 1 ใหม่ (ล้างคูลดาวน์)
+      if (z.st === 'broken' && inside) { z.st = 'idle'; z.lastReach = 0; z.inside = false; }
+      // ขั้น 1: ราคาถึงโซน (ตอนเข้ามาใหม่) และพ้นคูลดาวน์ 1 ชม.
+      if (inside && !z.inside && now - z.lastReach >= REACH_COOL) {
+        z.lastReach = now; z.st = 'reached'; fire(r, price, 'reach');
+      }
+      z.inside = inside;
+      // ขั้น 2: ผ่านขั้น 1 แล้ว + M5 ปิดเลยขอบบน/ล่างเกิน $2 + พ้นคูลดาวน์ 30 นาที
+      if (z.st === 'reached' && m5Close !== null && now - z.lastBreak >= BREAK_COOL) {
+        const up = m5Close > hi + BREAK_EXTRA, down = m5Close < lo - BREAK_EXTRA;
+        if (up || down) { z.st = 'broken'; z.lastBreak = now; fire(r, m5Close, up ? 'up' : 'down'); }
       }
     });
   }
@@ -1026,7 +1037,7 @@
       resetArming(lastClose, true);
       beep();
       keepAwake();
-      showToast(`🔔 เปิดแจ้งเตือนแล้ว: ${alertZones().length} โซน (OI ≥ ${ALERT_MIN_OI}) ห่างเส้นไม่เกิน ${ALERT_TOL} · เปิดแอปค้างไว้เพื่อให้เตือนได้`);
+      showToast(`🔔 เปิดแจ้งเตือนแล้ว: ${alertZones().length} โซน (OI ≥ ${ALERT_MIN_OI}) เตือนเมื่อราคาถึงโซน (ซ้ำได้ทุก 1 ชม.) และเมื่อ M5 ปิดพ้นโซนเกิน $2 (ซ้ำได้ทุก 30 นาที) · เปิดแอปค้างไว้เพื่อให้เตือนได้`);
     } else {
       try { wakeLock && wakeLock.release(); } catch (e) {}
       wakeLock = null;
@@ -1727,7 +1738,7 @@
   $('loginVer').textContent = 'V' + APP_VER;
   let saved = null;
   try { saved = localStorage.getItem('oi_code'); } catch (e) {}
-  // ---------- เลือกสัญลักษณ์ (ทอง / น้ำมัน / US30) ----------
+  // ---------- เลือกสัญลักษณ์ (ทอง / น้ำมัน) ----------
   $('symName').textContent = SC.name;
   $('symMenu').innerHTML = Object.keys(SYMS).map(k => `<button data-sym="${k}" class="${k === SYM ? 'on' : ''}"><em>${SYMS[k].ico}</em>${SYMS[k].label}<small>${SYMS[k].name}</small></button>`).join('');
   $('symBtn').addEventListener('click', e => { e.stopPropagation(); $('symMenu').hidden = !$('symMenu').hidden; });

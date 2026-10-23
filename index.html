@@ -249,7 +249,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.13.02';
+  const APP_VER = '1.13.03';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1084,10 +1084,12 @@
       const rows = b.map(k => [k[0] * 1000, k[1], k[2], k[3], k[4]]);
       yc[t] = { at: Date.now(), rows }; return rows;
     }
+    let perpIdx = 0; // จำแหล่ง perp ที่ใช้ได้ล่าสุด (บางเครือข่ายในไทยเข้า Bybit ไม่ได้) ลองตัวนั้นก่อน
     async function perpRows(t, n) {
       let last = null;
-      for (const q of PERP) {
-        try { const r = await withTimeout(q.rest(t, Math.min(n, 1000)), 6000); if (!r.ok) throw new Error('HTTP ' + r.status); return q.parse(await r.json(), t).sort((a, b) => a[0] - b[0]); } catch (e) { last = e; }
+      for (let i = 0; i < PERP.length; i++) {
+        const q = PERP[(perpIdx + i) % PERP.length];
+        try { const r = await withTimeout(q.rest(t, Math.min(n, 1000)), 4000); if (!r.ok) throw new Error('HTTP ' + r.status); const rows = q.parse(await r.json(), t).sort((a, b) => a[0] - b[0]); perpIdx = (perpIdx + i) % PERP.length; return rows; } catch (e) { last = e; }
       }
       throw last || new Error('perp ไม่ตอบ');
     }
@@ -1261,8 +1263,10 @@
     const p = prov, t = tf;
     if (!p.ws) { // ไม่มี websocket: ดึงซ้ำเป็นระยะ (ค่าเริ่ม 30 วินาที, กราฟ Yahoo ผสม 5 วินาที)
       $('dot').classList.add('live');
+      let polling = false;
       pollTimer = setInterval(async () => {
-        if (document.visibilityState === 'hidden' || tf !== t) return;
+        if (document.visibilityState === 'hidden' || tf !== t || polling) return;
+        polling = true;
         try {
           const rows = (await fetchBars(p, t, 800)).filter(k => !cmeClosed(k[0]));
           rows.forEach(k => {
@@ -1273,7 +1277,7 @@
             if (lastRaw && lastRaw[0] === k[0]) rawBars[rawBars.length - 1] = k; else rawBars.push(k);
           });
           showPrice(); indTick(); checkAlerts(lastClose); if (SC.yahoo) paintOff();
-        } catch (e) {}
+        } catch (e) {} finally { polling = false; }
       }, p.pollMs || 30000);
       return;
     }

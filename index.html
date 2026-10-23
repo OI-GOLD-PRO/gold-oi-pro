@@ -246,7 +246,7 @@
   const SC = SYMS[SYM], SYMSFX = SYM === 'gold' ? '' : '_' + SYM;
   const SYMBOL = SC.perp;
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.12.00';
+  const APP_VER = '1.12.01';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -337,8 +337,8 @@
     if (authExpire) chips.push(`<span class="chip">${expLabel(authExpire)} <b>${esc(fmtExpire(authExpire))}</b></span>`);
     $('chips').innerHTML = chips.join('');
     paintRaw(); paintNextNews();
-    if (ok && (carry === null || !adjSet)) applyAdj(-off); else paintOff();
-    if (ok) refreshAdj(true);
+    // offset ล็อก: ใช้ค่าจากชีตตรง ๆ (คำนวณจาก Low ฟิวเจอร์ของวัน เทียบ Low ของกราฟเรา) ไม่ลอยตามราคา spot อีกต่อไป
+    if (ok) applyAdj(-off); else paintOff();
     dirty = true;
     if (typeof resetArming === 'function') resetArming(lastClose);
   }
@@ -1115,6 +1115,7 @@
   }
   // คำนวณ offset ใหม่: GC ประมาณ = spot ล่าสุด + carry → offset = GC − perp
   function refreshAdj(force) {
+    return; // ปิดการลอยตาม spot/carry: offset ล็อกตามชีต
     if (carry === null || basisEma === null) return;
     if (!force && adjAt && Date.now() - adjAt.getTime() < REFRESH_MS - 5000) return;
     applyAdj(basisEma - carry);

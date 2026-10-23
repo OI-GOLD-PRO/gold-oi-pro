@@ -154,8 +154,7 @@
   body.half .px #chg { font-size: 9px; }
   body.half .chips, body.half .tfs, body.half #gsTbl { padding-left: 8px; padding-right: 8px; }
   #wrap { position: relative; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
-  #chart, #ov, #bands { position: absolute; inset: 0; }
-  #bands { pointer-events: none; z-index: 0; }
+  #chart, #ov { position: absolute; inset: 0; }
   #chart { z-index: 1; }
   #ov { pointer-events: none; z-index: 2; }
   #tip { position: absolute; left: 10px; top: 8px; z-index: 3; font-size: 12px; background: rgba(18,26,48,.92); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-family: var(--mono); pointer-events: none; }
@@ -208,7 +207,6 @@
   </div>
   <div id="gsTbl"></div>
   <div id="wrap">
-    <canvas id="bands"></canvas>
     <div id="chart"></div>
     <canvas id="ov"></canvas>
     <div id="tip" hidden></div>
@@ -331,7 +329,7 @@
     oi = { top5P, top5C, rows, offset: ok ? off : null, maxOI, maxChg, hasChg, maxVol, hasVol, topP, topC, topV, maxPain, rankP, rankC };
 
     const cfg = d.cfg || {};
-    ivInfo = parseIV(cfg); dirty = true;
+    dirty = true;
     const chips = [];
     chips.push(`<span class="chip">สัญญา <b>${esc(cfg.contract || '–')}</b></span>`);
     chips.push(ok ? `<span class="chip" id="offchip"></span>` : `<span class="chip warn">ยังไม่มี offset ในแท็บ webapp</span>`);
@@ -386,56 +384,6 @@
   let dirty = true, lastKey = '';
   const overlayHooks = []; // ส่วนเสริม (เช่น goldscalp.js) วาดทับกราฟได้
 
-  // ---------- แถบ ±1σ ±2σ ±3σ ตาม ATM IV อยู่ใต้แท่งเทียน (ชั้น canvas #bands) ----------
-  // σ = ราคา × IV × √T โดย T = เวลาที่เหลือถึงหมดอายุ (ปี) คำนวณสดทุกเฟรม
-  // ชีต webapp: atm_iv (เช่น 46.13 หรือ 0.4613), iv_expiry (เวลาไทย เช่น 2026-10-22 00:30)
-  const bandsEl = $('bands'), bctx = bandsEl.getContext('2d');
-  let ivInfo = null;
-  function parseIV(cfg) {
-    let iv = Number(cfg && cfg.atm_iv);
-    if (!isFinite(iv) || iv <= 0) return null;
-    if (iv > 1) iv = iv / 100;
-    const m = String((cfg && cfg.iv_expiry) || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})/);
-    if (!m) return null;
-    const pad = s => String(s).padStart(2, '0');
-    const ex = Date.parse(`${m[1]}-${pad(m[2])}-${pad(m[3])}T${pad(m[4])}:${m[5]}:00+07:00`);
-    if (!isFinite(ex)) return null;
-    return { iv, expiry: ex };
-  }
-  function drawBands(w, h) {
-    const dpr = window.devicePixelRatio || 1;
-    if (bandsEl.width !== Math.round(w * dpr) || bandsEl.height !== Math.round(h * dpr)) {
-      bandsEl.width = Math.round(w * dpr); bandsEl.height = Math.round(h * dpr);
-      bandsEl.style.width = w + 'px'; bandsEl.style.height = h + 'px';
-    }
-    bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    bctx.clearRect(0, 0, w, h);
-    bctx.fillStyle = C('--bg'); bctx.fillRect(0, 0, w, h);
-    if (!ivInfo || lastClose === null) return;
-    const T = (ivInfo.expiry - Date.now()) / (365 * 24 * 3600 * 1000);
-    if (!(T > 0)) return;
-    const P = lastClose, sig = P * ivInfo.iv * Math.sqrt(T);
-    const plotW = chart.timeScale().width(), plotH = h - chart.timeScale().height();
-    const y = p => series.priceToCoordinate(p);
-    // แถบ 2σ และ 3σ (ไม่มีแถบ 1σ แล้ว) ทั้งบนและล่างของราคา
-    const ring = (kLo, kHi, col) => {
-      [[P + kLo * sig, P + kHi * sig], [P - kHi * sig, P - kLo * sig]].forEach(([a, b]) => {
-        const ya = y(a), yb2 = y(b);
-        if (ya === null || yb2 === null) return;
-        bctx.fillStyle = col;
-        bctx.fillRect(0, Math.min(ya, yb2), plotW, Math.abs(yb2 - ya));
-      });
-    };
-    ring(2, 3, 'rgba(90,140,255,0.35)');
-    ring(1, 2, 'rgba(90,140,255,0.18)');
-    bctx.font = `10px ${C('--mono')}`; bctx.fillStyle = C('--muted');
-    [1, 2, 3].forEach(k => {
-      const yt = y(P + k * sig), yb = y(P - k * sig);
-      if (yt !== null && yt >= 0 && yt <= plotH) bctx.fillText(`+${k}σ ${(k * sig).toFixed(SC.dec)}`, 6, yt - 3);
-      if (yb !== null && yb >= 0 && yb <= plotH) bctx.fillText(`−${k}σ ${(k * sig).toFixed(SC.dec)}`, 6, yb + 11);
-    });
-  }
-
   // ---------- กรอบเหลืองคลอบเลขราคาบนแกนขวา (เฉพาะกราฟทอง) ----------
   // ไฮไลต์ราคาเต็มที่ลงท้ายด้วย 00, 25, 50, 75 โดยวาดทับป้ายแกนของ lightweight-charts
   const GOLD_HL = ['00', '25', '50', '75'];
@@ -471,7 +419,6 @@
 
   function drawOverlay() {
     const w = chartEl.clientWidth, h = chartEl.clientHeight, dpr = window.devicePixelRatio || 1;
-    drawBands(w, h);
     if (ov.width !== Math.round(w * dpr) || ov.height !== Math.round(h * dpr)) {
       ov.width = Math.round(w * dpr); ov.height = Math.round(h * dpr);
       ov.style.width = w + 'px'; ov.style.height = h + 'px';

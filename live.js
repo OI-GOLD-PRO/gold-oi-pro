@@ -103,6 +103,11 @@
   }
   setTimeout(poll, 2500);
   setInterval(poll, 60000);
+  // ชีตโหลดเสร็จหลังข้อมูลสด หรือโหลดชีตใหม่ (oi ถูกสร้างใหม่): คำนวณซ้ำ
+  setInterval(() => {
+    if (!st.d || !O.cfgData) return;
+    if (!st.calc || st.calc.cfgC !== (O.cfgData.contract || null) || st.lastOi !== O.oi) { st.lastOi = O.oi; tick(); }
+  }, 3000);
 
   // ใส่ volume สด + gmf itd สด ลงในข้อมูล OI ของกราฟ (buildOI สร้าง oi ใหม่ทุกครั้งที่โหลดชีต จึงต้องใส่ซ้ำ)
   function applyToOI() {
@@ -130,8 +135,6 @@
   const C = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   O.hooks.push((ctx, w, h) => {
     const oi = O.oi, c = st.calc;
-    // ชีตโหลดเสร็จหลังข้อมูลสด (หรือเปลี่ยนสัญญา): คำนวณใหม่
-    if (st.d && O.cfgData && (!st.calc || st.calc.cfgC !== (O.cfgData.contract || null) || (oi && !st.calc.match && oi.rows.length))) { const before = st.calc && st.calc.cfgC; if (before !== (O.cfgData.contract || null) || (oi && oi !== st.lastOi)) { st.lastOi = oi; setTimeout(tick, 0); } }
     if (oi && st.at && oi.__live !== st.at) { applyToOI(); if (oi.__live === st.at) setTimeout(() => O.markDirty(), 0); }
     const chart = O.chart, series = O.series;
     const plotW = chart.timeScale().width(), plotH = h - chart.timeScale().height();

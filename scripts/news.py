@@ -47,6 +47,7 @@ def utc0(s):
 
 # ---------- ข่าวล่วงหน้าจาก FXStreet (ช่วงเสาร์-อาทิตย์ FF ยังไม่มีสัปดาห์หน้า) ----------
 now = datetime.now(timezone.utc)
+diag = {'future_ff': sum(1 for e in ff_events if utc0(e['date']) > now)}
 if not any(utc0(e['date']) > now for e in ff_events):
     url = ('https://calendar-api.fxstreet.com/en/api/v1/eventDates/'
            f"{now:%Y-%m-%dT%H:%M:00Z}/{now + timedelta(days=8):%Y-%m-%dT00:00:00Z}?countries=US"
@@ -68,9 +69,10 @@ if not any(utc0(e['date']) > now for e in ff_events):
                               'forecast': num(x.get('consensus'), x.get('unit')), 'previous': num(x.get('previous'), x.get('unit')), 'src': 'fxstreet'})
             add += 1
         print('FXStreet upcoming added', add)
+        diag.update(fx_n=len(up), fx_keys=list(up[0].keys())[:20] if up else [], added=add)
         ff_events.sort(key=lambda e: utc0(e['date']))
     except Exception as e:
-        print('FXStreet upcoming failed:', e)
+        print('FXStreet upcoming failed:', e); diag['err'] = str(e)[:200]
 
 def utc(s):
     return datetime.fromisoformat(s).astimezone(timezone.utc)
@@ -156,7 +158,7 @@ for e in ff_events:
         hit += 1
         print(f"match {e['title']!r} <- {best['name']!r} ({bs:.2f}) = {e['actual']}")
 
-out = {'source': 'Forex Factory + FXStreet (actual)', 'events': ff_events}
+out = {'source': 'Forex Factory + FXStreet (actual)', 'diag': diag, 'events': ff_events}
 new = json.dumps(out, ensure_ascii=False, indent=2)
 try:
     cur = open('news.json').read()

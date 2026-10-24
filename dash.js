@@ -152,12 +152,14 @@
   async function loadCOT(force) {
     if (!force && cot && !cot.err && Date.now() - cot.at < 3 * 3600e3) return;
     try {
-      if (!force) { const c = JSON.parse(localStorage.getItem('cot_cache') || 'null'); if (c && Date.now() - c.at < 3 * 3600e3) { cot = c; return; } }
+      if (!force) { const c = JSON.parse(localStorage.getItem('cot_cache2') || 'null'); if (c && Date.now() - c.at < 3 * 3600e3) { cot = c; return; } }
     } catch (e) {}
     try {
       const sel = ['report_date_as_yyyy_mm_dd', 'open_interest_all', 'm_money_positions_long_all', 'm_money_positions_short_all', 'prod_merc_positions_long', 'prod_merc_positions_short', 'swap_positions_long_all', 'swap__positions_short_all', 'nonrept_positions_long_all', 'nonrept_positions_short_all'].join(',');
       const u = `${CFTC}?cftc_contract_market_code=088691&$select=${sel}&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=170`;
-      const [r1, r2] = await Promise.all([fetch(u), fetch(GCW).catch(() => null)]);
+      // DXY (ICE US Dollar Index 098662) รายงาน Legacy: นักเก็งกำไร (Non-commercial) สุทธิ
+      const ud = `https://publicreporting.cftc.gov/resource/6dca-aqww.json?cftc_contract_market_code=098662&$select=report_date_as_yyyy_mm_dd,noncomm_positions_long_all,noncomm_positions_short_all,open_interest_all&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=2`;
+      const [r1, r2, r3] = await Promise.all([fetch(u), fetch(GCW).catch(() => null), fetch(ud).catch(() => null)]);
       if (!r1.ok) throw new Error('CFTC HTTP ' + r1.status);
       const raw = await r1.json();
       const n = v => Number(v) || 0;
@@ -167,8 +169,10 @@
         nrL: n(x.nonrept_positions_long_all), nrS: n(x.nonrept_positions_short_all) }));
       let px = [];
       try { if (r2 && r2.ok) px = (((await r2.json()).bars || {})['1d'] || []).map(b => [b[0], b[4]]); } catch (e) {}
-      cot = { rows, px, at: Date.now() };
-      try { localStorage.setItem('cot_cache', JSON.stringify(cot)); } catch (e) {}
+      let dxy = null;
+      try { if (r3 && r3.ok) { const a = await r3.json(); if (a.length >= 2) { const nt = x => n(x.noncomm_positions_long_all) - n(x.noncomm_positions_short_all); dxy = { d: String(a[0].report_date_as_yyyy_mm_dd).slice(0, 10), net: nt(a[0]), chg: nt(a[0]) - nt(a[1]), oi: n(a[0].open_interest_all) }; } } } catch (e) {}
+      cot = { rows, px, dxy, at: Date.now() };
+      try { localStorage.setItem('cot_cache2', JSON.stringify(cot)); } catch (e) {}
     } catch (e) { cot = { err: e.message || String(e), at: Date.now() }; }
   }
   // ราคาปิดของวันที่ (หรือวันทำการก่อนหน้า) จากแท่งรายวัน
@@ -198,7 +202,16 @@
       ['Commercial เทียบ 3 ปี', .05, clamp(pct(L.cm, cmMin, cmMax) * 200 - 100)],
       ['กองทุนสุทธิ เทียบ 3 ปี', .05, clamp(pct(L.mm, mmMin, mmMax) * 200 - 100)],
     ];
-    const score = Math.round(S.reduce((a, x) => a + x[1] * x[2], 0) * 10) / 10;
+    const raw = S.reduce((a, x) => a + x[1] * x[2], 0);
+    // ปรับด้วย DXY: นักเก็งกำไรเปลี่ยนสถานะเกิน 2% ของ OI ของ DXY จึงนับ · ซื้อดอลลาร์ = กดทอง −5 · ขายดอลลาร์ = หนุนทอง +5
+    const X = cot.dxy; let dxyAdj = 0, dxyTxt = 'ไม่มีข้อมูล DXY';
+    if (X && X.oi) {
+      const th = X.oi * 0.02;
+      if (X.chg > th) { dxyAdj = -5; dxyTxt = raw >= 0 ? 'ดอลลาร์ถูกซื้อสวนทอง (Divergence)' : 'ดอลลาร์ถูกซื้อ ยืนยันทองขาลง'; }
+      else if (X.chg < -th) { dxyAdj = 5; dxyTxt = raw <= 0 ? 'ดอลลาร์ถูกขายสวนทอง (Divergence)' : 'ดอลลาร์ถูกขาย ยืนยันทองขาขึ้น'; }
+      else dxyTxt = 'ดอลลาร์ทรงตัว (เปลี่ยนไม่ถึง 2% ของ OI)';
+    }
+    const score = Math.round(clamp(raw + dxyAdj) * 10) / 10;
     const bias = score >= 20 ? 1 : score <= -20 ? -1 : 0;
     // ช่วงตลาด: ราคา × OI × กองทุน (สัปดาห์ล่าสุด)
     const dOI = L.oi - P.oi, dMM = L.mm - P.mm;
@@ -209,7 +222,7 @@
       else if (dOI >= 0) phase = ['bear', 'เปิด Short ใหม่ / ขาลงมีแรงหนุน', 'ราคาลงพร้อม OI เพิ่ม' + (dMM <= 0 ? ' และกองทุนลดสถานะสุทธิ' : ' แต่กองทุนกลับเพิ่ม Long')];
       else phase = ['mix', 'ขายทิ้ง Long (Liquidation)', 'ราคาลงพร้อม OI ลด เป็นการปิดสถานะ ขาลงอาจใกล้หมดแรง'];
     }
-    return { L, P, S, score, bias, phase, dP, p0, dOI, dMM, mmIdx: pct(L.mm, mmMin, mmMax) * 100, cmIdx: pct(L.cm, cmMin, cmMax) * 100,
+    return { L, P, S, score, raw: Math.round(raw * 10) / 10, dxyAdj, dxyTxt, dxy: X, bias, phase, dP, p0, dOI, dMM, mmIdx: pct(L.mm, mmMin, mmMax) * 100, cmIdx: pct(L.cm, cmMin, cmMax) * 100,
       nrLongPct: nrTot ? L.nrL / nrTot * 100 : null, d8: d8(0), oi4: o4(0), spark: R.slice(0, 52).map(r => r.mm).reverse() };
   }
   function cotCard(price, cfg) {
@@ -252,12 +265,16 @@
         <div class="tile"><small>Commercial (ผู้ผลิต+Swap) สุทธิ</small><b>${sg(k.L.cm)}</b><em>เทียบ 3 ปี ${k.cmIdx.toFixed(0)}% · <span class="${cl(k.L.cm - k.P.cm)}">${sg(k.L.cm - k.P.cm)}</span></em></div>
         <div class="tile"><small>รายย่อย ถือ Long</small><b class="${k.nrLongPct > 75 ? 'dn' : ''}">${k.nrLongPct === null ? '–' : k.nrLongPct.toFixed(1) + '%'}</b><em>${k.nrLongPct > 75 ? 'Long แน่น (สัญญาณเตือนใกล้ยอด)' : 'สุทธิ ' + sg(k.L.nrL - k.L.nrS)}</em></div>
         <div class="tile"><small>OI รวม GC</small><b>${f0(k.L.oi)}</b><em><span class="${cl(k.dOI)}">${sg(k.dOI)}</span> 1 สัปดาห์ · <span class="${cl(k.oi4)}">${sg(k.oi4)}</span> 4 สัปดาห์</em></div>
+        <div class="tile"><small>DXY นักเก็งกำไร สุทธิ</small><b>${k.dxy ? sg(k.dxy.net) : '–'}</b><em>${k.dxy ? `<span class="${cl(k.dxy.chg)}">${sg(k.dxy.chg)}</span> 1 สัปดาห์ · ` : ''}<span class="${cl(k.dxyAdj)}">${k.dxyAdj > 0 ? '+' : ''}${k.dxyAdj} คะแนน</span><br>${esc(k.dxyTxt)}</em></div>
         <div class="tile"><small>ราคา GC วันอังคาร</small><b>${k.p0 === null ? '–' : fmt(k.p0, 1)}</b><em><span class="${cl(k.dP)}">${k.dP === null ? '–' : (k.dP >= 0 ? '+' : '−') + Math.abs(k.dP).toFixed(1)}</span> จากสัปดาห์ก่อน</em></div>
       </div>
       ${spark}
-      <details><summary>ดูที่มาของคะแนน COT (7 ปัจจัย)</summary><div class="fx"><span>ปัจจัย</span><span>น้ำหนัก</span><span>ค่า</span>
-        ${k.S.map(x => `<span>${x[0]}</span><span>${Math.round(x[1] * 100)}%</span><span class="${cl(x[2])}">${x[2] > 0 ? '+' : ''}${x[2].toFixed(0)}</span>`).join('')}</div>
-        <div class="note" style="margin-top:6px">ปัจจัย 1–4 หารด้วยค่าเปลี่ยนแปลงสูงสุดในอดีต (COT 3 ปี, ราคา 1 ปี) · ปัจจัย 6–7 เทียบช่วงต่ำสุด–สูงสุด 3 ปี · คะแนน ≥ +20 = ขาขึ้น, ≤ −20 = ขาลง</div></details>
+      <details><summary>ดูที่มาของคะแนน COT (7 ปัจจัย + DXY)</summary><div class="fx"><span>ปัจจัย</span><span>น้ำหนัก</span><span>ค่า</span>
+        ${k.S.map(x => `<span>${x[0]}</span><span>${Math.round(x[1] * 100)}%</span><span class="${cl(x[2])}">${x[2] > 0 ? '+' : ''}${x[2].toFixed(0)}</span>`).join('')}
+        <span>รวม 7 ปัจจัย</span><span></span><span class="${cl(k.raw)}">${k.raw > 0 ? '+' : ''}${k.raw}</span>
+        <span>ปรับ DXY</span><span></span><span class="${cl(k.dxyAdj)}">${k.dxyAdj > 0 ? '+' : ''}${k.dxyAdj}</span>
+        <span>คะแนนสุดท้าย</span><span></span><span class="${cl(k.score)}">${k.score > 0 ? '+' : ''}${k.score}</span></div>
+        <div class="note" style="margin-top:6px">ปัจจัย 1–4 หารด้วยค่าเปลี่ยนแปลงสูงสุดในอดีต (COT 3 ปี, ราคา 1 ปี) · ปัจจัย 6–7 เทียบช่วงต่ำสุด–สูงสุด 3 ปี · DXY: นักเก็งกำไรดอลลาร์ (Legacy, ICE DXY) เปลี่ยนเกิน 2% ของ OI → ซื้อดอลลาร์ −5 / ขายดอลลาร์ +5 · คะแนน ≥ +20 = ขาขึ้น, ≤ −20 = ขาลง</div></details>
       <div class="note" style="margin-top:6px">COT ช้า 3 วัน (ข้อมูลวันอังคาร ประกาศคืนวันศุกร์) ใช้ดูภาพใหญ่ ส่วน gmf ใช้ดูจังหวะ · ที่มา CFTC Disaggregated COMEX Gold</div></div>`;
   }
 

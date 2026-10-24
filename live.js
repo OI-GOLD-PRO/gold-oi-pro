@@ -90,7 +90,22 @@
     } catch (e) { st.err = e.message || String(e); }
     tick();
   }
+  // OI ของสัญญาวันนี้จาก Worker (TradingView อัปเดตวันละครั้งเอง) แทน OI ในชีต
+  function syncLevels() {
+    const d = st.d;
+    if (!d || !d.rows || !O.setLevels || !O.cfgData || !O.oi) return;
+    const lv = [];
+    d.rows.forEach(r => { if (r[11] > 0) lv.push({ strike: r[0], oi: r[11], type: r[1] }); });
+    if (!lv.length) return;
+    const sig = d.root + '|' + d.oiT + '|' + lv.length + '|' + lv.reduce((a, l) => a + l.oi, 0);
+    if (st.lvSig === sig && st.lvOi === O.oi) return;
+    const dt = d.oiT ? new Date(d.oiT * 1000).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' }) : '';
+    O.setLevels(lv, d.root, dt ? `OI ${dt}` : 'OI สด');
+    st.lvSig = sig; st.lvOi = O.oi; st.oiSrc = 'tv';
+  }
   function tick() {
+    syncLevels();
+    st.lastOi = O.oi;
     st.calc = compute();
     const c = st.calc;
     if (c && c.gmf !== null) {

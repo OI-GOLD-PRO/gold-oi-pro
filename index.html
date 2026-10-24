@@ -251,7 +251,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.15.03';
+  const APP_VER = '1.16.00';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -293,6 +293,19 @@
   let lastCfg = null;
   function buildOI(d) {
     lastCfg = d.cfg || {};
+    oi = calcOI(d);
+    afterOI(d);
+  }
+  // OI ใหม่จาก Worker (TradingView) ของสัญญาที่หมดอายุวันนั้น: คำนวณแนว/กำแพง/Max Pain ใหม่ ไม่แตะ offset
+  function setLevels(levels, contract, note) {
+    if (!lastCfg) return;
+    lastCfg = Object.assign({}, lastCfg, { contract });
+    oi = calcOI({ levels, cfg: lastCfg });
+    const ch = document.querySelector('#chips .chip');
+    if (ch && /สัญญา/.test(ch.textContent)) ch.innerHTML = `สัญญา <b>${esc(contract)}</b>${note ? ` <small>${esc(note)}</small>` : ''}`;
+    dirty = true;
+  }
+  function calcOI(d) {
     const off = Number(d.cfg && d.cfg.offset);
     const map = new Map();
     (d.levels || []).forEach(l => {
@@ -337,8 +350,10 @@
       if (g && isFinite(+g.M) && g.M !== null) gmf.push({ p: +g.M, lab: 'gmf M', col: '--gmfm' });
     } catch (e) { gmf = []; }
     { const lg = document.getElementById('gmflg'); if (lg) lg.style.display = gmf.length ? '' : 'none'; }
-    oi = { top5P, top5C, rows, offset: ok ? off : null, maxOI, maxVol, hasVol, topP, topC, topV, maxPain, rankP, rankC, gmf };
-
+    return { top5P, top5C, rows, offset: ok ? off : null, maxOI, maxVol, hasVol, topP, topC, topV, maxPain, rankP, rankC, gmf };
+  }
+  function afterOI(d) {
+    const ok = oi.offset !== null, off = oi.offset;
     const cfg = d.cfg || {};
     dirty = true;
     const chips = [];
@@ -1889,7 +1904,7 @@
     },
     get tf() { return tf; }, sym: SYM, cfg: SC, sfx: SYMSFX, psfx: PSFX,
     chart, series, chartEl, hooks: overlayHooks,
-    get oi() { return oi; }, get lastClose() { return lastClose; }, get cfgData() { return lastCfg; },
+    get oi() { return oi; }, get lastClose() { return lastClose; }, get cfgData() { return lastCfg; }, setLevels,
     // ดึงข้อมูลชีตของสัญลักษณ์ใดก็ได้ (ใช้ในแดชบอร์ด dash.js)
     async fetchData(sym) {
       const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 20000);
@@ -1910,6 +1925,6 @@
 </script>
 <script src="goldscalp.js"></script>
 <script src="dash.js?v=11503"></script>
-<script src="live.js?v=11503"></script>
+<script src="live.js?v=11600"></script>
 </body>
 </html>

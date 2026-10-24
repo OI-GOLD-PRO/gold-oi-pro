@@ -91,6 +91,36 @@
   #dash .cleg i { display: inline-block; width: 10px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
   #dash .msg { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px; }
   #dash .note { font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+  @media (max-width: 440px) { #dash .dtt { display: none; } #dash .dtop { gap: 6px; padding: 10px 10px 8px; } #dash .dtabs button { padding: 5px 8px; } }
+  #dash .aibtn { background: linear-gradient(135deg, #1b2a4a, #2a1b4a); border: 1px solid #5b7cff; color: #cfe0ff; border-radius: 10px; padding: 6px 10px; font: 600 12px var(--sans); white-space: nowrap; box-shadow: 0 0 10px rgba(91,124,255,.35); }
+  #dash .aibtn:active { transform: scale(.96); }
+  #aiwrap { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(4,8,20,.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: aifade .25s ease-out; }
+  @keyframes aifade { from { opacity: 0 } to { opacity: 1 } }
+  #aiwrap .box { position: relative; width: min(340px, 88vw); padding: 22px 18px 18px; border-radius: 20px; background: radial-gradient(120% 90% at 50% 0%, #121c3a 0%, #070b18 70%); border: 1px solid rgba(91,124,255,.45); box-shadow: 0 0 40px rgba(60,120,255,.25), inset 0 0 30px rgba(60,120,255,.08); overflow: hidden; text-align: center; color: #dbe6ff; }
+  #aiwrap .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(91,124,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(91,124,255,.08) 1px, transparent 1px); background-size: 18px 18px; animation: aigrid 6s linear infinite; pointer-events: none; }
+  @keyframes aigrid { to { background-position: 0 180px, 180px 0; } }
+  #aiwrap .scan { position: absolute; left: 0; right: 0; height: 60px; top: -60px; background: linear-gradient(180deg, transparent, rgba(0,229,255,.18), transparent); animation: aiscan 2.2s ease-in-out infinite; pointer-events: none; }
+  @keyframes aiscan { to { top: 100%; } }
+  #aiwrap svg { width: 168px; height: 168px; display: block; margin: 0 auto; position: relative; }
+  #aiwrap .r1 { transform-origin: 84px 84px; animation: airot 6s linear infinite; }
+  #aiwrap .r2 { transform-origin: 84px 84px; animation: airot 3.5s linear infinite reverse; }
+  #aiwrap .r3 { transform-origin: 84px 84px; animation: airot 9s linear infinite; }
+  @keyframes airot { to { transform: rotate(360deg); } }
+  #aiwrap .core { transform-origin: 84px 84px; animation: aipulse 1.4s ease-in-out infinite; }
+  @keyframes aipulse { 50% { transform: scale(1.12); opacity: .75; } }
+  #aiwrap h4 { margin: 8px 0 2px; font: 700 16px var(--sans); letter-spacing: .04em; background: linear-gradient(90deg, #7ad7ff, #b18cff, #ffd36b, #7ad7ff); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: aihue 3s linear infinite; position: relative; }
+  @keyframes aihue { to { background-position: 300% 0; } }
+  #aiwrap .hex { font: 10px var(--mono); color: rgba(122,215,255,.55); height: 14px; overflow: hidden; white-space: nowrap; position: relative; }
+  #aiwrap ol { list-style: none; margin: 12px 0 6px; padding: 0; text-align: left; display: grid; gap: 6px; position: relative; }
+  #aiwrap li { font-size: 12.5px; color: #6f7ea8; display: flex; gap: 8px; align-items: center; transition: color .3s; }
+  #aiwrap li i { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 1.5px solid #3a4770; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 10px; }
+  #aiwrap li.on { color: #dbe6ff; } #aiwrap li.on i { border-color: #00e5ff; border-top-color: transparent; animation: airot .8s linear infinite; }
+  #aiwrap li.done { color: #8fe3b3; } #aiwrap li.done i { border-color: #2fbf8f; background: #2fbf8f; color: #04140d; animation: none; }
+  #aiwrap .bar { height: 4px; border-radius: 2px; background: #1a2442; overflow: hidden; margin-top: 8px; position: relative; }
+  #aiwrap .bar b { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, #00e5ff, #b18cff); box-shadow: 0 0 10px #00e5ff; transition: width .6s ease; }
+  #aiwrap .tm { font: 10.5px var(--mono); color: #6f7ea8; margin-top: 6px; position: relative; }
+  #aiwrap .err { color: #ff8a9a; font-size: 12.5px; margin-top: 10px; line-height: 1.5; position: relative; }
+  #aiwrap button { margin-top: 12px; background: #1b2a4a; border: 1px solid #5b7cff; color: #cfe0ff; border-radius: 10px; padding: 7px 16px; font: 600 12px var(--sans); position: relative; }
   #dash .cf { border-radius: 12px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
   #dash .cf.bull { background: rgba(47,191,143,.12); border: 1px solid rgba(47,191,143,.5); }
   #dash .cf.bear { background: rgba(229,87,107,.12); border: 1px solid rgba(229,87,107,.5); }
@@ -123,7 +153,8 @@
 
   const box = document.createElement('div');
   box.id = 'dash'; box.hidden = true;
-  box.innerHTML = `<div class="dtop"><h2>📊 วิเคราะห์ตลาด</h2><div class="dtabs" id="dTabs"></div>
+  box.innerHTML = `<div class="dtop"><h2>📊 <span class="dtt">วิเคราะห์ตลาด</span></h2><div class="dtabs" id="dTabs"></div>
+    <button class="aibtn" id="dAI" aria-label="ให้ AI วิเคราะห์ตอนนี้">🤖 วิเคราะห์</button>
     <button class="icon" id="dReload" aria-label="โหลดใหม่">⟳</button><button class="icon" id="dClose" aria-label="ปิด">✕</button></div>
     <div class="dbody" id="dBody"></div>`;
   document.body.appendChild(box);
@@ -150,6 +181,52 @@
     });
   }
   $('dReload').addEventListener('click', () => load(true));
+  // ---------- ปุ่ม "วิเคราะห์": ป๊อปอัพแอนิเมชันระหว่าง AI ทำงาน ----------
+  $('dAI').addEventListener('click', runAI);
+  async function runAI() {
+    if (!O.aiAnalyze || document.getElementById('aiwrap')) return;
+    const steps = ['ดึง OI · Volume · IV สดจาก TradingView', 'คำนวณ Gamma Flip · Max Pain · Expected Move', 'อ่าน COT กองทุน + DXY และปฏิทินข่าว', 'ส่งข้อมูลให้ AI (DeepSeek) วิเคราะห์', 'ตรวจตัวเลขแนวรับ-ต้าน และบันทึกผล'];
+    const w = document.createElement('div'); w.id = 'aiwrap';
+    w.innerHTML = `<div class="box"><div class="grid"></div><div class="scan"></div>
+      <svg viewBox="0 0 168 168" aria-hidden="true"><defs><linearGradient id="aig" x1="0" x2="1"><stop offset="0" stop-color="#00e5ff"/><stop offset="1" stop-color="#b18cff"/></linearGradient>
+        <radialGradient id="aic"><stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="#7ad7ff"/><stop offset="1" stop-color="#1b3a8a" stop-opacity="0"/></radialGradient></defs>
+        <g class="r3"><circle cx="84" cy="84" r="78" fill="none" stroke="rgba(91,124,255,.35)" stroke-width="1" stroke-dasharray="2 6"/></g>
+        <g class="r1"><circle cx="84" cy="84" r="66" fill="none" stroke="url(#aig)" stroke-width="3" stroke-dasharray="70 34 18 34" stroke-linecap="round"/><circle cx="150" cy="84" r="4" fill="#00e5ff"/></g>
+        <g class="r2"><circle cx="84" cy="84" r="50" fill="none" stroke="#ffd36b" stroke-width="2" stroke-dasharray="10 14" opacity=".8"/><circle cx="34" cy="84" r="3" fill="#ffd36b"/></g>
+        <g class="core"><circle cx="84" cy="84" r="30" fill="url(#aic)" opacity=".9"/><text x="84" y="90" text-anchor="middle" font-size="18" font-weight="700" fill="#06102a" font-family="JetBrains Mono">AI</text></g>
+      </svg>
+      <h4>AI กำลังวิเคราะห์ตลาดทองคำ</h4><div class="hex" id="aiHex"></div>
+      <ol>${steps.map(t => `<li><i></i><span>${t}</span></li>`).join('')}</ol>
+      <div class="bar"><b id="aiBar"></b></div><div class="tm" id="aiTm">0 วินาที</div><div id="aiErr"></div></div>`;
+    document.body.appendChild(w);
+    const lis = [...w.querySelectorAll('li')], t0 = Date.now();
+    let cur = 0; const setStep = i => { lis.forEach((li, j) => { li.className = j < i ? 'done' : j === i ? 'on' : ''; if (j < i) li.querySelector('i').textContent = '✓'; }); $('aiBar').style.width = Math.min(96, (i + .5) / steps.length * 100) + '%'; };
+    setStep(0);
+    const hexChars = '0123456789ABCDEF';
+    const iv = setInterval(() => {
+      const s = (Date.now() - t0) / 1000;
+      $('aiTm').textContent = `${Math.floor(s)} วินาที`;
+      $('aiHex').textContent = Array.from({ length: 34 }, () => hexChars[Math.floor(Math.random() * 16)]).join('').replace(/(.{4})/g, '$1 ');
+      const want = s < 2 ? 0 : s < 4 ? 1 : s < 6 ? 2 : 3; // ขั้น 4 (AI) ค้างจนได้ผล
+      if (want > cur) { cur = want; setStep(cur); }
+    }, 120);
+    const res = await O.aiAnalyze();
+    if (res && res.ok) {
+      cur = 4; setStep(4);
+      await new Promise(r => setTimeout(r, 500));
+      setStep(5); $('aiBar').style.width = '100%';
+      await new Promise(r => setTimeout(r, 600));
+      clearInterval(iv); w.remove();
+      await load(true);
+      const b = $('dBody'); if (b) b.scrollTop = 0;
+      if (O.showToast) O.showToast(res.cached ? 'เพิ่งวิเคราะห์ไปไม่ถึง 1 นาที แสดงผลล่าสุด' : '✅ AI วิเคราะห์เสร็จแล้ว');
+    } else {
+      clearInterval(iv);
+      const msg = !res ? 'ไม่ได้รับคำตอบ' : res.error === 'auth' ? 'รหัสผ่านใช้ไม่ได้' : res.error === 'busy' ? 'AI กำลังวิเคราะห์อยู่จากอีกเครื่อง ลองใหม่อีกครู่' : res.error;
+      $('aiErr').innerHTML = `<div class="err">วิเคราะห์ไม่สำเร็จ: ${esc(msg)}</div><button id="aiClose">ปิด</button>`;
+      $('aiClose').addEventListener('click', () => w.remove());
+    }
+  }
   btn.addEventListener('click', () => { box.hidden = false; tabs(); load(true); });
 
   async function load(force) {

@@ -20,15 +20,17 @@ function loadRemote_(file) {
   }
   return src;
 }
-function runRemote_(file, fn) {
+function runRemote_(file, fn, arg) {
   const f = new Function(loadRemote_(file) + '\nreturn ' + fn + ';')();
-  return f();
+  return f(arg);
 }
 
 // ฟังก์ชันที่ตัวตั้งเวลาและปุ่มรันเรียกใช้
 function syncLive() { return runRemote_('sync_live.gs', 'syncLive'); }
 function aiTick() { return runRemote_('ai_dash.gs', 'aiTick'); }
 function runAINow() { return runRemote_('ai_dash.gs', 'runAINow'); }
+// ปุ่ม "วิเคราะห์" ในแอป: POST ?api=ai&code=… (ต้อง Deploy เป็นเวอร์ชันใหม่ 1 ครั้งหลังวางไฟล์นี้)
+function doPost(e) { return runRemote_('ai_dash.gs', 'aiWeb_', e); }
 
 // ล้างแคชเพื่อดึงโค้ดใหม่ทันที (ปกติรอไม่เกิน 5 นาที)
 function reloadNow() { CacheService.getScriptCache().removeAll(['src_sync_live.gs', 'src_ai_dash.gs']); }

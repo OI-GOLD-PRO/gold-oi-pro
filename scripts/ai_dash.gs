@@ -180,4 +180,30 @@ function runAI_(reason) {
     events: (A.events || []).slice(0, 6).map(String), watch: String(A.watch || '').slice(0, 400), warn: String(A.warn || '').slice(0, 300) + ' (วิเคราะห์โดย DeepSeek จากข้อมูลจริง ไม่ใช่คำแนะนำการลงทุน)', hist, px: pxh };
   sh.getRange(row, 1, 1, 2).setValues([['dash', JSON.stringify(dash)]]);
   console.log('AI dash updated: ' + reason + ' · ' + dash.trend_label);
+  return dash;
+}
+
+// ---------- ปุ่ม "วิเคราะห์" ในแอป (เรียกผ่าน doPost ของ loader) ----------
+// ตรวจรหัสผู้ใช้ด้วย api=login ของ Code.gs เดิม · กันกดถี่: ภายใน 60 วินาทีคืนผลล่าสุด
+function aiWeb_(e) {
+  const p = (e && e.parameter) || {};
+  const out = o => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+  if (p.api !== 'ai') return out({ error: 'bad api' });
+  let ok = false;
+  try { const r = JSON.parse(doGet({ parameter: { api: 'login', code: p.code || '' } }).getContent()); ok = !!(r && (r.ok || r.legacy)); } catch (err) { ok = false; }
+  if (!ok) return out({ error: 'auth' });
+  const cache = CacheService.getScriptCache();
+  const last = cache.get('ai_web_last');
+  if (last) return out({ ok: true, cached: true, dash: JSON.parse(last) });
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(90000)) return out({ error: 'busy' });
+  try {
+    const again = cache.get('ai_web_last');
+    if (again) return out({ ok: true, cached: true, dash: JSON.parse(again) });
+    const dash = runAI_('กดปุ่มวิเคราะห์ในแอป');
+    try { cache.put('ai_web_last', JSON.stringify(dash), 60); } catch (err) {}
+    return out({ ok: true, dash });
+  } catch (err) {
+    return out({ error: String(err.message || err).slice(0, 300) });
+  } finally { lock.releaseLock(); }
 }

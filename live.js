@@ -131,6 +131,10 @@
     return Math.abs(dv) < 0.5 ? '' : dv > 0 ? ' ↑' : ' ↓';
   }
 
+  // 🔥 เงินใหม่: volume วันนี้ ≥ OI (หรือไม่มี OI) และเป็น strike ที่เทรดหนาจริง (≥ 50 และ ≥ ครึ่งหนึ่งของ strike ที่เทรดมากสุดรอบราคา)
+  const hot = (s, vMax) => { const v = s.vc + s.vp, o = s.c + s.p; return v >= 50 && v >= vMax * 0.5 && (o === 0 || v / o >= 1); };
+  st.hot = hot;
+
   // ---------- วาดบนกราฟ ----------
   const C = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   O.hooks.push((ctx, w, h) => {
@@ -147,10 +151,11 @@
         ctx.globalAlpha = 0.07; ctx.fillStyle = '#9aa7ff'; ctx.fillRect(0, Math.min(top, bot), plotW, Math.abs(bot - top));
         ctx.globalAlpha = 0.55; ctx.strokeStyle = '#9aa7ff'; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
         [top, bot].forEach(y => { if (y > 0 && y < plotH) { ctx.beginPath(); ctx.moveTo(0, Math.round(y) + .5); ctx.lineTo(plotW, Math.round(y) + .5); ctx.stroke(); } });
-        ctx.setLineDash([]); ctx.globalAlpha = 0.9; ctx.fillStyle = '#9aa7ff'; ctx.font = `9px ${mono}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-        if (top > 10 && top < plotH) ctx.fillText(`EM บน ${(c.openF + c.openEM).toFixed(1)}`, plotW * 0.78, top - 2);
+        ctx.setLineDash([]); ctx.globalAlpha = 0.9; ctx.fillStyle = '#9aa7ff'; ctx.font = `9px ${mono}`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+        const ex = Math.round(plotW * 0.2);
+        if (top > 24 && top < plotH) ctx.fillText(`EM บน ${(c.openF + c.openEM).toFixed(1)}`, ex, top - 2);
         ctx.textBaseline = 'top';
-        if (bot > 0 && bot < plotH - 10) ctx.fillText(`EM ล่าง ${(c.openF - c.openEM).toFixed(1)}`, plotW * 0.78, bot + 2);
+        if (bot > 0 && bot < plotH - 10) ctx.fillText(`EM ล่าง ${(c.openF - c.openEM).toFixed(1)}`, ex, bot + 2);
         ctx.restore();
       }
     }
@@ -160,13 +165,14 @@
       const near = c.strikes.filter(s => s.vc + s.vp + s.c + s.p > 0).sort((a, b) => Math.abs(a.k - px) - Math.abs(b.k - px)).slice(0, 11);
       ctx.save(); ctx.font = `bold 10px ${mono}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
       const x0 = Math.min(plotW * 0.36, 150);
+      const vMax = Math.max(1, ...near.map(s => s.vc + s.vp));
       near.forEach(s => {
         const y = series.priceToCoordinate(s.k); if (y === null || y < 26 || y > plotH - 8) return;
         const parts = [];
         const sig = (b, sl, lab) => { const v = b + sl, n = b - sl; if (v >= 10 && Math.abs(n) >= Math.max(5, v * 0.2)) parts.push([lab + (n > 0 ? '▲' : '▼'), n > 0 ? C('--call') : C('--put')]); };
         sig(s.bc, s.sc, 'C'); sig(s.bp, s.sp, 'P');
         const v = s.vc + s.vp, o = s.c + s.p;
-        if (v >= 20 && (o === 0 || v / o >= 1)) parts.push(['🔥', '#fff']);
+        if (hot(s, vMax)) parts.push(['🔥', '#fff']);
         if (!parts.length) return;
         let x = x0;
         parts.forEach(([t, col]) => { ctx.fillStyle = col; ctx.fillText(t, x, y - 6); x += ctx.measureText(t).width + 4; });

@@ -313,20 +313,21 @@
     }
     // ซื้อ/ขายสุทธิ + เงินใหม่
     const act = c.strikes.filter(s => s.vc + s.vp > 0).sort((a, b) => (b.vc + b.vp) - (a.vc + a.vp)).slice(0, 8).sort((a, b) => b.k - a.k);
+    const vTop = Math.max(1, ...c.strikes.filter(s => Math.abs(s.k - px) <= 30).map(s => s.vc + s.vp));
     if (act.length) {
       const nt = (b, sl) => { const v = b + sl, n = b - sl; if (v < 10 || Math.abs(n) < Math.max(5, v * 0.2)) return '<span class="tg turn">ก้ำกึ่ง</span>'; return n > 0 ? `<span class="tg new">ซื้อ +${Math.round(n)}</span>` : `<span class="tg close">ขาย ${Math.round(n)}</span>`; };
       const mean = (s) => {
         const out = []; const cb = s.bc - s.sc, pb = s.bp - s.sp;
         if (s.vc >= 10 && cb > 0) out.push('เก็งขึ้น'); if (s.vc >= 10 && cb < 0) out.push('ตั้งเพดาน');
         if (s.vp >= 10 && pb > 0) out.push('ป้องกัน/เก็งลง'); if (s.vp >= 10 && pb < 0) out.push('รับซื้อแถวนี้');
-        const o = s.c + s.p, v = s.vc + s.vp; if (v >= 20 && (o === 0 || v / o >= 1)) out.push('🔥 เงินใหม่');
+        if (L.hot && L.hot(s, vTop)) out.push('🔥 เงินใหม่');
         return out.join(' · ');
       };
       parts.push(`<h3 style="margin-top:12px">ซื้อ/ขายสุทธิวันนี้ (8 strike ที่เทรดมากสุด · ประมาณจากราคาเทียบ bid/ask)</h3><table><thead><tr><th>Strike</th><th>Call</th><th>Put</th><th>Vol/OI</th></tr></thead><tbody>
         ${act.map(s => `<tr><td>${s.k}</td><td class="tag">${nt(s.bc, s.sc)}</td><td class="tag">${nt(s.bp, s.sp)}</td><td>${(s.c + s.p) ? ((s.vc + s.vp) / (s.c + s.p)).toFixed(1) : '∞'}</td></tr>${mean(s) ? `<tr><td></td><td colspan="3" style="font-family:var(--sans);font-size:10.5px;color:var(--muted);padding-top:0">${mean(s)}</td></tr>` : ''}`).join('')}</tbody></table>`);
     }
     return `<div class="card"><h3>⚡ ออปชันวันนี้ ${esc(c.root)} (สด · ช้า 10 นาที · อัปเดต ${upd} · เหลือ ${hh} ชม. ${mm} นาที)</h3>${parts.join('')}
-      <div class="note" style="margin-top:8px">gmf itd สด = OI ของวัน + IV สด + เวลาที่เหลือ คำนวณทุก 1 นาที · แบบ "ปรับตามซื้อ/ขาย" ใช้ยอดซื้อ/ขายวันนี้แทนสมมติฐาน Call+/Put− (เป็นค่าประมาณ) · ป้ายบนกราฟ C▲ = Call ถูกซื้อ, C▼ = Call ถูกขาย, P▲/P▼ เช่นกัน, 🔥 = Vol/OI ≥ 1</div></div>`;
+      <div class="note" style="margin-top:8px">gmf itd สด = OI ของวัน + IV สด + เวลาที่เหลือ คำนวณทุก 1 นาที · แบบ "ปรับตามซื้อ/ขาย" ใช้ยอดซื้อ/ขายวันนี้แทนสมมติฐาน Call+/Put− (เป็นค่าประมาณ) · ป้ายบนกราฟ C▲ = Call ถูกซื้อ, C▼ = Call ถูกขาย, P▲/P▼ เช่นกัน, 🔥 = เงินใหม่ (volume ≥ OI และเทรดหนา)</div></div>`;
   }
 
   // ---------- คำนวณจากข้อมูล OI + Volume ----------

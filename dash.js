@@ -94,9 +94,9 @@
   @media (max-width: 440px) { #dash .dtt { display: none; } #dash .dtop { gap: 6px; padding: 10px 10px 8px; } #dash .dtabs button { padding: 5px 8px; } }
   #dash .aibtn { background: linear-gradient(135deg, #1b2a4a, #2a1b4a); border: 1px solid #5b7cff; color: #cfe0ff; border-radius: 10px; padding: 6px 10px; font: 600 12px var(--sans); white-space: nowrap; box-shadow: 0 0 10px rgba(91,124,255,.35); }
   #dash .aibtn:active { transform: scale(.96); }
-  #aiwrap { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(4,8,20,.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: aifade .25s ease-out; }
+  #aiwrap { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(4,8,20,.88); animation: aifade .25s ease-out; }
   @keyframes aifade { from { opacity: 0 } to { opacity: 1 } }
-  #aiwrap .box { position: relative; width: min(340px, 88vw); padding: 22px 18px 18px; border-radius: 20px; background: radial-gradient(120% 90% at 50% 0%, #121c3a 0%, #070b18 70%); border: 1px solid rgba(91,124,255,.45); box-shadow: 0 0 40px rgba(60,120,255,.25), inset 0 0 30px rgba(60,120,255,.08); overflow: hidden; text-align: center; color: #dbe6ff; }
+  #aiwrap .box { position: relative; width: min(340px, 88vw); padding: 22px 18px 18px; border-radius: 20px; background-color: #080d1e; background-image: radial-gradient(120% 90% at 50% 0%, #142048 0%, #080d1e 70%); border: 1px solid rgba(91,124,255,.45); box-shadow: 0 0 40px rgba(60,120,255,.25), inset 0 0 30px rgba(60,120,255,.08); overflow: hidden; text-align: center; color: #dbe6ff; }
   #aiwrap .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(91,124,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(91,124,255,.08) 1px, transparent 1px); background-size: 18px 18px; animation: aigrid 6s linear infinite; pointer-events: none; }
   @keyframes aigrid { to { background-position: 0 180px, 180px 0; } }
   #aiwrap .scan { position: absolute; left: 0; right: 0; height: 60px; top: -60px; background: linear-gradient(180deg, transparent, rgba(0,229,255,.18), transparent); animation: aiscan 2.2s ease-in-out infinite; pointer-events: none; }

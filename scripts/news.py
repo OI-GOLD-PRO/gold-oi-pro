@@ -42,6 +42,36 @@ else:
             e['actual'] = o['actual']; e['better'] = o.get('better')
 ff_events.sort(key=lambda e: e['date'])
 
+def utc0(s):
+    return datetime.fromisoformat(s.replace('Z', '+00:00')).astimezone(timezone.utc)
+
+# ---------- ข่าวล่วงหน้าจาก FXStreet (ช่วงเสาร์-อาทิตย์ FF ยังไม่มีสัปดาห์หน้า) ----------
+now = datetime.now(timezone.utc)
+if not any(utc0(e['date']) > now for e in ff_events):
+    url = ('https://calendar-api.fxstreet.com/en/api/v1/eventDates/'
+           f"{now:%Y-%m-%dT%H:%M:00Z}/{now + timedelta(days=8):%Y-%m-%dT00:00:00Z}?countries=US"
+           '&volatilities=HIGH&volatilities=MEDIUM')
+    try:
+        up = get(url, {'Referer': 'https://www.fxstreet.com/', 'Origin': 'https://www.fxstreet.com'})
+        have = {(utc0(e['date']).isoformat(), e['title']) for e in ff_events}
+        def num(v, unit):
+            if v is None or v == '': return ''
+            u = unit if unit in ('%', 'K', 'M', 'B', 'T') else ''
+            return (f'{v:g}' if isinstance(v, (int, float)) else str(v)) + u
+        add = 0
+        for x in up:
+            vol = str(x.get('volatility', '')).upper()
+            if vol not in ('HIGH', 'MEDIUM') or not x.get('dateUtc'): continue
+            d = utc0(x['dateUtc']).isoformat()
+            if (d, x.get('name')) in have: continue
+            ff_events.append({'date': d, 'c': 'USD', 'i': 'H' if vol == 'HIGH' else 'M', 'title': x.get('name', ''),
+                              'forecast': num(x.get('consensus'), x.get('unit')), 'previous': num(x.get('previous'), x.get('unit')), 'src': 'fxstreet'})
+            add += 1
+        print('FXStreet upcoming added', add)
+        ff_events.sort(key=lambda e: utc0(e['date']))
+    except Exception as e:
+        print('FXStreet upcoming failed:', e)
+
 def utc(s):
     return datetime.fromisoformat(s).astimezone(timezone.utc)
 

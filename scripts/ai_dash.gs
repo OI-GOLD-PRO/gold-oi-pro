@@ -90,7 +90,7 @@ function aiGather_() {
   } catch (e) { console.warn('cot: ' + e); }
   // ปฏิทินข่าว
   let cal = [];
-  try { cal = (aiFetchJson_(AI_NEWS).events || []).filter(e => e.c === 'USD').map(e => ({ time_th: aiFmt_(new Date(e.date), 'dd/MM HH:mm'), impact: (e.i || 'H') === 'H' ? 'high' : 'medium', title: e.title, forecast: e.forecast, previous: e.previous, actual: e.actual || null, better_than_forecast: e.better === undefined ? null : e.better })); } catch (e) {}
+  try { cal = (aiFetchJson_(AI_NEWS).events || []).filter(e => e.c === 'USD').map(e => ({ ms: Date.parse(e.date), time_th: aiFmt_(new Date(e.date), 'dd/MM HH:mm'), impact: (e.i || 'H') === 'H' ? 'high' : 'medium', title: e.title, forecast: e.forecast, previous: e.previous, actual: e.actual || null, better_than_forecast: e.better === undefined ? null : e.better })); } catch (e) {}
   const emLo = o.openEM ? o.openF - o.openEM : null, emHi = o.openEM ? o.openF + o.openEM : null;
   const facts = {
     price_vs_gmf_itd: o.itd == null ? null : (price >= o.itd ? 'เหนือ ' : 'ใต้ ') + Math.abs(Math.round((price - o.itd) * 10) / 10),
@@ -154,7 +154,9 @@ function runAI_(reason) {
   ['trend_label', 'headline', 'summary', 'watch', 'warn'].forEach(k => { A[k] = clean(A[k]); });
   A.mm = (Array.isArray(A.mm) ? A.mm : A.mm && typeof A.mm === 'object' ? Object.values(A.mm) : [A.mm]).map(clean).map(t => t.replace(/^\d+\s*[—\-.)]\s*/, '')).filter(t => t.length >= 8);
   // ปฏิทิน: สร้างจากข้อมูลจริง (ไม่ให้ AI ตีความตัวเลขข่าวเอง)
-  A.events = data.calendar.slice(-6).map(e => e.time_th + ' ' + (e.impact === 'high' ? '🔴 ' : '🟠 ') + e.title + (e.actual ? ` ออก ${e.actual} (คาด ${e.forecast || '–'})${e.better_than_forecast === true ? ' ดีกว่าคาด → หนุนดอลลาร์' : e.better_than_forecast === false ? ' แย่กว่าคาด → หนุนทอง' : ''}` : ` (คาด ${e.forecast || '–'}, ก่อนหน้า ${e.previous || '–'})`));
+  // ข่าวที่ยังไม่ออก (ใกล้สุดก่อน) + ข่าวที่เพิ่งออกใน 24 ชม.
+  const calSort = data.calendar.filter(e => e.ms > Date.now()).slice(0, 6).concat(data.calendar.filter(e => e.ms <= Date.now() && Date.now() - e.ms < 24 * 36e5).reverse().slice(0, 2));
+  A.events = calSort.map(e => e.time_th + ' ' + (e.impact === 'high' ? '🔴 ' : '🟠 ') + e.title + (e.actual ? ` ออก ${e.actual} (คาด ${e.forecast || '–'})${e.better_than_forecast === true ? ' ดีกว่าคาด → หนุนดอลลาร์' : e.better_than_forecast === false ? ' แย่กว่าคาด → หนุนทอง' : ''}` : ` ยังไม่ออก · คาด ${e.forecast || '–'} ก่อนหน้า ${e.previous || '–'}`));
   (A.levels || []).forEach(l => { l.t = clean(l.t); });
   // แนวเหนือราคา = แนวต้าน, ใต้ราคา = แนวรับ (ยกเว้น P = จุดดึงดูด)
   const sideOf = (p, k) => k === 'P' ? 'P' : p > data.futures_price ? 'R' : 'S';

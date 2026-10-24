@@ -2,7 +2,7 @@
 // วางเป็นไฟล์ใหม่ในโปรเจกต์ Apps Script เดียวกับ sync_live
 // 1) ใส่คีย์: Project Settings (รูปเฟือง) → Script properties → Add: DEEPSEEK_API_KEY = <คีย์ของคุณ>
 // 2) รัน installAITrigger ครั้งเดียว → ระบบเช็กทุก 5 นาที และวิเคราะห์เมื่อ:
-//    - ตลาดเอเชียเปิด 07:00 น. (โตเกียว 09:00) · ยุโรปเปิด (ลอนดอน 08:00 = 14:00/15:00 น. ไทยตามฤดู) · อเมริกา 19:00 น.
+//    - เวลาไทย 07:00 (เอเชีย) · 13:30 และ 15:00 (ยุโรป) · 19:00 และ 21:30 (อเมริกา)
 //    - หลังข่าวแดง USD ออก 10 นาที
 //    (เฉพาะวันตลาดเปิด จ.–ศ.) · รันเองได้ด้วย runAINow
 // ผลลัพธ์เขียนลงแท็บ webapp key "dash" ซึ่งแอปแสดงในการ์ดบนสุดของแดชบอร์ด
@@ -27,10 +27,8 @@ function aiTick() {
   if (dow >= 6) return; // ส.–อา. ตลาดปิด
   const ymd = aiFmt_(now, 'yyyyMMdd');
   const at = (hh, mm) => new Date(aiFmt_(now, 'yyyy-MM-dd') + 'T' + String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ':00+07:00');
-  // ลอนดอน 08:00 → เวลาไทย (14:00 ช่วง BST, 15:00 ช่วง GMT)
-  const lonOff = Utilities.formatDate(now, 'Europe/London', 'Z'); // +0100 / +0000
-  const europe = lonOff === '+0100' ? at(14, 0) : at(15, 0);
-  const slots = [['asia', at(7, 0), 'ตลาดเอเชียเปิด'], ['europe', europe, 'ตลาดยุโรปเปิด'], ['us', at(19, 0), 'ตลาดอเมริกา']];
+  // เวลาไทย: เอเชีย 07:00 · ยุโรป 13:30 และ 15:00 · อเมริกา 19:00 และ 21:30
+  const slots = [['asia', at(7, 0), 'ตลาดเอเชียเปิด'], ['eu1', at(13, 30), 'ตลาดยุโรป (ก่อนเปิด)'], ['eu2', at(15, 0), 'ตลาดยุโรปเปิด'], ['us1', at(19, 0), 'ตลาดอเมริกา (ก่อนเปิด)'], ['us2', at(21, 30), 'ตลาดอเมริกาเปิด']];
   for (const [k, t, label] of slots) {
     const key = 'ai_' + ymd + '_' + k;
     if (now >= t && now - t < 60 * 60e3 && !props.getProperty(key)) { props.setProperty(key, '1'); runAI_(label); return; }

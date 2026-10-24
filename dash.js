@@ -91,6 +91,25 @@
   #dash .cleg i { display: inline-block; width: 10px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
   #dash .msg { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px; }
   #dash .note { font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+  #dash .cf { border-radius: 12px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
+  #dash .cf.bull { background: rgba(47,191,143,.12); border: 1px solid rgba(47,191,143,.5); }
+  #dash .cf.bear { background: rgba(229,87,107,.12); border: 1px solid rgba(229,87,107,.5); }
+  #dash .cf.mix { background: rgba(224,180,76,.10); border: 1px solid rgba(224,180,76,.5); }
+  #dash .cf .ic { font-size: 26px; }
+  #dash .cf b { display: block; font: 600 15px var(--sans); }
+  #dash .cf span { display: block; font-size: 12px; color: var(--fg); line-height: 1.5; margin-top: 2px; }
+  #dash .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  #dash .half { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+  #dash .half small { display: block; font: 10.5px var(--sans); color: var(--muted); }
+  #dash .half b { display: block; font: 600 14px var(--sans); margin-top: 2px; }
+  #dash .half em { display: block; font: normal 10.5px var(--mono); color: var(--muted); margin-top: 2px; line-height: 1.5; }
+  #dash .up { color: var(--call); } #dash .dn { color: var(--put); } #dash .md { color: var(--gold); }
+  #dash .ph { margin-top: 10px; font-size: 12.5px; line-height: 1.55; }
+  #dash .ph .tg { margin-right: 6px; }
+  #dash details { margin-top: 8px; } #dash summary { font-size: 11.5px; color: var(--muted); cursor: pointer; }
+  #dash .fx { display: grid; grid-template-columns: 1fr 44px 56px; gap: 2px 8px; font: 11px var(--mono); margin-top: 6px; }
+  #dash .fx span:nth-child(3n+1) { font-family: var(--sans); color: var(--muted); }
+  #dash .fx span:nth-child(3n+2), #dash .fx span:nth-child(3n) { text-align: right; }
   `;
   document.head.appendChild(st);
 
@@ -116,11 +135,130 @@
 
   async function load(force) {
     $('dBody').innerHTML = '<div class="msg">กำลังโหลดข้อมูลล่าสุดจากชีต…</div>';
+    loadCOT(force).then(() => { if (!box.hidden && cur === 'gold') show(); });
     await Promise.all(Object.keys(SY).map(async s => {
       if (!force && cache[s]) return;
       try { cache[s] = { d: await O.fetchData(s), at: new Date() }; } catch (e) { cache[s] = { err: e.message || String(e) }; }
     }));
     show();
+  }
+
+  // ---------- COT (CFTC) + Gamma Flip ----------
+  // COT ทองคำ COMEX (088691) รายงาน Disaggregated ของ CFTC: ข้อมูล ณ วันอังคาร ประกาศคืนวันศุกร์ (ไทย ~02:30 เสาร์)
+  // ราคาทองรายวันจาก Worker (Yahoo GC=F) ใช้คิดราคาเปลี่ยนแปลงรายสัปดาห์ (วันอังคารถึงวันอังคาร)
+  const CFTC = 'https://publicreporting.cftc.gov/resource/72hh-3qpy.json';
+  const GCW = 'https://gc-yahoo.oigoldpro.workers.dev/?tf=1d';
+  let cot = null; // { rows:[...ใหม่→เก่า], px:[[sec,close]], at, err }
+  async function loadCOT(force) {
+    if (!force && cot && !cot.err && Date.now() - cot.at < 3 * 3600e3) return;
+    try {
+      if (!force) { const c = JSON.parse(localStorage.getItem('cot_cache') || 'null'); if (c && Date.now() - c.at < 3 * 3600e3) { cot = c; return; } }
+    } catch (e) {}
+    try {
+      const sel = ['report_date_as_yyyy_mm_dd', 'open_interest_all', 'm_money_positions_long_all', 'm_money_positions_short_all', 'prod_merc_positions_long', 'prod_merc_positions_short', 'swap_positions_long_all', 'swap__positions_short_all', 'nonrept_positions_long_all', 'nonrept_positions_short_all'].join(',');
+      const u = `${CFTC}?cftc_contract_market_code=088691&$select=${sel}&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=170`;
+      const [r1, r2] = await Promise.all([fetch(u), fetch(GCW).catch(() => null)]);
+      if (!r1.ok) throw new Error('CFTC HTTP ' + r1.status);
+      const raw = await r1.json();
+      const n = v => Number(v) || 0;
+      const rows = raw.map(x => ({ d: String(x.report_date_as_yyyy_mm_dd).slice(0, 10), oi: n(x.open_interest_all),
+        mm: n(x.m_money_positions_long_all) - n(x.m_money_positions_short_all), mmL: n(x.m_money_positions_long_all), mmS: n(x.m_money_positions_short_all),
+        cm: n(x.prod_merc_positions_long) + n(x.swap_positions_long_all) - n(x.prod_merc_positions_short) - n(x.swap__positions_short_all),
+        nrL: n(x.nonrept_positions_long_all), nrS: n(x.nonrept_positions_short_all) }));
+      let px = [];
+      try { if (r2 && r2.ok) px = (((await r2.json()).bars || {})['1d'] || []).map(b => [b[0], b[4]]); } catch (e) {}
+      cot = { rows, px, at: Date.now() };
+      try { localStorage.setItem('cot_cache', JSON.stringify(cot)); } catch (e) {}
+    } catch (e) { cot = { err: e.message || String(e), at: Date.now() }; }
+  }
+  // ราคาปิดของวันที่ (หรือวันทำการก่อนหน้า) จากแท่งรายวัน
+  const pxOn = (px, d) => { const t = Date.parse(d + 'T23:59:59Z') / 1000; let v = null; for (const b of px) { if (b[0] <= t) v = b[1]; else break; } return v; };
+  const clamp = v => Math.max(-100, Math.min(100, v));
+  function cotCalc() {
+    if (!cot || !cot.rows || cot.rows.length < 10) return null;
+    const R = cot.rows, H = R.slice(0, 157); // ย้อนหลัง 3 ปี
+    const maxAbs = a => Math.max(1, ...a.map(Math.abs));
+    const d1 = i => R[i + 1] ? R[i].mm - R[i + 1].mm : 0, d8 = i => R[i + 8] ? R[i].mm - R[i + 8].mm : 0, o4 = i => R[i + 4] ? R[i].oi - R[i + 4].oi : 0;
+    const idx = [...Array(Math.max(1, H.length - 8)).keys()];
+    const L = R[0], P = R[1];
+    const mmMin = Math.min(...H.map(r => r.mm)), mmMax = Math.max(...H.map(r => r.mm));
+    const cmMin = Math.min(...H.map(r => r.cm)), cmMax = Math.max(...H.map(r => r.cm));
+    const pct = (v, lo, hi) => hi > lo ? (v - lo) / (hi - lo) : 0.5;
+    // ราคาวันอังคาร
+    const p0 = cot.px.length ? pxOn(cot.px, L.d) : null, p1 = cot.px.length ? pxOn(cot.px, P.d) : null;
+    const dP = p0 !== null && p1 !== null ? p0 - p1 : null;
+    const wk = []; for (let i = 0; i + 1 < R.length && i < 52; i++) { const a = pxOn(cot.px, R[i].d), b = pxOn(cot.px, R[i + 1].d); if (a !== null && b !== null) wk.push(a - b); }
+    const nrNet = L.nrL - L.nrS, nrTot = L.nrL + L.nrS;
+    const S = [
+      ['กองทุน (MM) เปลี่ยน 1 สัปดาห์', .30, clamp(d1(0) / maxAbs(idx.map(d1)) * 100)],
+      ['กองทุน (MM) เปลี่ยน 8 สัปดาห์', .25, clamp(d8(0) / maxAbs(idx.map(d8)) * 100)],
+      ['ราคาทองเปลี่ยน 1 สัปดาห์', .20, dP === null ? 0 : clamp(dP / maxAbs(wk) * 100)],
+      ['OI รวมเปลี่ยน 4 สัปดาห์', .10, clamp(o4(0) / maxAbs(idx.map(o4)) * 100)],
+      ['สวนทางรายย่อย', .05, clamp(-(nrTot ? nrNet / nrTot * 100 : 0))],
+      ['Commercial เทียบ 3 ปี', .05, clamp(pct(L.cm, cmMin, cmMax) * 200 - 100)],
+      ['กองทุนสุทธิ เทียบ 3 ปี', .05, clamp(pct(L.mm, mmMin, mmMax) * 200 - 100)],
+    ];
+    const score = Math.round(S.reduce((a, x) => a + x[1] * x[2], 0) * 10) / 10;
+    const bias = score >= 20 ? 1 : score <= -20 ? -1 : 0;
+    // ช่วงตลาด: ราคา × OI × กองทุน (สัปดาห์ล่าสุด)
+    const dOI = L.oi - P.oi, dMM = L.mm - P.mm;
+    let phase = null;
+    if (dP !== null) {
+      if (dP >= 0 && dOI >= 0) phase = ['bull', 'เงินใหม่เข้าฝั่งซื้อ', 'ราคาขึ้นพร้อม OI เพิ่ม' + (dMM >= 0 ? ' และกองทุนเพิ่ม Long' : ' แต่กองทุนลดสถานะ (ระวังแรงซื้อไม่ใช่กองทุน)')];
+      else if (dP >= 0) phase = ['mix', 'ปิด Short (Short covering)', 'ราคาขึ้นแต่ OI ลด แรงขึ้นมาจากการปิด Short อาจไม่ยั่งยืน'];
+      else if (dOI >= 0) phase = ['bear', 'เปิด Short ใหม่ / ขาลงมีแรงหนุน', 'ราคาลงพร้อม OI เพิ่ม' + (dMM <= 0 ? ' และกองทุนลดสถานะสุทธิ' : ' แต่กองทุนกลับเพิ่ม Long')];
+      else phase = ['mix', 'ขายทิ้ง Long (Liquidation)', 'ราคาลงพร้อม OI ลด เป็นการปิดสถานะ ขาลงอาจใกล้หมดแรง'];
+    }
+    return { L, P, S, score, bias, phase, dP, p0, dOI, dMM, mmIdx: pct(L.mm, mmMin, mmMax) * 100, cmIdx: pct(L.cm, cmMin, cmMax) * 100,
+      nrLongPct: nrTot ? L.nrL / nrTot * 100 : null, d8: d8(0), oi4: o4(0), spark: R.slice(0, 52).map(r => r.mm).reverse() };
+  }
+  function cotCard(price, cfg) {
+    if (!cot) return `<div class="card"><h3>🏦 COT + Gamma</h3><div class="note">กำลังโหลด COT จาก CFTC…</div></div>`;
+    if (cot.err) return `<div class="card"><h3>🏦 COT + Gamma</h3><div class="note">โหลด COT ไม่สำเร็จ: ${esc(cot.err)} (กด ⟳)</div></div>`;
+    const k = cotCalc(); if (!k) return '';
+    let g = null; try { g = cfg.gmf ? JSON.parse(cfg.gmf) : null; } catch (e) {}
+    const px = price !== null ? price : (g && isFinite(g.F) ? g.F : null);
+    const flipM = g && isFinite(+g.M) && g.M !== null ? +g.M : null, flipI = g && isFinite(+g.itd) && g.itd !== null ? +g.itd : null;
+    const gam = (px !== null && flipM !== null) ? (px >= flipM ? 1 : -1) : 0;
+    const bTxt = ['ขาลง', 'กลาง', 'ขาขึ้น'][k.bias + 1], bCls = ['dn', 'md', 'up'][k.bias + 1];
+    // Confluence
+    let cf;
+    if (!gam) cf = ['mix', '❔', 'ยังไม่มี gmf', 'สั่ง "อัพเดท" เพื่อคำนวณ Gamma Flip'];
+    else if (k.bias === -1 && gam === -1) cf = ['bear', '🔻', 'ไปทางเดียวกัน: ขาลง', 'COT ภาพใหญ่ลง และราคาอยู่ใต้ gmf M (Gamma ลบ วิ่งแรงตามทาง) ไม่ควรสวน Long เด้งขึ้นใช้เป็นจุดดูขาย'];
+    else if (k.bias === 1 && gam === 1) cf = ['bull', '🔺', 'ไปทางเดียวกัน: ขาขึ้น', 'COT ภาพใหญ่ขึ้น และราคาอยู่เหนือ gmf M (Gamma บวก ตลาดนิ่ง) ย่อลงใช้เป็นจุดดูซื้อ'];
+    else if (k.bias === 1 && gam === -1) cf = ['mix', '⚠️', 'ขัดกัน: ภาพใหญ่ขึ้น แต่ระยะสั้นผันผวน', 'กองทุนยังเอียงซื้อ แต่ราคาอยู่ใต้ gmf M ระวังไส้ลงแรง รอยืนกลับเหนือ gmf ก่อน'];
+    else if (k.bias === -1 && gam === 1) cf = ['mix', '⚠️', 'ขัดกัน: ภาพใหญ่ลง แต่ระยะสั้นถูกตรึงในกรอบ', 'กองทุนเอียงขาย แต่ราคาอยู่เหนือ gmf M ตลาดมักแกว่งกรอบ หลุด gmf เมื่อไรขาลงจะเร่ง'];
+    else cf = ['mix', '➖', 'ไม่ชัด', `COT เป็นกลาง ราคาอยู่${gam > 0 ? 'เหนือ' : 'ใต้'} gmf M ให้ใช้แนว OI เป็นหลัก`];
+    const f0 = v => v === null || !isFinite(v) ? '–' : Math.round(v).toLocaleString('en-US');
+    const sg = v => v === null || !isFinite(v) ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(Math.round(v)).toLocaleString('en-US');
+    const cl = v => v > 0 ? 'up' : v < 0 ? 'dn' : '';
+    const ext = k.mmIdx >= 90 ? 'กองทุน Long สุดโต่ง (ระวังกลับตัวลง)' : k.mmIdx <= 10 ? 'กองทุนสุทธิต่ำสุดในรอบ 3 ปี (ระวังกลับตัวขึ้น)' : null;
+    const sp = k.spark, sMin = Math.min(...sp), sMax = Math.max(...sp), W = 300, Hh = 40;
+    const spark = sp.length > 1 ? `<svg viewBox="0 0 ${W} ${Hh}" style="width:100%;height:40px;display:block;margin-top:6px" aria-label="กองทุนสุทธิ 52 สัปดาห์"><polyline fill="none" stroke="var(--gold)" stroke-width="1.6" points="${sp.map((v, i) => `${i * W / (sp.length - 1)},${3 + (1 - (v - sMin) / ((sMax - sMin) || 1)) * (Hh - 6)}`).join(' ')}"/></svg><div class="note">กองทุน (MM) สุทธิ 52 สัปดาห์: ${f0(sMin)} ถึง ${f0(sMax)}</div>` : '';
+    const dt = new Date(k.L.d + 'T00:00:00Z').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+    return `<div class="card"><h3>🏦 COT + Gamma (ภาพใหญ่รายสัปดาห์ × จังหวะจาก Gamma Flip)</h3>
+      <div class="cf ${cf[0]}"><div class="ic">${cf[1]}</div><div><b>${cf[2]}</b><span>${cf[3]}</span></div></div>
+      <div class="two">
+        <div class="half"><small>ทิศ COT (คะแนน 7 ปัจจัย)</small><b class="${bCls}">${bTxt} ${k.score > 0 ? '+' : ''}${k.score}</b>
+          <div class="sbar" style="margin-top:6px"><i style="left:${(k.score + 100) / 2}%"></i></div><em>ข้อมูล ณ ${dt} (อังคาร)</em></div>
+        <div class="half"><small>Gamma (ราคา vs gmf)</small><b class="${gam > 0 ? 'up' : gam < 0 ? 'dn' : ''}">${gam > 0 ? 'เหนือ Flip · แกว่งกรอบ' : gam < 0 ? 'ใต้ Flip · วิ่งแรง' : '–'}</b>
+          <em>gmf M ${flipM === null ? '–' : flipM.toFixed(1)}${px !== null && flipM !== null ? ` (${px >= flipM ? '+' : '−'}${Math.abs(px - flipM).toFixed(1)})` : ''}<br>gmf itd ${flipI === null ? '–' : flipI.toFixed(1)}${px !== null && flipI !== null ? ` (${px >= flipI ? '+' : '−'}${Math.abs(px - flipI).toFixed(1)})` : ''}</em></div>
+      </div>
+      ${k.phase ? `<div class="ph"><span class="tg ${k.phase[0] === 'bull' ? 'new' : k.phase[0] === 'bear' ? 'close' : 'hold'}">${esc(k.phase[1])}</span>${esc(k.phase[2])}</div>` : ''}
+      ${ext ? `<div class="warn" style="margin-top:6px">⚠️ ${ext}</div>` : ''}
+      <div class="tiles" style="margin-top:10px">
+        <div class="tile"><small>กองทุน (Managed Money) สุทธิ</small><b>${sg(k.L.mm)}</b><em><span class="${cl(k.dMM)}">${sg(k.dMM)}</span> 1 สัปดาห์ · <span class="${cl(k.d8)}">${sg(k.d8)}</span> 8 สัปดาห์</em></div>
+        <div class="tile"><small>COT Index 3 ปี (กองทุน)</small><b>${k.mmIdx.toFixed(0)}%</b><em>0% = ต่ำสุด 3 ปี · 100% = สูงสุด</em></div>
+        <div class="tile"><small>Commercial (ผู้ผลิต+Swap) สุทธิ</small><b>${sg(k.L.cm)}</b><em>เทียบ 3 ปี ${k.cmIdx.toFixed(0)}% · <span class="${cl(k.L.cm - k.P.cm)}">${sg(k.L.cm - k.P.cm)}</span></em></div>
+        <div class="tile"><small>รายย่อย ถือ Long</small><b class="${k.nrLongPct > 75 ? 'dn' : ''}">${k.nrLongPct === null ? '–' : k.nrLongPct.toFixed(1) + '%'}</b><em>${k.nrLongPct > 75 ? 'Long แน่น (สัญญาณเตือนใกล้ยอด)' : 'สุทธิ ' + sg(k.L.nrL - k.L.nrS)}</em></div>
+        <div class="tile"><small>OI รวม GC</small><b>${f0(k.L.oi)}</b><em><span class="${cl(k.dOI)}">${sg(k.dOI)}</span> 1 สัปดาห์ · <span class="${cl(k.oi4)}">${sg(k.oi4)}</span> 4 สัปดาห์</em></div>
+        <div class="tile"><small>ราคา GC วันอังคาร</small><b>${k.p0 === null ? '–' : fmt(k.p0, 1)}</b><em><span class="${cl(k.dP)}">${k.dP === null ? '–' : (k.dP >= 0 ? '+' : '−') + Math.abs(k.dP).toFixed(1)}</span> จากสัปดาห์ก่อน</em></div>
+      </div>
+      ${spark}
+      <details><summary>ดูที่มาของคะแนน COT (7 ปัจจัย)</summary><div class="fx"><span>ปัจจัย</span><span>น้ำหนัก</span><span>ค่า</span>
+        ${k.S.map(x => `<span>${x[0]}</span><span>${Math.round(x[1] * 100)}%</span><span class="${cl(x[2])}">${x[2] > 0 ? '+' : ''}${x[2].toFixed(0)}</span>`).join('')}</div>
+        <div class="note" style="margin-top:6px">ปัจจัย 1–4 หารด้วยค่าเปลี่ยนแปลงสูงสุดในอดีต (COT 3 ปี, ราคา 1 ปี) · ปัจจัย 6–7 เทียบช่วงต่ำสุด–สูงสุด 3 ปี · คะแนน ≥ +20 = ขาขึ้น, ≤ −20 = ขาลง</div></details>
+      <div class="note" style="margin-top:6px">COT ช้า 3 วัน (ข้อมูลวันอังคาร ประกาศคืนวันศุกร์) ใช้ดูภาพใหญ่ ส่วน gmf ใช้ดูจังหวะ · ที่มา CFTC Disaggregated COMEX Gold</div></div>`;
   }
 
   // ---------- คำนวณจากข้อมูล OI + Volume ----------
@@ -186,6 +324,9 @@
         <div class="slab"><span>ขาลง −100</span><span>คะแนนแนวโน้ม <b>${sgn(sc)}</b></span><span>+100 ขาขึ้น</span></div></div>
         <div class="meta">วิเคราะห์ ${esc(A.updated || '–')} · OI ${esc(d.stamp || '–')} · Volume ${esc(cfg.volume_time || '–')} · สัญญา ${esc(cfg.contract || A.contract || '–')}<br>โหลดหน้า ${c.at.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</div></div>`);
     }
+
+    // 1.5) COT + Gamma (เฉพาะทองคำ)
+    if (cur === 'gold') parts.push(cotCard(price, cfg));
 
     // 2) ป้ายเตือนราคาใกล้แนว
     if (price !== null) {

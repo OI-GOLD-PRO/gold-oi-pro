@@ -8,6 +8,7 @@
 //   B7     contract                                                (สัญญาที่หมดอายุวันนั้น)
 //   B8:B10 volume, volume_time, volume_contract                    (volume ราย strike ของสัญญาวันนั้น)
 //   B18    gmf                                                     (gmf itd + gmf M)
+// แท็บ vol_log: ต่อท้าย 1 แถวทุกชั่วโมงเฉพาะตอนตลาดเปิด (เวลา, gold, สัญญา, ราคา, offset, JSON สรุป + volume ราย strike, หมายเหตุ)
 // และแท็บ ชีต1: OI ราย strike ของสัญญาวันนั้น (แถว 2 = ราคา F, แถว 3 = เวลา V)
 
 const SYNC_SHEET_ID = '1-0tiRE91vvRM3xOiJPXBqlwGQbTmvmGaHv804DX4liU';
@@ -24,8 +25,9 @@ function syncLive() {
   const now = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm');
 
   // 1) ราคา Gold.F + offset
+  let px = null;
   try {
-    const px = get('/px');
+    px = get('/px');
     if (px && px.offset !== null && px.gc_price) {
       sh.getRange('B2:B6').setValues([[px.offset], [px.gc_price], [px.ref_price], [px.ref_symbol], [px.offset_time]]);
     }
@@ -50,6 +52,23 @@ function syncLive() {
   if (o.gmfM && o.gmfM.M !== null && o.gmfM.M !== undefined) { g.M = o.gmfM.M; g.gex_M = o.gmfM.gexM; g.M_c = o.gmfM.roots + ' contracts exp <=30d (TradingView OI+IV)'; }
   g.F = o.F; g.src = 'Worker auto (TradingView)'; g.time = now;
   sh.getRange('A18:B18').setValues([['gmf', JSON.stringify(g)]]);
+
+  // vol_log: ชั่วโมงละ 1 แถว เมื่อ Worker เพิ่งอัปเดต (ตลาดเปิด) — ใช้ backtest แนว OI + volume
+  try {
+    const props0 = PropertiesService.getScriptProperties();
+    const hourKey = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH');
+    const fresh = o.updated && (Date.now() / 1000 - o.updated) < 15 * 60;
+    if (fresh && props0.getProperty('vol_log_hour') !== hourKey) {
+      let vC = 0, vP = 0, oC = 0, oP = 0;
+      o.rows.forEach(r => { if (r[1] === 'C') { vC += r[8] || 0; oC += r[11] || 0; } else { vP += r[8] || 0; oP += r[11] || 0; } });
+      // ATM IV = เฉลี่ย IV Call/Put ของ strike ใกล้ราคาที่สุด
+      let atm = null;
+      if (o.F) { const near = o.rows.filter(r => r[2]).sort((a, b) => Math.abs(a[0] - o.F) - Math.abs(b[0] - o.F)).slice(0, 2); if (near.length) atm = Math.round(near.reduce((a, r) => a + r[2], 0) / near.length * 1000) / 10; }
+      const sum = { vol_C: vC, vol_P: vP, oi_C: oC, oi_P: oP, atm_iv: atm, gmf_itd: g.itd, gmf_M: g.M, em: o.em, v: vol };
+      ss.getSheetByName('vol_log').appendRow([now, 'gold', o.root, px && px.gc_price ? px.gc_price : (o.F || ''), px && px.offset !== null ? px.offset : '', JSON.stringify(sum), 'auto (Worker/TradingView) ทุกชั่วโมง']);
+      props0.setProperty('vol_log_hour', hourKey);
+    }
+  } catch (e) { console.warn('vol_log: ' + e); }
 
   // OI ลง ชีต1 เฉพาะเมื่อมีข้อมูลและเปลี่ยนจากเดิม
   if (levels.length) {

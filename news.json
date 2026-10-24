@@ -1,32 +1,5 @@
 {
   "source": "Forex Factory + FXStreet (actual)",
-  "diag": {
-    "future_ff": 0,
-    "fx_n": 25,
-    "fx_keys": [
-      "id",
-      "eventId",
-      "dateUtc",
-      "periodDateUtc",
-      "periodType",
-      "actual",
-      "revised",
-      "consensus",
-      "ratioDeviation",
-      "previous",
-      "isBetterThanExpected",
-      "name",
-      "countryCode",
-      "currencyCode",
-      "unit",
-      "potency",
-      "volatility",
-      "isAllDay",
-      "isTentative",
-      "isPreliminary"
-    ],
-    "added": 25
-  },
   "events": [
     {
       "date": "2026-10-22T08:30:00-04:00",

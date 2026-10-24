@@ -135,7 +135,7 @@
 
   async function load(force) {
     $('dBody').innerHTML = '<div class="msg">กำลังโหลดข้อมูลล่าสุดจากชีต…</div>';
-    loadCOT(force).then(() => { if (!box.hidden && cur === 'gold') show(); });
+    loadCOT(force).then(() => { pubCot(); if (!box.hidden && cur === 'gold') show(); });
     await Promise.all(Object.keys(SY).map(async s => {
       if (!force && cache[s]) return;
       try { cache[s] = { d: await O.fetchData(s), at: new Date() }; } catch (e) { cache[s] = { err: e.message || String(e) }; }
@@ -233,7 +233,9 @@
     const k = cotCalc(); if (!k) return '';
     let g = null; try { g = cfg.gmf ? JSON.parse(cfg.gmf) : null; } catch (e) {}
     const px = price !== null ? price : (g && isFinite(g.F) ? g.F : null);
-    const flipM = g && isFinite(+g.M) && g.M !== null ? +g.M : null, flipI = g && isFinite(+g.itd) && g.itd !== null ? +g.itd : null;
+    const LC = window.OILive && window.OILive.calc;
+    const flipM = g && isFinite(+g.M) && g.M !== null ? +g.M : null;
+    const flipI = LC && LC.match && LC.gmf !== null ? LC.gmf : (g && isFinite(+g.itd) && g.itd !== null ? +g.itd : null);
     const gam = (px !== null && flipM !== null) ? (px >= flipM ? 1 : -1) : 0;
     const bTxt = ['ขาลง', 'กลาง', 'ขาขึ้น'][k.bias + 1], bCls = ['dn', 'md', 'up'][k.bias + 1];
     // Confluence
@@ -278,6 +280,53 @@
         <span>คะแนนสุดท้าย</span><span></span><span class="${cl(k.score)}">${k.score > 0 ? '+' : ''}${k.score}</span></div>
         <div class="note" style="margin-top:6px">ปัจจัย 1–4 หารด้วยค่าเปลี่ยนแปลงสูงสุดในอดีต (COT 3 ปี, ราคา 1 ปี) · ปัจจัย 6–7 เทียบช่วงต่ำสุด–สูงสุด 3 ปี · DXY: นักเก็งกำไรดอลลาร์ (Legacy, ICE DXY) เปลี่ยนเกิน 2% ของ OI → ซื้อดอลลาร์ −5 / ขายดอลลาร์ +5 · คะแนน ≥ +20 = ขาขึ้น, ≤ −20 = ขาลง</div></details>
       <div class="note" style="margin-top:6px">COT ช้า 3 วัน (ข้อมูลวันอังคาร ประกาศคืนวันศุกร์) ใช้ดูภาพใหญ่ ส่วน gmf ใช้ดูจังหวะ · ที่มา CFTC Disaggregated COMEX Gold</div></div>`;
+  }
+
+  // ---------- ออปชันสัญญาวันนี้แบบสด (จาก live.js / Worker) ----------
+  function liveCard(price) {
+    const L = window.OILive, c = L && L.calc;
+    if (!L) return '';
+    if (!c) return `<div class="card"><h3>⚡ ออปชันวันนี้ (สด · ช้า 10 นาที)</h3><div class="note">${L.err ? 'ดึงข้อมูลสดไม่ได้: ' + esc(L.err) : 'กำลังโหลด…'}</div></div>`;
+    const px = price !== null ? price : c.S0;
+    const f1 = v => v === null || v === undefined || !isFinite(v) ? '–' : Number(v).toFixed(1);
+    const rel = v => v === null || px === null ? '' : ` <span class="${px >= v ? 'up' : 'dn'}">(${px >= v ? 'ราคาเหนือ' : 'ราคาใต้'} ${Math.abs(px - v).toFixed(1)})</span>`;
+    const left = Math.max(0, c.expTs * 1000 - Date.now()), hh = Math.floor(left / 3600e3), mm = Math.floor(left % 3600e3 / 60e3);
+    const upd = c.updated ? new Date(c.updated * 1000).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '–';
+    const skTxt = c.skew === null ? '–' : c.skew > 1.5 ? 'ตลาดกลัวขาลง (Put แพงกว่า)' : c.skew < -1.5 ? 'ตลาดไล่ซื้อขาขึ้น (Call แพงกว่า)' : 'สมดุล';
+    const parts = [];
+    parts.push(`<div class="tiles">
+      <div class="tile"><small>gmf itd สด (${esc(c.root)})</small><b style="color:var(--gmfi)">${f1(c.gmf)}</b><em>${c.match ? rel(c.gmf) : 'OI ในชีตเป็นสัญญา ' + esc(c.cfgC || '–')}</em></div>
+      <div class="tile"><small>gmf itd ปรับตามซื้อ/ขายวันนี้</small><b style="color:var(--gmfi)">${f1(c.gmfAdj)}</b><em>${c.gmfAdj !== null ? rel(c.gmfAdj) : 'volume ยังน้อย'}</em></div>
+      <div class="tile"><small>Expected Move ถึงหมดอายุ</small><b style="color:#9aa7ff">±${f1(c.em)}</b><em>${c.openEM ? `กรอบวันนี้ ${f1(c.openF - c.openEM)} – ${f1(c.openF + c.openEM)}` : ''}</em></div>
+      <div class="tile"><small>Skew (IV Put25Δ − Call25Δ)</small><b class="${c.skew > 1.5 ? 'dn' : c.skew < -1.5 ? 'up' : ''}">${c.skew === null ? '–' : (c.skew > 0 ? '+' : '') + c.skew.toFixed(1) + ' จุด'}</b><em>${skTxt}</em></div>
+    </div>`);
+    // GEX ราย strike ±10 strike รอบราคา
+    const near = c.strikes.filter(s => s.c + s.p > 0).sort((a, b) => Math.abs(a.k - px) - Math.abs(b.k - px)).slice(0, 15).sort((a, b) => b.k - a.k);
+    if (c.match && near.length) {
+      const mx = Math.max(1, ...near.map(s => Math.abs(s.gex)));
+      parts.push(`<h3 style="margin-top:12px">GEX ราย strike (เขียว = Call ดึงราคาให้นิ่ง / แดง = Put เร่งให้วิ่ง)</h3><div style="display:grid;gap:3px">${near.map(s => {
+        const wpx = Math.round(Math.abs(s.gex) / mx * 100), pos = s.gex >= 0;
+        const isPx = Math.abs(s.k - px) < 2.5;
+        return `<div style="display:grid;grid-template-columns:46px 1fr 1fr;align-items:center;gap:4px;font:10.5px var(--mono)${isPx ? ';background:rgba(224,180,76,.12);border-radius:4px' : ''}"><span>${s.k}</span>
+          <div style="display:flex;justify-content:flex-end">${pos ? '' : `<i style="display:block;height:8px;width:${wpx}%;background:var(--put);border-radius:2px"></i>`}</div>
+          <div>${pos ? `<i style="display:block;height:8px;width:${wpx}%;background:var(--call);border-radius:2px"></i>` : ''}</div></div>`; }).join('')}</div>`);
+    }
+    // ซื้อ/ขายสุทธิ + เงินใหม่
+    const act = c.strikes.filter(s => s.vc + s.vp > 0).sort((a, b) => (b.vc + b.vp) - (a.vc + a.vp)).slice(0, 8).sort((a, b) => b.k - a.k);
+    if (act.length) {
+      const nt = (b, sl) => { const v = b + sl, n = b - sl; if (v < 10 || Math.abs(n) < Math.max(5, v * 0.2)) return '<span class="tg turn">ก้ำกึ่ง</span>'; return n > 0 ? `<span class="tg new">ซื้อ +${Math.round(n)}</span>` : `<span class="tg close">ขาย ${Math.round(n)}</span>`; };
+      const mean = (s) => {
+        const out = []; const cb = s.bc - s.sc, pb = s.bp - s.sp;
+        if (s.vc >= 10 && cb > 0) out.push('เก็งขึ้น'); if (s.vc >= 10 && cb < 0) out.push('ตั้งเพดาน');
+        if (s.vp >= 10 && pb > 0) out.push('ป้องกัน/เก็งลง'); if (s.vp >= 10 && pb < 0) out.push('รับซื้อแถวนี้');
+        const o = s.c + s.p, v = s.vc + s.vp; if (v >= 20 && (o === 0 || v / o >= 1)) out.push('🔥 เงินใหม่');
+        return out.join(' · ');
+      };
+      parts.push(`<h3 style="margin-top:12px">ซื้อ/ขายสุทธิวันนี้ (8 strike ที่เทรดมากสุด · ประมาณจากราคาเทียบ bid/ask)</h3><table><thead><tr><th>Strike</th><th>Call</th><th>Put</th><th>Vol/OI</th></tr></thead><tbody>
+        ${act.map(s => `<tr><td>${s.k}</td><td class="tag">${nt(s.bc, s.sc)}</td><td class="tag">${nt(s.bp, s.sp)}</td><td>${(s.c + s.p) ? ((s.vc + s.vp) / (s.c + s.p)).toFixed(1) : '∞'}</td></tr>${mean(s) ? `<tr><td></td><td colspan="3" style="font-family:var(--sans);font-size:10.5px;color:var(--muted);padding-top:0">${mean(s)}</td></tr>` : ''}`).join('')}</tbody></table>`);
+    }
+    return `<div class="card"><h3>⚡ ออปชันวันนี้ ${esc(c.root)} (สด · ช้า 10 นาที · อัปเดต ${upd} · เหลือ ${hh} ชม. ${mm} นาที)</h3>${parts.join('')}
+      <div class="note" style="margin-top:8px">gmf itd สด = OI ของวัน + IV สด + เวลาที่เหลือ คำนวณทุก 1 นาที · แบบ "ปรับตามซื้อ/ขาย" ใช้ยอดซื้อ/ขายวันนี้แทนสมมติฐาน Call+/Put− (เป็นค่าประมาณ) · ป้ายบนกราฟ C▲ = Call ถูกซื้อ, C▼ = Call ถูกขาย, P▲/P▼ เช่นกัน, 🔥 = Vol/OI ≥ 1</div></div>`;
   }
 
   // ---------- คำนวณจากข้อมูล OI + Volume ----------
@@ -347,7 +396,7 @@
     }
 
     // 1.5) COT + Gamma (เฉพาะทองคำ)
-    if (cur === 'gold') parts.push(cotCard(price, cfg));
+    if (cur === 'gold') { parts.push(cotCard(price, cfg)); parts.push(liveCard(price)); }
 
     // 2) ป้ายเตือนราคาใกล้แนว
     if (price !== null) {
@@ -458,4 +507,8 @@
     out.push(`<div class="note">สัญญาเปลี่ยนตามรอบหมดอายุ จึงเทียบ OI รวมข้ามสัญญาได้แค่คร่าวๆ</div>`);
     return out.join('');
   }
+  document.addEventListener('oilive', () => { if (!box.hidden && cur === 'gold' && !box.querySelector('details[open]')) { const b = $('dBody'), y = b.scrollTop; show(); b.scrollTop = y; } });
+  // ทิศ COT ให้ป้ายบนกราฟ (live.js) ใช้ โหลดตั้งแต่เปิดแอป
+  const pubCot = () => { if (cur !== 'gold' && O.sym !== 'gold' && O.sym !== 'gcy') return; const k = cotCalc(); if (k) { window.OICot = { bias: k.bias, score: k.score }; O.markDirty && O.markDirty(); } };
+  if (O.sym === 'gold' || O.sym === 'gcy') setTimeout(() => loadCOT(false).then(pubCot), 3000);
 })();

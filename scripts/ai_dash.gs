@@ -112,6 +112,20 @@ function aiGather_() {
   };
 }
 
+// อ่าน JSON จากคำตอบ AI แบบทนทาน: ตัด ```json ออก และเอาเฉพาะ object แรกที่วงเล็บครบ (กันกรณีมีข้อความหรือ JSON ต่อท้าย)
+function aiParseJson_(txt) {
+  txt = String(txt || '').replace(/```(?:json)?/g, '').trim();
+  try { return JSON.parse(txt); } catch (e) {}
+  const i = txt.indexOf('{'); if (i < 0) throw new Error('AI ไม่ได้ตอบเป็น JSON');
+  let depth = 0, inStr = false, esc = false;
+  for (let j = i; j < txt.length; j++) {
+    const ch = txt[j];
+    if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+    if (ch === '"') inStr = true; else if (ch === '{') depth++; else if (ch === '}' && --depth === 0) return JSON.parse(txt.slice(i, j + 1));
+  }
+  throw new Error('JSON จาก AI ไม่ครบ (อาจถูกตัดเพราะยาวเกิน)');
+}
+
 // ---------- เรียก DeepSeek ----------
 function runAI_(reason) {
   const key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY');
@@ -127,10 +141,10 @@ function runAI_(reason) {
     'mm และ events ต้องเป็น array ของ string ธรรมดาเท่านั้น (ไม่ใช่ object)',
     'ตอบเป็น JSON เท่านั้น ภาษาไทย กระชับ มีฟิลด์: trend ("up"|"down"|"side"), trend_label (ไม่เกิน 30 ตัวอักษร), score (จำนวนเต็ม -100..100 = ทิศแนวโน้ม), gauge (0..100 แรงกดดัน 0=ขายเต็ม 100=ซื้อเต็ม), headline (ไม่เกิน 140 ตัวอักษร), summary (3-5 ประโยค), levels (4-7 รายการ {p, k:"R"|"S"|"P", t: เหตุผลสั้นพร้อมตัวเลข, s: 1-3 ความแข็ง}), mm (3-4 ข้อ ความคิด/ตำแหน่ง MM), events (ปฏิทินที่ต้องจับตา พร้อมผลถ้าออกแล้ว), watch (สถานการณ์ ถ้า…แล้ว… คั่นด้วย " / "), warn (ข้อควรระวัง 1 ประโยค)',
   ].join('\n');
-  const body = { model: AI_MODEL, temperature: 0.3, response_format: { type: 'json_object' }, max_tokens: 1800,
+  const body = { model: AI_MODEL, temperature: 0.3, response_format: { type: 'json_object' }, max_tokens: 2500,
     messages: [{ role: 'system', content: sys }, { role: 'user', content: 'เหตุผลที่วิเคราะห์รอบนี้: ' + reason + '\nเวลาไทย: ' + aiFmt_(new Date(), 'yyyy-MM-dd HH:mm') + '\nข้อมูล:\n' + JSON.stringify(data) }] };
   const res = aiFetchJson_('https://api.deepseek.com/chat/completions', { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + key }, payload: JSON.stringify(body) });
-  let A = JSON.parse(res.choices[0].message.content);
+  let A = aiParseJson_(res.choices[0].message.content);
   // ตรวจตัวเลข: แนวต้องอยู่ในชุดราคาที่มีจริง
   const allowed = new Set(data.strikes.map(s => s.k));
   [data.gamma_flip_today, data.gamma_flip_30d, data.max_pain].concat(data.expected_move_range_today || []).forEach(v => { if (v !== null && v !== undefined) allowed.add(Number(v)); });

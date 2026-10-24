@@ -114,6 +114,8 @@ function runAI_(reason) {
     'คุณคือนักวิเคราะห์ Options Order Flow ของทองคำฟิวเจอร์ COMEX (GC) มองแบบ Market Maker',
     'ใช้เฉพาะตัวเลขในข้อมูลที่ให้ ห้ามแต่งตัวเลขหรือราคาใหม่ ราคาแนว (levels.p) ต้องเป็นค่าที่มีอยู่ในข้อมูลเท่านั้น (strike, gamma_flip, max_pain, ขอบ expected_move)',
     'หลักตีความ: ราคาใต้ gamma_flip_30d = gamma ลบ ราคามักวิ่งแรงตามทาง / เหนือ = แกว่งกรอบ · OI Call หนา = แนวต้าน, OI Put หนา = แนวรับ · call_net_buy > 0 = มีคนซื้อ Call (เก็งขึ้น), < 0 = ขาย Call (ตั้งเพดาน) · put_net_buy > 0 = ซื้อ Put (ป้องกัน/เก็งลง), < 0 = ขาย Put (รับซื้อ) · skew บวก = Put แพง ตลาดกลัวขาลง · COT ใช้ดูภาพใหญ่รายสัปดาห์ · retail_long_pct สูงผิดปกติ = เตือนใกล้ยอด',
+    'ห้ามใช้ชื่อฟิลด์ภาษาอังกฤษแบบ snake_case ในข้อความ ให้เรียกว่า: gamma_flip_today = "gmf itd", gamma_flip_30d = "gmf M", max_pain = "Max Pain", net_gex = "Net GEX", expected_move = "กรอบ EM", retail_long_pct = "รายย่อยถือ Long", managed_money_net = "กองทุนสุทธิ", skew = "Skew", oi_call/oi_put = "OI Call/Put", vol_call/vol_put = "Volume Call/Put"',
+    'mm และ events ต้องเป็น array ของ string ธรรมดาเท่านั้น (ไม่ใช่ object)',
     'ตอบเป็น JSON เท่านั้น ภาษาไทย กระชับ มีฟิลด์: trend ("up"|"down"|"side"), trend_label (ไม่เกิน 30 ตัวอักษร), score (จำนวนเต็ม -100..100 = ทิศแนวโน้ม), gauge (0..100 แรงกดดัน 0=ขายเต็ม 100=ซื้อเต็ม), headline (ไม่เกิน 140 ตัวอักษร), summary (3-5 ประโยค), levels (4-7 รายการ {p, k:"R"|"S"|"P", t: เหตุผลสั้นพร้อมตัวเลข, s: 1-3 ความแข็ง}), mm (3-4 ข้อ ความคิด/ตำแหน่ง MM), events (ปฏิทินที่ต้องจับตา พร้อมผลถ้าออกแล้ว), watch (สถานการณ์ ถ้า…แล้ว… คั่นด้วย " / "), warn (ข้อควรระวัง 1 ประโยค)',
   ].join('\n');
   const body = { model: AI_MODEL, temperature: 0.3, response_format: { type: 'json_object' }, max_tokens: 1800,
@@ -123,6 +125,13 @@ function runAI_(reason) {
   // ตรวจตัวเลข: แนวต้องอยู่ในชุดราคาที่มีจริง
   const allowed = new Set(data.strikes.map(s => s.k));
   [data.gamma_flip_today, data.gamma_flip_30d, data.max_pain].concat(data.expected_move_range_today || []).forEach(v => { if (v !== null && v !== undefined) allowed.add(Number(v)); });
+  // ทำความสะอาดข้อความ: object → string, ชื่อฟิลด์ → ชื่อไทย
+  const NAMES = [[/gamma_flip_today/g, 'gmf itd'], [/gamma_flip_30d/g, 'gmf M'], [/max_pain/g, 'Max Pain'], [/net_gex_(today|30d)(_musd)?/g, 'Net GEX'], [/expected_move_range_today|expected_move/g, 'กรอบ EM'], [/retail_long_pct/g, 'รายย่อยถือ Long %'], [/managed_money_net/g, 'กองทุนสุทธิ'], [/mm_change_1w/g, 'กองทุนเปลี่ยน 1 สัปดาห์'], [/mm_change_8w/g, 'กองทุนเปลี่ยน 8 สัปดาห์'], [/cot_index_3y_pct/g, 'COT Index 3 ปี'], [/skew_put25_minus_call25_volpts/g, 'Skew'], [/oi_call/g, 'OI Call'], [/oi_put/g, 'OI Put'], [/vol_call/g, 'Volume Call'], [/vol_put/g, 'Volume Put'], [/call_net_buy/g, 'Call ซื้อสุทธิ'], [/put_net_buy/g, 'Put ซื้อสุทธิ'], [/futures_price/g, 'ราคาฟิวเจอร์'], [/dxy_spec_(net|change_1w)/g, 'DXY นักเก็งกำไร']];
+  const clean = v => { let t = v === null || v === undefined ? '' : typeof v === 'object' ? (v.text || v.t || v.desc || v.title || Object.values(v).filter(x => typeof x !== 'object').join(' — ')) : String(v); NAMES.forEach(([re, to]) => { t = t.replace(re, to); }); return t.trim(); };
+  ['trend_label', 'headline', 'summary', 'watch', 'warn'].forEach(k => { A[k] = clean(A[k]); });
+  A.mm = (Array.isArray(A.mm) ? A.mm : [A.mm]).map(clean).filter(Boolean);
+  A.events = (Array.isArray(A.events) ? A.events : [A.events]).map(clean).filter(Boolean);
+  (A.levels || []).forEach(l => { l.t = clean(l.t); });
   const levels = (A.levels || []).map(l => ({ p: Number(l.p), k: ['R', 'S', 'P'].indexOf(l.k) >= 0 ? l.k : 'P', t: String(l.t || '').slice(0, 120), s: Math.max(1, Math.min(3, Number(l.s) || 1)) })).filter(l => allowed.has(l.p));
   const keys = sh.getRange('A1:A40').getValues().map(r => r[0]);
   const row = keys.indexOf('dash') + 1 || 13;

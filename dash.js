@@ -130,6 +130,25 @@
   const tabs = () => { $('dTabs').innerHTML = Object.keys(SY).map(k => `<button data-s="${k}" class="${k === cur ? 'on' : ''}">${SY[k].ico} ${SY[k].label}</button>`).join(''); };
   $('dTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; cur = b.dataset.s; tabs(); show(); });
   $('dClose').addEventListener('click', () => { box.hidden = true; });
+  // ปัดไปทางขวาเพื่อกลับไปหน้ากราฟ (เหมือนปุ่มย้อนกลับ) · ต้องลากแนวนอนชัดเจน ≥ 80px และไม่ใช่การเลื่อนขึ้นลง
+  { let sx = null, sy = null, t0 = 0, horiz = null;
+    box.addEventListener('touchstart', e => { if (e.touches.length !== 1) { sx = null; return; } sx = e.touches[0].clientX; sy = e.touches[0].clientY; t0 = Date.now(); horiz = null; box.style.transition = 'none'; }, { passive: true });
+    box.addEventListener('touchmove', e => {
+      if (sx === null) return;
+      const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
+      if (horiz === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) horiz = Math.abs(dx) > Math.abs(dy) * 1.5 && dx > 0;
+      if (horiz) box.style.transform = `translateX(${Math.max(0, dx)}px)`;
+    }, { passive: true });
+    box.addEventListener('touchend', e => {
+      if (sx === null) return;
+      const dx = (e.changedTouches[0] || {}).clientX - sx;
+      const go = horiz && (dx > 80 || (dx > 40 && Date.now() - t0 < 250));
+      box.style.transition = 'transform .18s ease-out';
+      if (go) { box.style.transform = 'translateX(100%)'; setTimeout(() => { box.hidden = true; box.style.transform = ''; box.style.transition = ''; }, 180); }
+      else box.style.transform = '';
+      sx = null; horiz = null;
+    });
+  }
   $('dReload').addEventListener('click', () => load(true));
   btn.addEventListener('click', () => { box.hidden = false; tabs(); load(true); });
 
@@ -234,7 +253,8 @@
     let g = null; try { g = cfg.gmf ? JSON.parse(cfg.gmf) : null; } catch (e) {}
     const px = price !== null ? price : (g && isFinite(g.F) ? g.F : null);
     const LC = window.OILive && window.OILive.calc;
-    const flipM = g && isFinite(+g.M) && g.M !== null ? +g.M : null;
+    const GM = window.OILive && window.OILive.d && window.OILive.d.gmfM;
+    const flipM = GM && GM.M != null ? GM.M : (g && isFinite(+g.M) && g.M !== null ? +g.M : null);
     const flipI = LC && LC.match && LC.gmf !== null ? LC.gmf : (g && isFinite(+g.itd) && g.itd !== null ? +g.itd : null);
     const gam = (px !== null && flipM !== null) ? (px >= flipM ? 1 : -1) : 0;
     const bTxt = ['ขาลง', 'กลาง', 'ขาขึ้น'][k.bias + 1], bCls = ['dn', 'md', 'up'][k.bias + 1];

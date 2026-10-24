@@ -133,6 +133,12 @@
     oi.maxVol = Math.max(1, ...oi.rows.map(r => Math.max(r.vc || 0, r.vp || 0)));
     oi.hasVol = oi.rows.some(r => r.vc || r.vp);
     oi.topV = [...oi.rows].filter(r => (r.vc || 0) + (r.vp || 0) > 0).sort((a, b) => (b.vc + b.vp) - (a.vc + a.vp)).slice(0, 5).map(r => r.strike);
+    // gmf M จาก Worker (คำนวณทุกชั่วโมงจากทุกสัญญา ≤ 30 วัน)
+    const gm = st.d && st.d.gmfM;
+    if (gm && gm.M !== null && gm.M !== undefined) {
+      oi.gmf = (oi.gmf || []).filter(g => g.lab !== 'gmf M');
+      oi.gmf.push({ p: gm.M, lab: 'gmf M', col: '--gmfm' });
+    }
     if (c.gmf !== null) {
       oi.gmf = (oi.gmf || []).filter(g => g.lab !== 'gmf itd');
       oi.gmf.push({ p: c.gmf, lab: 'gmf itd' + trend(), col: '--gmfi' });

@@ -18,7 +18,7 @@ async function gmfCME({ expMap, F, tradeDate, now = Date.now(), days = 30 } = {}
   exps.forEach(p => p.expirations.forEach(e => {
     const d = expMap[e.contractId]; if (!d) return;
     const cdt = d < '2026-11-01' || (d >= '2027-03-14' && d < '2027-11-07'); // 12:30 CT (CDT/CST)
-    list.push({ pid: e.productId, code: e.expiration.code, cid: e.contractId, td: e.tradeDates[0].formatedDate, exp: Date.parse(d + 'T12:30:00' + (cdt ? '-05:00' : '-06:00')) });
+    list.push({ pid: e.productId, code: e.expiration.code, cid: e.contractId, td: tradeDate || e.tradeDates[0].formatedDate, exp: Date.parse(d + 'T12:30:00' + (cdt ? '-05:00' : '-06:00')) });
   }));
   if (!F) { const s = (fut.settlements || []).find(s => /DEC|FEB|APR|JUN|AUG|OCT/.test(s.month) && +s.openInterest.replace(/,/g, '') > 100000); F = +String(s.settle).replace(/,/g, ''); }
   const opts = [];

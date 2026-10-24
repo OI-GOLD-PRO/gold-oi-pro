@@ -325,9 +325,11 @@
     let A = null;
     try { A = cfg.dash ? JSON.parse(cfg.dash) : null; } catch (e) { A = null; }
     const m = calc(d);
-    const live = (O.sym === cur && O.lastClose !== null && isFinite(O.lastClose)) ? O.lastClose : null;
-    const price = live !== null ? live : (A && isFinite(A.price) ? A.price : (isFinite(d.gc) ? d.gc : null));
-    const priceSrc = live !== null ? 'ราคาสดบนกราฟ' : 'ราคาตอนวิเคราะห์';
+    // ราคาสด: กราฟ XAUUSD และ GC·Y ใช้ข้อมูลทองชุดเดียวกัน · ถ้าไม่มี ใช้ราคาฟิวเจอร์ล่าสุดในชีต (gc_price) ก่อนราคาตอนวิเคราะห์
+    const live = ((O.sym === cur || (cur === 'gold' && O.sym === 'gcy')) && O.lastClose !== null && isFinite(O.lastClose)) ? O.lastClose : null;
+    const gcSheet = Number(cfg.gc_price !== undefined ? cfg.gc_price : d.gc);
+    const price = live !== null ? live : (isFinite(gcSheet) && gcSheet > 0 ? gcSheet : (A && isFinite(A.price) ? A.price : null));
+    const priceSrc = live !== null ? 'ราคาสดบนกราฟ' : (isFinite(gcSheet) && gcSheet > 0 ? `ราคาฟิวเจอร์ตอนอัพเดท ${esc(cfg.offset_time || '')}` : 'ราคาตอนวิเคราะห์');
     const parts = [];
 
     if (!A) parts.push(`<div class="card warn">ยังไม่มีผลวิเคราะห์ของ${S.label}ในชีต (key "dash") พิมพ์ "อัพเดท" ในแชทเพื่อสร้าง ส่วนตัวเลขด้านล่างคำนวณจากข้อมูล OI ล่าสุด</div>`);

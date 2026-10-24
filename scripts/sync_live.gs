@@ -7,6 +7,7 @@
 //   B2:B6  offset, gc_price, ref_price, ref_symbol, offset_time   (Gold.F + offset จากจุดตัด 00/25/50/75 ล่าสุด)
 //   B7     contract                                                (สัญญาที่หมดอายุวันนั้น)
 //   B8:B10 volume, volume_time, volume_contract                    (volume ราย strike ของสัญญาวันนั้น)
+//   B14:B17 atm_iv, iv_expiry, iv_time, iv_contract               (ATM IV สัญญาวันนั้น)
 //   B18    gmf                                                     (gmf itd + gmf M)
 // แท็บ vol_log: ต่อท้าย 1 แถวทุกชั่วโมงเฉพาะตอนตลาดเปิด (เวลา, gold, สัญญา, ราคา, offset, JSON สรุป + volume ราย strike, หมายเหตุ)
 // และแท็บ ชีต1: OI ราย strike ของสัญญาวันนั้น (แถว 2 = ราคา F, แถว 3 = เวลา V)
@@ -46,6 +47,14 @@ function syncLive() {
   sh.getRange('B7').setValue(o.root);
   sh.getRange('B8:B10').setValues([[JSON.stringify(vol)], [now], [o.root]]);
 
+  // ATM IV = เฉลี่ย IV Call/Put ของ strike ใกล้ราคาที่สุด (%)
+  let atmIV = null;
+  if (o.F) { const near = o.rows.filter(r => r[2]).sort((a, b) => Math.abs(a[0] - o.F) - Math.abs(b[0] - o.F)).slice(0, 2); if (near.length) atmIV = Math.round(near.reduce((a, r) => a + r[2], 0) / near.length * 1000) / 10; }
+  if (atmIV !== null) {
+    const expTxt = o.expTs ? Utilities.formatDate(new Date(o.expTs * 1000), 'Asia/Bangkok', 'yyyy-MM-dd H:mm') : '';
+    sh.getRange('A14:B17').setValues([['atm_iv', atmIV], ['iv_expiry', expTxt], ['iv_time', now], ['iv_contract', o.root]]);
+  }
+
   let g = {};
   try { g = JSON.parse(sh.getRange('B18').getValue() || '{}'); } catch (e) { g = {}; }
   if (o.itd !== null && o.itd !== undefined) { g.itd = o.itd; g.itd_c = o.root; g.gex_itd = o.gexItd; }
@@ -62,8 +71,7 @@ function syncLive() {
       let vC = 0, vP = 0, oC = 0, oP = 0;
       o.rows.forEach(r => { if (r[1] === 'C') { vC += r[8] || 0; oC += r[11] || 0; } else { vP += r[8] || 0; oP += r[11] || 0; } });
       // ATM IV = เฉลี่ย IV Call/Put ของ strike ใกล้ราคาที่สุด
-      let atm = null;
-      if (o.F) { const near = o.rows.filter(r => r[2]).sort((a, b) => Math.abs(a[0] - o.F) - Math.abs(b[0] - o.F)).slice(0, 2); if (near.length) atm = Math.round(near.reduce((a, r) => a + r[2], 0) / near.length * 1000) / 10; }
+      const atm = atmIV;
       const sum = { vol_C: vC, vol_P: vP, oi_C: oC, oi_P: oP, atm_iv: atm, gmf_itd: g.itd, gmf_M: g.M, em: o.em, v: vol };
       ss.getSheetByName('vol_log').appendRow([now, 'gold', o.root, px && px.gc_price ? px.gc_price : (o.F || ''), px && px.offset !== null ? px.offset : '', JSON.stringify(sum), 'auto (Worker/TradingView) ทุกชั่วโมง']);
       props0.setProperty('vol_log_hour', hourKey);

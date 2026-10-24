@@ -138,7 +138,8 @@ function runAI_(reason) {
     'ใช้ facts สำหรับตำแหน่งราคาเทียบ gmf / Max Pain / กรอบ EM ห้ามคำนวณระยะเอง',
     'หลักตีความ: ราคาใต้ gamma_flip_30d = gamma ลบ ราคามักวิ่งแรงตามทาง / เหนือ = แกว่งกรอบ · OI Call หนา = แนวต้าน, OI Put หนา = แนวรับ · call_net_buy > 0 = มีคนซื้อ Call (เก็งขึ้น), < 0 = ขาย Call (ตั้งเพดาน) · put_net_buy > 0 = ซื้อ Put (ป้องกัน/เก็งลง), < 0 = ขาย Put (รับซื้อ) · skew บวก = Put แพง ตลาดกลัวขาลง · COT ใช้ดูภาพใหญ่รายสัปดาห์ · retail_long_pct สูงผิดปกติ = เตือนใกล้ยอด',
     'ห้ามใช้ชื่อฟิลด์ภาษาอังกฤษแบบ snake_case ในข้อความ ให้เรียกว่า: gamma_flip_today = "gmf itd", gamma_flip_30d = "gmf M", max_pain = "Max Pain", net_gex = "Net GEX", expected_move = "กรอบ EM", retail_long_pct = "รายย่อยถือ Long", managed_money_net = "กองทุนสุทธิ", skew = "Skew", oi_call/oi_put = "OI Call/Put", vol_call/vol_put = "Volume Call/Put"',
-    'mm และ events ต้องเป็น array ของ string ธรรมดาเท่านั้น (ไม่ใช่ object)',
+    'mm ต้องเป็น array ของ string 3-4 ข้อ ข้อละ 1 ประโยค เช่น ["MM ขาย Call 4250 ตั้งเพดาน ...", "..."] ห้ามเป็น object · events ไม่ต้องส่ง (ระบบสร้างเอง)',
+    'ข้อความ t ของแต่ละแนวต้องสอดคล้องกับ k: แนวเหนือราคาปัจจุบันคือแนวต้าน แนวใต้ราคาคือแนวรับ',
     'ตอบเป็น JSON เท่านั้น ภาษาไทย กระชับ มีฟิลด์: trend ("up"|"down"|"side"), trend_label (ไม่เกิน 30 ตัวอักษร), score (จำนวนเต็ม -100..100 = ทิศแนวโน้ม), gauge (0..100 แรงกดดัน 0=ขายเต็ม 100=ซื้อเต็ม), headline (ไม่เกิน 140 ตัวอักษร), summary (3-5 ประโยค), levels (4-7 รายการ {p, k:"R"|"S"|"P", t: เหตุผลสั้นพร้อมตัวเลข, s: 1-3 ความแข็ง}), mm (3-4 ข้อ ความคิด/ตำแหน่ง MM), events (ปฏิทินที่ต้องจับตา พร้อมผลถ้าออกแล้ว), watch (สถานการณ์ ถ้า…แล้ว… คั่นด้วย " / "), warn (ข้อควรระวัง 1 ประโยค)',
   ].join('\n');
   const body = { model: AI_MODEL, temperature: 0.3, response_format: { type: 'json_object' }, max_tokens: 2500,
@@ -169,6 +170,10 @@ function runAI_(reason) {
   if (lastLab && Math.abs(new Date('2026-' + lastLab[0].replace(' ', 'T') + ':00+07:00').getTime() - Date.now()) < 30 * 60e3) { old.px = old.px.slice(0, -1); old.hist = (old.hist || []).slice(0, -1); }
   const hist = (old.hist || []).concat([[lab, data.contract, data.total_oi_call, data.total_oi_put, data.futures_price]]).slice(-20);
   const pxh = (old.px || []).concat([[lab, data.futures_price]]).slice(-30);
+  // ตัดจุดที่ห่างจากจุดถัดไปไม่ถึง 30 นาที (รันซ้ำติดกัน) เก็บจุดหลัง
+  const tOf = l => new Date(new Date().getFullYear() + '-' + String(l).replace(' ', 'T') + ':00+07:00').getTime();
+  const dedupe = a => a.filter((x, i) => i === a.length - 1 || !(Math.abs(tOf(a[i + 1][0]) - tOf(x[0])) < 30 * 60e3));
+  hist.splice(0, hist.length, ...dedupe(hist)); pxh.splice(0, pxh.length, ...dedupe(pxh));
   const dash = { v: 1, updated: stamp, sym: 'gold', contract: data.contract, price: data.futures_price, price_note: 'Gold.F ' + (data.gold_f_time || '') + ' · AI: ' + reason,
     trend: ['up', 'down', 'side'].indexOf(A.trend) >= 0 ? A.trend : 'side', trend_label: String(A.trend_label || '').slice(0, 40), score: Math.max(-100, Math.min(100, Math.round(Number(A.score) || 0))), gauge: Math.max(0, Math.min(100, Math.round(Number(A.gauge) || 50))),
     headline: String(A.headline || '').slice(0, 200), summary: String(A.summary || '').slice(0, 1200), levels, mm: (A.mm || []).slice(0, 5).map(String), news: [],

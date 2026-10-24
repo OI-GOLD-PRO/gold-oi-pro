@@ -223,7 +223,9 @@
       else phase = ['mix', 'ขายทิ้ง Long (Liquidation)', 'ราคาลงพร้อม OI ลด เป็นการปิดสถานะ ขาลงอาจใกล้หมดแรง'];
     }
     return { L, P, S, score, raw: Math.round(raw * 10) / 10, dxyAdj, dxyTxt, dxy: X, bias, phase, dP, p0, dOI, dMM, mmIdx: pct(L.mm, mmMin, mmMax) * 100, cmIdx: pct(L.cm, cmMin, cmMax) * 100,
-      nrLongPct: nrTot ? L.nrL / nrTot * 100 : null, d8: d8(0), oi4: o4(0), spark: R.slice(0, 52).map(r => r.mm).reverse() };
+      nrLongPct: nrTot ? L.nrL / nrTot * 100 : null, nrRank: (() => { // เปอร์เซ็นไทล์ของสัดส่วน Long รายย่อย เทียบประวัติ 3 ปีของตัวเอง
+        const hs = H.map(r => r.nrL + r.nrS ? r.nrL / (r.nrL + r.nrS) : null).filter(v => v !== null), v = nrTot ? L.nrL / nrTot : null;
+        return v === null || !hs.length ? null : hs.filter(x => x <= v).length / hs.length * 100; })(), d8: d8(0), oi4: o4(0), spark: R.slice(0, 52).map(r => r.mm).reverse() };
   }
   function cotCard(price, cfg) {
     if (!cot) return `<div class="card"><h3>🏦 COT + Gamma</h3><div class="note">กำลังโหลด COT จาก CFTC…</div></div>`;
@@ -263,7 +265,7 @@
         <div class="tile"><small>กองทุน (Managed Money) สุทธิ</small><b>${sg(k.L.mm)}</b><em><span class="${cl(k.dMM)}">${sg(k.dMM)}</span> 1 สัปดาห์ · <span class="${cl(k.d8)}">${sg(k.d8)}</span> 8 สัปดาห์</em></div>
         <div class="tile"><small>COT Index 3 ปี (กองทุน)</small><b>${k.mmIdx.toFixed(0)}%</b><em>0% = ต่ำสุด 3 ปี · 100% = สูงสุด</em></div>
         <div class="tile"><small>Commercial (ผู้ผลิต+Swap) สุทธิ</small><b>${sg(k.L.cm)}</b><em>เทียบ 3 ปี ${k.cmIdx.toFixed(0)}% · <span class="${cl(k.L.cm - k.P.cm)}">${sg(k.L.cm - k.P.cm)}</span></em></div>
-        <div class="tile"><small>รายย่อย ถือ Long</small><b class="${k.nrLongPct > 75 ? 'dn' : ''}">${k.nrLongPct === null ? '–' : k.nrLongPct.toFixed(1) + '%'}</b><em>${k.nrLongPct > 75 ? 'Long แน่น (สัญญาณเตือนใกล้ยอด)' : 'สุทธิ ' + sg(k.L.nrL - k.L.nrS)}</em></div>
+        <div class="tile"><small>รายย่อย ถือ Long</small><b class="${k.nrRank >= 80 ? 'dn' : k.nrRank <= 20 ? 'up' : ''}">${k.nrLongPct === null ? '–' : k.nrLongPct.toFixed(1) + '%'}</b><em>${k.nrRank === null ? '' : `สูงกว่า ${k.nrRank.toFixed(0)}% ของช่วง 3 ปี<br>`}${k.nrRank >= 80 ? 'Long แน่นผิดปกติ (เตือนใกล้ยอด)' : k.nrRank <= 20 ? 'Long น้อยผิดปกติ (มักใกล้ก้น)' : 'ปกติของทอง · สุทธิ ' + sg(k.L.nrL - k.L.nrS)}</em></div>
         <div class="tile"><small>OI รวม GC</small><b>${f0(k.L.oi)}</b><em><span class="${cl(k.dOI)}">${sg(k.dOI)}</span> 1 สัปดาห์ · <span class="${cl(k.oi4)}">${sg(k.oi4)}</span> 4 สัปดาห์</em></div>
         <div class="tile"><small>DXY นักเก็งกำไร สุทธิ</small><b>${k.dxy ? sg(k.dxy.net) : '–'}</b><em>${k.dxy ? `<span class="${cl(k.dxy.chg)}">${sg(k.dxy.chg)}</span> 1 สัปดาห์ · ` : ''}<span class="${cl(k.dxyAdj)}">${k.dxyAdj > 0 ? '+' : ''}${k.dxyAdj} คะแนน</span><br>${esc(k.dxyTxt)}</em></div>
         <div class="tile"><small>ราคา GC วันอังคาร</small><b>${k.p0 === null ? '–' : fmt(k.p0, 1)}</b><em><span class="${cl(k.dP)}">${k.dP === null ? '–' : (k.dP >= 0 ? '+' : '−') + Math.abs(k.dP).toFixed(1)}</span> จากสัปดาห์ก่อน</em></div>

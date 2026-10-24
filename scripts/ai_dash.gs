@@ -136,17 +136,23 @@ function runAI_(reason) {
   [data.gamma_flip_today, data.gamma_flip_30d, data.max_pain].concat(data.expected_move_range_today || []).forEach(v => { if (v !== null && v !== undefined) allowed.add(Number(v)); });
   // ทำความสะอาดข้อความ: object → string, ชื่อฟิลด์ → ชื่อไทย
   const NAMES = [[/gamma_flip_today/g, 'gmf itd'], [/gamma_flip_30d/g, 'gmf M'], [/max_pain/g, 'Max Pain'], [/net_gex_(today|30d)(_musd)?/g, 'Net GEX'], [/expected_move_range_today|expected_move/g, 'กรอบ EM'], [/retail_long_pct/g, 'รายย่อยถือ Long %'], [/managed_money_net/g, 'กองทุนสุทธิ'], [/mm_change_1w/g, 'กองทุนเปลี่ยน 1 สัปดาห์'], [/mm_change_8w/g, 'กองทุนเปลี่ยน 8 สัปดาห์'], [/cot_index_3y_pct/g, 'COT Index 3 ปี'], [/skew_put25_minus_call25_volpts/g, 'Skew'], [/oi_call/g, 'OI Call'], [/oi_put/g, 'OI Put'], [/vol_call/g, 'Volume Call'], [/vol_put/g, 'Volume Put'], [/call_net_buy/g, 'Call ซื้อสุทธิ'], [/put_net_buy/g, 'Put ซื้อสุทธิ'], [/futures_price/g, 'ราคาฟิวเจอร์'], [/dxy_spec_(net|change_1w)/g, 'DXY นักเก็งกำไร']];
-  const clean = v => { let t = v === null || v === undefined ? '' : typeof v === 'object' ? Object.values(v).filter(x => x !== null && typeof x !== 'object').join(' — ') : String(v); NAMES.forEach(([re, to]) => { t = t.replace(re, to); }); return t.trim(); };
+  // object → เลือกข้อความที่ยาวที่สุด (ตัด label สั้นๆ เช่น "P", "2" ทิ้ง)
+  const clean = v => { let t = v === null || v === undefined ? '' : typeof v === 'object' ? (Object.values(v).filter(x => typeof x === 'string').sort((a, b) => b.length - a.length)[0] || '') : String(v); NAMES.forEach(([re, to]) => { t = t.replace(re, to); }); return t.trim(); };
   ['trend_label', 'headline', 'summary', 'watch', 'warn'].forEach(k => { A[k] = clean(A[k]); });
-  A.mm = (Array.isArray(A.mm) ? A.mm : [A.mm]).map(clean).map(t => t.replace(/^\d+\s*[—\-.)]\s*/, '')).filter(Boolean);
+  A.mm = (Array.isArray(A.mm) ? A.mm : A.mm && typeof A.mm === 'object' ? Object.values(A.mm) : [A.mm]).map(clean).map(t => t.replace(/^\d+\s*[—\-.)]\s*/, '')).filter(t => t.length >= 8);
   // ปฏิทิน: สร้างจากข้อมูลจริง (ไม่ให้ AI ตีความตัวเลขข่าวเอง)
   A.events = data.calendar.slice(-6).map(e => e.time_th + ' ' + (e.impact === 'high' ? '🔴 ' : '🟠 ') + e.title + (e.actual ? ` ออก ${e.actual} (คาด ${e.forecast || '–'})${e.better_than_forecast === true ? ' ดีกว่าคาด → หนุนดอลลาร์' : e.better_than_forecast === false ? ' แย่กว่าคาด → หนุนทอง' : ''}` : ` (คาด ${e.forecast || '–'}, ก่อนหน้า ${e.previous || '–'})`));
   (A.levels || []).forEach(l => { l.t = clean(l.t); });
-  const levels = (A.levels || []).map(l => ({ p: Number(l.p), k: ['R', 'S', 'P'].indexOf(l.k) >= 0 ? l.k : 'P', t: String(l.t || '').slice(0, 120), s: Math.max(1, Math.min(3, Number(l.s) || 1)) })).filter(l => allowed.has(l.p));
+  // แนวเหนือราคา = แนวต้าน, ใต้ราคา = แนวรับ (ยกเว้น P = จุดดึงดูด)
+  const sideOf = (p, k) => k === 'P' ? 'P' : p > data.futures_price ? 'R' : 'S';
+  const levels = (A.levels || []).map(l => ({ p: Number(l.p), k: sideOf(Number(l.p), l.k), t: String(l.t || '').slice(0, 120), s: Math.max(1, Math.min(3, Number(l.s) || 1)) })).filter(l => allowed.has(l.p));
   const keys = sh.getRange('A1:A40').getValues().map(r => r[0]);
   const row = keys.indexOf('dash') + 1 || 13;
   let old = {}; try { old = JSON.parse(sh.getRange(row, 2).getValue() || '{}'); } catch (e) {}
   const stamp = aiFmt_(new Date(), 'yyyy-MM-dd HH:mm'), lab = aiFmt_(new Date(), 'MM-dd HH:mm');
+  // รันซ้ำภายใน 30 นาที: แทนจุดล่าสุดแทนการต่อท้าย
+  const lastLab = (old.px || []).slice(-1)[0];
+  if (lastLab && Math.abs(new Date('2026-' + lastLab[0].replace(' ', 'T') + ':00+07:00').getTime() - Date.now()) < 30 * 60e3) { old.px = old.px.slice(0, -1); old.hist = (old.hist || []).slice(0, -1); }
   const hist = (old.hist || []).concat([[lab, data.contract, data.total_oi_call, data.total_oi_put, data.futures_price]]).slice(-20);
   const pxh = (old.px || []).concat([[lab, data.futures_price]]).slice(-30);
   const dash = { v: 1, updated: stamp, sym: 'gold', contract: data.contract, price: data.futures_price, price_note: 'Gold.F ' + (data.gold_f_time || '') + ' · AI: ' + reason,

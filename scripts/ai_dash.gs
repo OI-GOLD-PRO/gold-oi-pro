@@ -93,6 +93,14 @@ function aiGather_() {
   // ปฏิทินข่าว
   let cal = [];
   try { cal = (aiFetchJson_(AI_NEWS).events || []).filter(e => e.c === 'USD').map(e => ({ time_th: aiFmt_(new Date(e.date), 'dd/MM HH:mm'), impact: (e.i || 'H') === 'H' ? 'high' : 'medium', title: e.title, forecast: e.forecast, previous: e.previous, actual: e.actual || null, better_than_forecast: e.better === undefined ? null : e.better })); } catch (e) {}
+  const emLo = o.openEM ? o.openF - o.openEM : null, emHi = o.openEM ? o.openF + o.openEM : null;
+  const facts = {
+    price_vs_gmf_itd: o.itd == null ? null : (price >= o.itd ? 'เหนือ ' : 'ใต้ ') + Math.abs(Math.round((price - o.itd) * 10) / 10),
+    price_vs_gmf_M: !(o.gmfM && o.gmfM.M != null) ? null : (price >= o.gmfM.M ? 'เหนือ ' : 'ใต้ ') + Math.abs(Math.round((price - o.gmfM.M) * 10) / 10),
+    price_vs_max_pain: mp == null ? null : (price >= mp ? 'เหนือ ' : 'ใต้ ') + Math.abs(Math.round((price - mp) * 10) / 10),
+    em_position_pct: emLo == null ? null : Math.round((price - emLo) / (emHi - emLo) * 100) + '% ของกรอบ EM (0 = ขอบล่าง, 100 = ขอบบน)',
+    dist_to_em_top: emHi == null ? null : Math.round((emHi - price) * 10) / 10, dist_to_em_bottom: emLo == null ? null : Math.round((price - emLo) * 10) / 10,
+  };
   const hrs = o.expTs ? Math.round((o.expTs * 1000 - Date.now()) / 36e5 * 10) / 10 : null;
   return {
     contract: o.root, expiry_hours_left: hrs, futures_price: price, gold_f_time: px && px.gc_time,
@@ -100,7 +108,7 @@ function aiGather_() {
     max_pain: mp, expected_move: o.em, expected_move_range_today: o.openEM ? [Math.round((o.openF - o.openEM) * 10) / 10, Math.round((o.openF + o.openEM) * 10) / 10] : null,
     skew_put25_minus_call25_volpts: p25 !== null && c25 !== null ? Math.round((p25 - c25) * 1000) / 10 : null,
     total_oi_call: totOI[0], total_oi_put: totOI[1], total_vol_call: totV[0], total_vol_put: totV[1],
-    strikes: tbl, cot, calendar: cal,
+    facts, strikes: tbl, cot, calendar: cal,
   };
 }
 
@@ -113,6 +121,7 @@ function runAI_(reason) {
   const sys = [
     'คุณคือนักวิเคราะห์ Options Order Flow ของทองคำฟิวเจอร์ COMEX (GC) มองแบบ Market Maker',
     'ใช้เฉพาะตัวเลขในข้อมูลที่ให้ ห้ามแต่งตัวเลขหรือราคาใหม่ ราคาแนว (levels.p) ต้องเป็นค่าที่มีอยู่ในข้อมูลเท่านั้น (strike, gamma_flip, max_pain, ขอบ expected_move)',
+    'ใช้ facts สำหรับตำแหน่งราคาเทียบ gmf / Max Pain / กรอบ EM ห้ามคำนวณระยะเอง',
     'หลักตีความ: ราคาใต้ gamma_flip_30d = gamma ลบ ราคามักวิ่งแรงตามทาง / เหนือ = แกว่งกรอบ · OI Call หนา = แนวต้าน, OI Put หนา = แนวรับ · call_net_buy > 0 = มีคนซื้อ Call (เก็งขึ้น), < 0 = ขาย Call (ตั้งเพดาน) · put_net_buy > 0 = ซื้อ Put (ป้องกัน/เก็งลง), < 0 = ขาย Put (รับซื้อ) · skew บวก = Put แพง ตลาดกลัวขาลง · COT ใช้ดูภาพใหญ่รายสัปดาห์ · retail_long_pct สูงผิดปกติ = เตือนใกล้ยอด',
     'ห้ามใช้ชื่อฟิลด์ภาษาอังกฤษแบบ snake_case ในข้อความ ให้เรียกว่า: gamma_flip_today = "gmf itd", gamma_flip_30d = "gmf M", max_pain = "Max Pain", net_gex = "Net GEX", expected_move = "กรอบ EM", retail_long_pct = "รายย่อยถือ Long", managed_money_net = "กองทุนสุทธิ", skew = "Skew", oi_call/oi_put = "OI Call/Put", vol_call/vol_put = "Volume Call/Put"',
     'mm และ events ต้องเป็น array ของ string ธรรมดาเท่านั้น (ไม่ใช่ object)',
@@ -129,8 +138,9 @@ function runAI_(reason) {
   const NAMES = [[/gamma_flip_today/g, 'gmf itd'], [/gamma_flip_30d/g, 'gmf M'], [/max_pain/g, 'Max Pain'], [/net_gex_(today|30d)(_musd)?/g, 'Net GEX'], [/expected_move_range_today|expected_move/g, 'กรอบ EM'], [/retail_long_pct/g, 'รายย่อยถือ Long %'], [/managed_money_net/g, 'กองทุนสุทธิ'], [/mm_change_1w/g, 'กองทุนเปลี่ยน 1 สัปดาห์'], [/mm_change_8w/g, 'กองทุนเปลี่ยน 8 สัปดาห์'], [/cot_index_3y_pct/g, 'COT Index 3 ปี'], [/skew_put25_minus_call25_volpts/g, 'Skew'], [/oi_call/g, 'OI Call'], [/oi_put/g, 'OI Put'], [/vol_call/g, 'Volume Call'], [/vol_put/g, 'Volume Put'], [/call_net_buy/g, 'Call ซื้อสุทธิ'], [/put_net_buy/g, 'Put ซื้อสุทธิ'], [/futures_price/g, 'ราคาฟิวเจอร์'], [/dxy_spec_(net|change_1w)/g, 'DXY นักเก็งกำไร']];
   const clean = v => { let t = v === null || v === undefined ? '' : typeof v === 'object' ? Object.values(v).filter(x => x !== null && typeof x !== 'object').join(' — ') : String(v); NAMES.forEach(([re, to]) => { t = t.replace(re, to); }); return t.trim(); };
   ['trend_label', 'headline', 'summary', 'watch', 'warn'].forEach(k => { A[k] = clean(A[k]); });
-  A.mm = (Array.isArray(A.mm) ? A.mm : [A.mm]).map(clean).filter(Boolean);
-  A.events = (Array.isArray(A.events) ? A.events : [A.events]).map(clean).filter(Boolean);
+  A.mm = (Array.isArray(A.mm) ? A.mm : [A.mm]).map(clean).map(t => t.replace(/^\d+\s*[—\-.)]\s*/, '')).filter(Boolean);
+  // ปฏิทิน: สร้างจากข้อมูลจริง (ไม่ให้ AI ตีความตัวเลขข่าวเอง)
+  A.events = data.calendar.slice(-6).map(e => e.time_th + ' ' + (e.impact === 'high' ? '🔴 ' : '🟠 ') + e.title + (e.actual ? ` ออก ${e.actual} (คาด ${e.forecast || '–'})${e.better_than_forecast === true ? ' ดีกว่าคาด → หนุนดอลลาร์' : e.better_than_forecast === false ? ' แย่กว่าคาด → หนุนทอง' : ''}` : ` (คาด ${e.forecast || '–'}, ก่อนหน้า ${e.previous || '–'})`));
   (A.levels || []).forEach(l => { l.t = clean(l.t); });
   const levels = (A.levels || []).map(l => ({ p: Number(l.p), k: ['R', 'S', 'P'].indexOf(l.k) >= 0 ? l.k : 'P', t: String(l.t || '').slice(0, 120), s: Math.max(1, Math.min(3, Number(l.s) || 1)) })).filter(l => allowed.has(l.p));
   const keys = sh.getRange('A1:A40').getValues().map(r => r[0]);

@@ -2,279 +2,76 @@
   "source": "Forex Factory + FXStreet (actual)",
   "events": [
     {
-      "date": "2026-10-22T08:30:00-04:00",
+      "date": "2026-10-27T10:00:00-04:00",
       "c": "USD",
       "i": "M",
-      "title": "Unemployment Claims",
-      "forecast": "200K",
-      "previous": "199K",
-      "actual": "194K",
-      "better": true
+      "title": "CB Consumer Confidence",
+      "forecast": "80.5",
+      "previous": "81.9"
     },
     {
-      "date": "2026-10-23T09:45:00-04:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Flash Manufacturing PMI",
-      "forecast": "55.4",
-      "previous": "57.0",
-      "actual": "56.0",
-      "better": true
-    },
-    {
-      "date": "2026-10-23T09:45:00-04:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Flash Services PMI",
-      "forecast": "57.9",
-      "previous": "58.7",
-      "actual": "57.9",
-      "better": null
-    },
-    {
-      "date": "2026-10-23T10:00:00-04:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Revised UoM Consumer Sentiment",
-      "forecast": "46.3",
-      "previous": "46.3",
-      "actual": "48.0",
-      "better": true
-    },
-    {
-      "date": "2026-10-23T10:00:00-04:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Revised UoM Inflation Expectations",
-      "forecast": "",
-      "previous": "4.7%",
-      "actual": "4.7%",
-      "better": null
-    },
-    {
-      "date": "2026-10-27T12:15:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "ADP Employment Change 4-week average",
-      "forecast": "",
-      "previous": "18.5",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-27T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Durable Goods Orders",
-      "forecast": "0.6%",
-      "previous": "0%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-27T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Durable Goods Orders ex Defense",
-      "forecast": "",
-      "previous": "0.1%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-27T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Durable Goods Orders ex Transportation",
-      "forecast": "0.6%",
-      "previous": "0.3%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-27T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Nondefense Capital Goods Orders ex Aircraft",
-      "forecast": "",
-      "previous": "1.6%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-27T13:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Housing Price Index (MoM)",
-      "forecast": "0.1%",
-      "previous": "0.3%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-27T14:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Consumer Confidence",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-27T14:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "New Home Sales Change (MoM)",
-      "forecast": "",
-      "previous": "6.4%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-28T18:00:00+00:00",
+      "date": "2026-10-28T14:00:00-04:00",
       "c": "USD",
       "i": "H",
-      "title": "Fed Interest Rate Decision",
-      "forecast": "4%",
-      "previous": "4%",
-      "src": "fxstreet"
+      "title": "Federal Funds Rate",
+      "forecast": "4.00%",
+      "previous": "4.00%"
     },
     {
-      "date": "2026-10-28T18:00:00+00:00",
+      "date": "2026-10-28T14:00:00-04:00",
       "c": "USD",
       "i": "H",
-      "title": "Fed Monetary Policy Statement",
+      "title": "FOMC Statement",
       "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
+      "previous": ""
     },
     {
-      "date": "2026-10-28T18:30:00+00:00",
+      "date": "2026-10-28T14:30:00-04:00",
       "c": "USD",
       "i": "H",
       "title": "FOMC Press Conference",
       "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
+      "previous": ""
     },
     {
-      "date": "2026-10-29T12:30:00+00:00",
+      "date": "2026-10-29T08:30:00-04:00",
       "c": "USD",
       "i": "H",
-      "title": "Core Personal Consumption Expenditures - Price Index (MoM)",
-      "forecast": "0.3%",
-      "previous": "0.2%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-29T12:30:00+00:00",
-      "c": "USD",
-      "i": "H",
-      "title": "Core Personal Consumption Expenditures - Price Index (YoY)",
-      "forecast": "3.1%",
-      "previous": "3%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-29T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Core Personal Consumption Expenditures (QoQ)",
-      "forecast": "",
-      "previous": "3.3%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-29T12:30:00+00:00",
-      "c": "USD",
-      "i": "H",
-      "title": "Gross Domestic Product Annualized",
+      "title": "Advance GDP q/q",
       "forecast": "3.2%",
-      "previous": "2.2%",
-      "src": "fxstreet"
+      "previous": "1.5%"
     },
     {
-      "date": "2026-10-29T12:30:00+00:00",
+      "date": "2026-10-29T08:30:00-04:00",
       "c": "USD",
       "i": "H",
-      "title": "Gross Domestic Product Price Index",
-      "forecast": "",
-      "previous": "6.1%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-29T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Initial Jobless Claims",
-      "forecast": "196",
-      "previous": "194",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-29T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Personal Consumption Expenditures - Price Index (MoM)",
-      "forecast": "0.5%",
-      "previous": "0.3%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-29T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Personal Consumption Expenditures - Price Index (YoY)",
-      "forecast": "",
-      "previous": "3.4%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-29T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Personal Consumption Expenditures Prices (QoQ)",
-      "forecast": "",
-      "previous": "5%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-29T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Personal Income (MoM)",
+      "title": "Core PCE Price Index m/m",
       "forecast": "0.3%",
-      "previous": "0.2%",
-      "src": "fxstreet"
+      "previous": "0.2%"
     },
     {
-      "date": "2026-10-29T12:30:00+00:00",
+      "date": "2026-10-29T08:30:00-04:00",
       "c": "USD",
       "i": "M",
-      "title": "Personal Spending",
-      "forecast": "0.3%",
-      "previous": "0.9%",
-      "src": "fxstreet"
+      "title": "Advance GDP Price Index q/q",
+      "forecast": "3.5%",
+      "previous": "6.2%"
     },
     {
-      "date": "2026-10-30T12:30:00+00:00",
+      "date": "2026-10-29T08:30:00-04:00",
       "c": "USD",
       "i": "M",
-      "title": "Employment Cost Index",
+      "title": "Unemployment Claims",
+      "forecast": "198K",
+      "previous": "194K"
+    },
+    {
+      "date": "2026-10-30T08:30:00-04:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Employment Cost Index q/q",
       "forecast": "0.8%",
-      "previous": "0.9%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-30T13:45:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Chicago PMI",
-      "forecast": "55.9",
-      "previous": "58.8",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-10-30T16:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Musalem speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
+      "previous": "0.9%"
     }
   ]
 }

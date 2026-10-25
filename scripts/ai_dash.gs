@@ -229,8 +229,9 @@ function aiPA_(snap) {
     'bars เรียงเก่า→ใหม่ แท่งสุดท้ายยังไม่ปิด (forming) อย่าตัดสินจากแท่งที่ยังไม่ปิดอย่างเดียว',
     'levels คือแนวจาก Options (Call Wall = แนวต้าน, Put Wall = แนวรับ, กรอบ EM, gmf, Max Pain, โซน OI, เส้น Volume) ราคาเหนือ gmf M มักแกว่งกรอบ ใต้ gmf M มักวิ่งแรงตามทาง',
     'หลักตัดสิน: เข้าเฉพาะเมื่อมี Price Action ชัดที่แนวสำคัญ และ R:R ถึง TP2 อย่างน้อย 1:1.5 · ถ้าไม่ชัด อยู่กลางกรอบ หรือใกล้ข่าวแดง ให้ WAIT',
+    'absorption คือแท่งที่ Volume สูงแต่ราคาไปไม่ไกล (มีออเดอร์ใหญ่รอรับ) ระบบคำนวณไว้แล้ว: rate_40_pct = อัตราการเกิดใน 40 แท่ง, side buy = ซื้อรับแรงขาย (หนุนขึ้น), sell = ขายรับแรงซื้อ (กดลง) · Absorption ที่แนวสำคัญ + Pin Bar/ปฏิเสธราคา = สัญญาณกลับตัวที่แข็งแรงขึ้น · Absorption ถี่แต่ราคาไม่ไปไหน = สะสม/แจกจ่ายของ รอเบรก',
     'SL ต้องอยู่หลังไส้/โครงสร้าง ห่างจาก entry 0.5-2.5 เท่า ATR · TP1/TP2 ใช้แนวที่มีในข้อมูลหรือ VWAP',
-    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: action ("BUY"|"SELL"|"WAIT"), confidence (0-100), pattern (ชื่อ Price Action ที่เห็นสั้นๆ หรือ "ไม่มีสัญญาณชัด"), pa (อธิบาย Price Action แท่งล่าสุด 1-2 ประโยค), context (ราคาอยู่ตรงไหนเทียบแนวสำคัญ 1 ประโยค), entry, sl, tp1, tp2 (ตัวเลข; ถ้า WAIT ให้ใส่ราคาที่ควรรอเข้าแทน หรือ null), reasons (array 2-4 ข้อ ข้อละ 1 ประโยค), invalid (ถ้า... แผนนี้ใช้ไม่ได้ 1 ประโยค), wait_for (ถ้า WAIT: ต้องเห็นอะไรก่อนเข้า 1 ประโยค)',
+    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: action ("BUY"|"SELL"|"WAIT"), confidence (0-100), pattern (ชื่อ Price Action ที่เห็นสั้นๆ หรือ "ไม่มีสัญญาณชัด"), pa (อธิบาย Price Action แท่งล่าสุด 1-2 ประโยค), context (ราคาอยู่ตรงไหนเทียบแนวสำคัญ 1 ประโยค), entry, sl, tp1, tp2 (ตัวเลข; ถ้า WAIT ให้ใส่ราคาที่ควรรอเข้าแทน หรือ null), reasons (array 2-4 ข้อ ข้อละ 1 ประโยค), invalid (ถ้า... แผนนี้ใช้ไม่ได้ 1 ประโยค), absorption (ตีความ Absorption จากข้อมูล 1-2 ประโยค: ถี่ไหม ฝั่งไหนรับ เกิดที่แนวไหน มีผลกับการเข้าออเดอร์อย่างไร), wait_for (ถ้า WAIT: ต้องเห็นอะไรก่อนเข้า 1 ประโยค)',
   ].join('\n');
   const body = { model: AI_MODEL, temperature: 0.2, response_format: { type: 'json_object' }, max_tokens: 1200,
     messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(snap) }] };
@@ -239,7 +240,7 @@ function aiPA_(snap) {
   const num = v => { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
   const out = { action: String(A.action || 'WAIT').toUpperCase(), confidence: Math.max(0, Math.min(100, Math.round(Number(A.confidence) || 0))),
     pattern: String(A.pattern || ''), pa: String(A.pa || ''), context: String(A.context || ''), entry: num(A.entry), sl: num(A.sl), tp1: num(A.tp1), tp2: num(A.tp2),
-    reasons: (Array.isArray(A.reasons) ? A.reasons : [A.reasons]).filter(Boolean).map(String).slice(0, 4), invalid: String(A.invalid || ''), wait_for: String(A.wait_for || ''),
+    reasons: (Array.isArray(A.reasons) ? A.reasons : [A.reasons]).filter(Boolean).map(String).slice(0, 4), invalid: String(A.invalid || ''), absorption: String(A.absorption || ''), wait_for: String(A.wait_for || ''),
     price, tf: snap.tf, time_th: snap.time_th, model: AI_MODEL };
   if (['BUY', 'SELL', 'WAIT'].indexOf(out.action) < 0) out.action = 'WAIT';
   // ตรวจความสมเหตุสมผลของแผน: ทิศ SL/TP ถูก, entry ใกล้ราคา, ระยะ SL สมจริง → ไม่ผ่าน = WAIT

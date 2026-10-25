@@ -118,6 +118,32 @@
     return out;
   }
 
+  // Absorption (แอบซอร์บชัน): Volume สูงแต่ราคาไปไม่ไกล = มีออเดอร์ใหญ่รอรับ (ความพยายามมาก ผลลัพธ์น้อย แบบ Wyckoff)
+  // เกณฑ์: Volume ≥ 1.5 เท่าค่าเฉลี่ย 20 แท่งก่อนหน้า + (เนื้อเทียน ≤ 35% ของแท่ง หรือ ทั้งแท่งแคบ ≤ 0.8 ATR)
+  // ฝั่ง: ไส้ล่างยาวกว่า = ฝั่งซื้อรับแรงขาย (หนุนขึ้น) · ไส้บนยาวกว่า = ฝั่งขายรับแรงซื้อ (กดลง)
+  function absorption(B, vol, atr, levels) {
+    const n = B.length - 1, V = B.map(b => vol.get(b.time) || 0); // แท่งสุดท้ายยังไม่ปิด ไม่นับ
+    if (V.slice(-41, -1).filter(v => v > 0).length < 20) return { note: 'ไม่มีข้อมูล Volume พอ' };
+    const list = [];
+    for (let i = Math.max(21, n - 40); i < n; i++) {
+      const b = B[i], rng = b.high - b.low; if (rng <= 0 || !V[i]) continue;
+      const avg = V.slice(i - 20, i).reduce((a, x) => a + x, 0) / 20; if (!avg) continue;
+      const rv = V[i] / avg, body = Math.abs(b.close - b.open), up = b.high - Math.max(b.open, b.close), dn = Math.min(b.open, b.close) - b.low;
+      if (rv < 1.5 || !(body <= 0.35 * rng || rng <= 0.8 * atr)) continue;
+      const side = dn > up * 1.2 ? 'buy' : up > dn * 1.2 ? 'sell' : 'both';
+      const score = Math.min(100, Math.round(Math.min(rv, 4) / 4 * 55 + (1 - body / rng) * 30 + (rng <= 0.8 * atr ? 15 : 0)));
+      const tol = Math.max(2, atr * 0.5), at = levels.filter(l => l.p >= b.low - tol && l.p <= b.high + tol).map(l => l.name).slice(0, 2).join(', ') || null;
+      list.push({ time: hhmm(b.time), ago: n - i, rvol: Math.round(rv * 10) / 10, side, score, price: Math.round((side === 'buy' ? b.low : side === 'sell' ? b.high : (b.high + b.low) / 2) * 100) / 100, at });
+    }
+    const last10 = list.filter(x => x.ago <= 10), buy = list.filter(x => x.side === 'buy').length, sell = list.filter(x => x.side === 'sell').length;
+    return {
+      rate_40_pct: Math.round(list.length / 40 * 100), count_40: list.length, count_last10: last10.length, buy_side: buy, sell_side: sell,
+      bias: buy > sell * 1.5 ? 'ฝั่งซื้อรับ (หนุนขึ้น)' : sell > buy * 1.5 ? 'ฝั่งขายรับ (กดลง)' : list.length ? 'ทั้งสองฝั่ง' : 'ไม่พบ',
+      latest: list.slice(-4).reverse(),
+      note: 'คำนวณจาก Volume ของ perp (ไม่ใช่ Volume CME) และไม่มีข้อมูลฝั่ง bid/ask จึงเป็นการประมาณจากรูปแท่ง + Volume',
+    };
+  }
+
   function snapshot() {
     const B = (O.series.data() || []).filter(b => isFinite(b.close));
     if (B.length < 30) return null;
@@ -141,6 +167,7 @@
       vwap: vwap ? Math.round(vwap * 100) / 100 : null,
       swing_30: { high: hi.high, high_time: hhmm(hi.time), low: lo.low, low_time: hhmm(lo.time) },
       patterns: patterns(B, atr, levels),
+      absorption: absorption(B, vol, atr, levels),
       levels, nearest_above: levels.filter(l => l.p > px).slice(-1)[0] || null, nearest_below: levels.filter(l => l.p < px)[0] || null,
       market: lastBarAgeMin > 30 ? `ตลาดปิดอยู่ ข้อมูลล่าสุดเมื่อ ${lastBarAgeMin} นาทีก่อน (วิเคราะห์เพื่อเตรียมแผนตอนตลาดเปิด)` : 'ตลาดเปิด ข้อมูลสด',
       red_news: nx ? { title: nx.t, minutes_from_now: Math.round((nx.ms - nowMs) / 60e3), forecast: nx.f || null } : null,
@@ -192,11 +219,22 @@
     $('paGo').onclick = run;
     if (result) bindResult();
   }
+  function absHTML(r) {
+    const a = r.abs; if (!a || a.count_40 === undefined) return '';
+    const col = a.rate_40_pct >= 20 ? '#ffd97a' : a.rate_40_pct >= 10 ? '#c9d1ea' : '#8a93ad';
+    const lt = (a.latest || []).slice(0, 3).map(x => `${x.time} ${x.side === 'buy' ? '🟢 ซื้อรับ' : x.side === 'sell' ? '🔴 ขายรับ' : '⚪ สองฝั่ง'} ${f2(x.price)} · Vol ${x.rvol}x${x.at ? ' · ' + esc(x.at) : ''}`).join('<br>');
+    return `<div style="margin:8px 0;padding:8px 10px;border:1px solid #1f2850;border-radius:10px;background:#0f1533">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:13px">🧲 Absorption</b><span style="font:700 15px var(--mono,monospace);color:${col}">${a.rate_40_pct}% <small style="font:11px var(--sans,sans-serif);color:#8a93ad">(${a.count_40}/40 แท่ง · 10 แท่งล่าสุด ${a.count_last10})</small></span></div>
+      <div style="font-size:12px;color:#a9b4d6;margin-top:3px">เอนไป: <b>${esc(a.bias)}</b> · ซื้อรับ ${a.buy_side} / ขายรับ ${a.sell_side}</div>
+      ${lt ? `<div style="font:11px var(--mono,monospace);color:#8fa0d0;margin-top:4px;line-height:1.5">${lt}</div>` : ''}
+      ${r.absorption ? `<p style="margin-top:5px">${esc(r.absorption)}</p>` : ''}</div>`;
+  }
   function resultHTML(r, old) {
     const conf = r.confidence || 0;
     return `${old ? '<div class="muted">ผลล่าสุด</div>' : ''}<div class="act"><span class="badge ${r.action}">${r.action === 'WAIT' ? 'รอ' : r.action}</span>
       <div class="conf"><small>ความมั่นใจ ${conf}% · ${esc(r.tf)} · ${esc((r.time_th || '').slice(11))} น. · ราคา ${f2(r.price)}</small><div class="bar"><i style="width:${old ? conf : 0}%"></i></div></div></div>
       <div class="pat">${esc(r.pattern)}</div><p>${esc(r.pa)}</p><p style="color:#a9b4d6">${esc(r.context)}</p>
+      ${absHTML(r)}
       ${r.entry || r.sl || r.tp1 ? `<div class="plan"><div><small>${r.action === 'WAIT' ? 'รอเข้า' : 'Entry'}</small>${f2(r.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(r.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(r.tp1)}</span></div><div><small>TP2${r.rr ? ' · R:R 1:' + r.rr : ''}</small><span style="color:#2fe3a6">${f2(r.tp2)}</span></div></div>` : ''}
       ${r.reasons && r.reasons.length ? `<ul>${r.reasons.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
       ${r.wait_for && r.action === 'WAIT' ? `<p>⏳ ${esc(r.wait_for)}</p>` : ''}${r.invalid ? `<p class="warn">⚠️ ${esc(r.invalid)}</p>` : ''}${r.checked ? `<p class="warn">${esc(r.checked)}</p>` : ''}
@@ -217,7 +255,7 @@
     busy = true;
     const draw = snap._draw, pats = snap.patterns;
     const patTxt = pats.length ? pats.slice(0, 2).map(p => p.name.split(' (')[0]).join(' + ') : 'ไม่พบรูปแบบชัด';
-    const steps = [`▸ อ่านแท่งเทียน ${snap.tf} 40 แท่ง · ATR ${f2(snap.atr)}`, `▸ Price Action: ${patTxt}`, `▸ เทียบแนว ${snap.levels.length} ระดับ (OI / EM / gmf / VWAP)`, '▸ DeepSeek กำลังตัดสินใจ…'];
+    const steps = [`▸ อ่านแท่งเทียน ${snap.tf} 40 แท่ง · ATR ${f2(snap.atr)}`, `▸ Price Action: ${patTxt}`, `▸ Absorption ${snap.absorption.count_40 !== undefined ? snap.absorption.rate_40_pct + '% · ' + snap.absorption.bias : '–'}`, `▸ เทียบแนว ${snap.levels.length} ระดับ (OI / EM / gmf / VWAP)`, '▸ DeepSeek กำลังตัดสินใจ…'];
     bd().innerHTML = `<canvas id="paCv"></canvas><div class="think">AI กำลังวิเคราะห์<i></i><i></i><i></i></div><div class="steps">${steps.map(s => `<div>${esc(s)}</div>`).join('')}</div>`;
     const cv = $('paCv'), st = [...bd().querySelectorAll('.steps div')];
     // กราฟวิ่งไวๆ: เลื่อนจากแท่งเก่าไปล่าสุด แล้วสแกนซ้ำ จนกว่าผลจะมา
@@ -228,7 +266,7 @@
       const upto = cyc < 1500 ? Math.max(1, Math.round(40 + (all.length - 40) * (cyc / 1500))) : all.length;
       const W = cv.clientWidth - 46, scan = cyc >= 1500 ? (cyc - 1500) / 1100 * W : null;
       drawMini(cv, all, Math.min(all.length, upto), scan, null, cyc >= 1500 ? lv : null);
-      const k = Math.min(3, Math.floor(el / 900));
+      const k = Math.min(4, Math.floor(el / 750));
       st.forEach((d, i) => { d.className = i < k ? 'ok' : i === k ? 'on' : ''; });
       anim = requestAnimationFrame(loop);
     };
@@ -240,7 +278,7 @@
       bd().innerHTML = `<div class="err">วิเคราะห์ไม่สำเร็จ: ${esc(res && res.error === 'auth' ? 'รหัสเข้าแอปหมดอายุ' : (res && res.error) || 'ไม่ทราบสาเหตุ')}</div><button class="go" id="paGo">ลองใหม่</button>`;
       $('paGo').onclick = run; return;
     }
-    result = res.pa; result.at = Date.now(); showPlan = result.action !== 'WAIT' || !!result.entry;
+    result = res.pa; result.at = Date.now(); result.abs = snap.absorption; showPlan = result.action !== 'WAIT' || !!result.entry;
     bd().innerHTML = `<canvas id="paCv"></canvas>` + resultHTML(result, false);
     drawMini($('paCv'), draw, draw.length, null, result, null);
     requestAnimationFrame(() => { const i = bd().querySelector('.conf .bar i'); if (i) i.style.width = (result.confidence || 0) + '%'; });

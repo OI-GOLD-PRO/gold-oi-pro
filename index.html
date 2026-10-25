@@ -251,7 +251,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.17.04';
+  const APP_VER = '1.18.00';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1182,7 +1182,7 @@
     const el = $('offchip'); if (!el) return;
     const t = adjAt ? adjAt.toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : '';
     if (SC.yahoo) { el.innerHTML = hybOff === null ? 'กราฟ Yahoo' : `ปลายกราฟต่อด้วย perp <b>${hybOff >= 0 ? '+' : ''}${hybOff.toFixed(2)}</b> <small>· Yahoo ถึง ${new Date(hybAt * 1000).toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}</small>`; return; }
-    el.innerHTML = `offset <b>${(-adj).toFixed(2)}</b>` + (liveAt !== null && SYM === 'gold' ? ` <small>· Yahoo ${new Date(liveAt * 1000).toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}</small>` : '');
+    el.innerHTML = `offset <b>${(-adj).toFixed(2)}</b>` + (liveAt !== null && SYM === 'gold' ? ` <small>· ${liveSrc} ${new Date(liveAt * 1000).toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })}</small>` : '');
   }
   function applyAdj(next) {
     adj = Math.round(next * 100) / 100; adjSet = true; adjAt = new Date();
@@ -1194,18 +1194,40 @@
   // offset สด: ทุก 1 นาที เอาแท่ง M1 ที่ "ปิดแล้ว" ล่าสุดของ Yahoo GC=F (gcy.json จาก GitHub Actions)
   // จับคู่กับแท่ง M1 ของ perp เวลาเดียวกัน offset = GC ปิดแท่งนั้น − perp ปิดแท่งนั้น แล้วปรับกราฟ XAUUSD
   // (ค่าของอดีตราว 10-20 นาทีตาม Yahoo แต่แม่นเพราะเทียบเวลาเดียวกัน แล้วใช้กับราคาปัจจุบัน)
-  let liveAt = null, liveBusy = false;
+  let liveAt = null, liveBusy = false, liveSrc = 'Yahoo';
   const GCY_URL = `https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/main/gcy.json`;
   async function pairYahoo() {
     if (SYM !== 'gold' || liveBusy || !prov || !oi) return;
     liveBusy = true;
     try {
-      let bars = [];
-      try { const w = await fetch(`${GC_WORKER}/?tf=1m`, { cache: 'no-store' }); if (w.ok) bars = ((await w.json()).bars || {})['1m'] || []; } catch (e) {}
-      if (!bars.length) { const r = await fetch(GCY_URL + '?t=' + Math.floor(Date.now() / 60000), { cache: 'no-store' }); bars = ((await r.json()).bars || {})['1m'] || []; }   // [t(วินาที), o, h, l, c]
       const rows = await fetchBars(prov, '1m', 400);
       const pm = new Map(rows.map(k => [Math.floor(k[0] / 1000), k[4]])); // ราคาปิดแท่ง M1 ของ perp
       const nowS = Date.now() / 1000;
+      // หลัก: Gold.F (BlackBull, เรียลไทม์) จับคู่แท่ง M1 ที่ปิดแล้ว 5 แท่งล่าสุด ใช้ค่ากลาง (median) → ไม่ดีเลย์แบบ Yahoo
+      try {
+        const g = await fetch(`${GC_WORKER}/gf?t=${Math.floor(Date.now() / 20000)}`, { cache: 'no-store' });
+        const gb = g.ok ? ((await g.json()).bars || []) : [];
+        const d = [];
+        for (let i = gb.length - 1; i >= 0 && d.length < 5; i--) {
+          const t = gb[i][0];
+          if (t + 60 > nowS || !pm.has(t)) continue;
+          d.push([t, gb[i][4] - pm.get(t)]);
+        }
+        if (d.length >= 2 && nowS - d[0][0] < 30 * 60) {
+          const v = d.map(x => x[1]).sort((a, b) => a - b), m = v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+          const off = Math.round(m * 100) / 100;
+          if (isFinite(off) && Math.abs(off) <= 40) {
+            liveSrc = 'Gold.F';
+            if (liveAt === null || Math.abs(-off - adj) >= 0.01) { liveAt = d[0][0]; applyAdj(-off); } else { liveAt = d[0][0]; paintOff(); }
+            return;
+          }
+        }
+      } catch (e) {}
+      // สำรอง: Yahoo GC=F (ช้า ~10 นาที)
+      liveSrc = 'Yahoo';
+      let bars = [];
+      try { const w = await fetch(`${GC_WORKER}/?tf=1m`, { cache: 'no-store' }); if (w.ok) bars = ((await w.json()).bars || {})['1m'] || []; } catch (e) {}
+      if (!bars.length) { const r = await fetch(GCY_URL + '?t=' + Math.floor(Date.now() / 60000), { cache: 'no-store' }); bars = ((await r.json()).bars || {})['1m'] || []; }   // [t(วินาที), o, h, l, c]
       for (let i = bars.length - 1; i >= 0 && i >= bars.length - 40; i--) {
         const t = Math.floor(bars[i][0] / 60) * 60;
         if (t + 60 > nowS) continue;            // แท่งที่ยังไม่ปิด ข้าม

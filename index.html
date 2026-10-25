@@ -45,7 +45,8 @@
   /* เต็มจอจริงบน iPhone (แอปจากหน้าโฮมบางรุ่นคิด 100dvh สั้นกว่าจอ ทำให้มีช่องว่างด้านล่าง) */
   body { position: fixed; top: 0; left: 0; right: 0; bottom: 0; height: auto; box-sizing: border-box; }
   /* iOS 26: ขอบบนจอ (ใต้แถบสถานะ) ถูกเบลอโดยระบบ ดันหัวแอปลงมาพ้นโซนเบลอ */
-  @supports (-webkit-touch-callout: none) { body { padding-top: calc(env(safe-area-inset-top, 0px) + 28px); } }
+  /* iPhone: ให้แถบเวลา/คำอธิบายสีชิดขอบล่าง เหลือเว้นเฉพาะใต้ขีด Home เล็กน้อย */
+  @supports (-webkit-touch-callout: none) { body { padding-top: calc(env(safe-area-inset-top, 0px) + 28px); padding-bottom: max(4px, calc(env(safe-area-inset-bottom, 0px) - 22px)); } }
   header { display: flex; align-items: center; gap: 12px; padding: 10px 14px 6px; }
   .sym { display: flex; flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; flex: 0 1 auto; }
   .sym b { white-space: nowrap; }
@@ -251,13 +252,15 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.19.02';
+  const APP_VER = '1.19.03';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
   const $ = id => document.getElementById(id);
   // บางเครื่องความสูงจอไม่ตรงกับ CSS: ตั้งความสูง body ตามหน้าต่างจริงทุกครั้งที่หมุนจอ/ปรับขนาด
-  const fitH = () => { document.body.style.height = window.innerHeight + 'px'; };
+  // iPhone ใช้ position:fixed เต็มจอแทน (innerHeight ในแอปจากหน้าโฮมสั้นกว่าจอจริง ทำให้มีช่องว่างล่าง)
+  const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const fitH = () => { document.body.style.height = IOS ? '' : window.innerHeight + 'px'; };
   fitH(); window.addEventListener('resize', fitH); window.addEventListener('orientationchange', () => setTimeout(fitH, 300));
   const css = getComputedStyle(document.documentElement);
   const C = k => css.getPropertyValue(k).trim();

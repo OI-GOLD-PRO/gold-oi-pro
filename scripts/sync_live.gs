@@ -24,6 +24,13 @@ function syncLive() {
     return JSON.parse(r.getContentText());
   };
   const now = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm');
+  // แยกรอบ (ตัวตั้งเวลาเรียกทุก 5 นาที): ราคา/offset ทุกรอบ · volume + IV ทุก 10 นาที · gmf ทุก 15 นาที
+  // OI และ contract เขียนเฉพาะตอนเปลี่ยน (เช็กพร้อม volume) · vol_log ชั่วโมงละครั้ง
+  const P = PropertiesService.getScriptProperties();
+  const due = (key, min) => { const last = Number(P.getProperty(key) || 0); return Date.now() - last >= min * 60e3 - 60e3; };
+  const mark = key => P.setProperty(key, String(Date.now()));
+  const hourKey = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH');
+  const dueVol = due('sync_vol', 10), dueGmf = due('sync_gmf', 15), dueLog = P.getProperty('vol_log_hour') !== hourKey;
 
   // 1) ราคา Gold.F + offset
   let px = null;
@@ -34,7 +41,8 @@ function syncLive() {
     }
   } catch (e) { console.warn('px: ' + e); }
 
-  // 2) ออปชันสัญญาวันนี้: OI, volume, gmf
+  // 2) ออปชันสัญญาวันนี้: OI, volume, gmf (ข้ามถ้ายังไม่ถึงรอบ)
+  if (!dueVol && !dueGmf && !dueLog) return;
   let o = null;
   try { o = get('/opt'); } catch (e) { console.warn('opt: ' + e); }
   if (!o || !o.root || !o.rows || !o.rows.length) return;
@@ -44,28 +52,31 @@ function syncLive() {
     if (v > 0) { const a = vol[k] || [0, 0]; a[t === 'C' ? 0 : 1] = v; vol[k] = a; }
     if (oi > 0) levels.push([k, oi, t, '']);
   });
-  sh.getRange('B7').setValue(o.root);
-  sh.getRange('B8:B10').setValues([[JSON.stringify(vol)], [now], [o.root]]);
+  if (String(sh.getRange('B7').getValue()) !== String(o.root)) sh.getRange('B7').setValue(o.root);
+  if (dueVol) sh.getRange('B8:B10').setValues([[JSON.stringify(vol)], [now], [o.root]]);
 
   // ATM IV = เฉลี่ย IV Call/Put ของ strike ใกล้ราคาที่สุด (%)
   let atmIV = null;
   if (o.F) { const near = o.rows.filter(r => r[2]).sort((a, b) => Math.abs(a[0] - o.F) - Math.abs(b[0] - o.F)).slice(0, 2); if (near.length) atmIV = Math.round(near.reduce((a, r) => a + r[2], 0) / near.length * 1000) / 10; }
-  if (atmIV !== null) {
+  if (atmIV !== null && dueVol) {
     const expTxt = o.expTs ? Utilities.formatDate(new Date(o.expTs * 1000), 'Asia/Bangkok', 'yyyy-MM-dd H:mm') : '';
     sh.getRange('A14:B17').setValues([['atm_iv', atmIV], ['iv_expiry', expTxt], ['iv_time', now], ['iv_contract', o.root]]);
   }
 
+  if (dueVol) mark('sync_vol');
   let g = {};
   try { g = JSON.parse(sh.getRange('B18').getValue() || '{}'); } catch (e) { g = {}; }
+  if (dueGmf) {
   if (o.itd !== null && o.itd !== undefined) { g.itd = o.itd; g.itd_c = o.root; g.gex_itd = o.gexItd; }
   if (o.gmfM && o.gmfM.M !== null && o.gmfM.M !== undefined) { g.M = o.gmfM.M; g.gex_M = o.gmfM.gexM; g.M_c = o.gmfM.roots + ' contracts exp <=30d (TradingView OI+IV)'; }
   g.F = o.F; g.src = 'Worker auto (TradingView)'; g.time = now;
   sh.getRange('A18:B18').setValues([['gmf', JSON.stringify(g)]]);
+  mark('sync_gmf');
+  }
 
   // vol_log: ชั่วโมงละ 1 แถว เมื่อ Worker เพิ่งอัปเดต (ตลาดเปิด) — ใช้ backtest แนว OI + volume
   try {
-    const props0 = PropertiesService.getScriptProperties();
-    const hourKey = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH');
+    const props0 = P;
     const fresh = o.updated && (Date.now() / 1000 - o.updated) < 15 * 60;
     if (fresh && props0.getProperty('vol_log_hour') !== hourKey) {
       let vC = 0, vP = 0, oC = 0, oP = 0;

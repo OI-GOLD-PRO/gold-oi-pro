@@ -251,7 +251,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.18.01';
+  const APP_VER = '1.19.00';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1089,28 +1089,28 @@
     {
       id: 'bybit', name: 'Bybit',
       rest: (t, n) => `https://api.bybit.com/v5/market/kline?category=linear&symbol=${SYMBOL}&interval=${BYBIT_TF[t]}&limit=${n}`,
-      parse: j => { if (j.retCode !== 0) throw new Error(j.retMsg); return j.result.list.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4]]); },
+      parse: j => { if (j.retCode !== 0) throw new Error(j.retMsg); return j.result.list.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4], +k[5] || 0]); },
       ws: () => 'wss://stream.bybit.com/v5/public/linear',
       sub: t => ({ op: 'subscribe', args: [`kline.${BYBIT_TF[t]}.${SYMBOL}`] }),
       ping: '{"op":"ping"}', pingMs: 20000,
-      msg: (m, t) => (m.topic === `kline.${BYBIT_TF[t]}.${SYMBOL}` && m.data) ? m.data.map(k => [+k.start, +k.open, +k.high, +k.low, +k.close]) : null,
+      msg: (m, t) => (m.topic === `kline.${BYBIT_TF[t]}.${SYMBOL}` && m.data) ? m.data.map(k => [+k.start, +k.open, +k.high, +k.low, +k.close, +k.volume || 0]) : null,
     },
     {
       id: 'bitget', name: 'Bitget',
       rest: (t, n) => `https://api.bitget.com/api/v2/mix/market/candles?symbol=${SYMBOL}&productType=usdt-futures&granularity=${BITGET_TF[t]}&limit=${n}`,
-      parse: j => { if (j.code !== '00000') throw new Error(j.msg); return j.data.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4]]); },
+      parse: j => { if (j.code !== '00000') throw new Error(j.msg); return j.data.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4], +k[5] || 0]); },
       ws: () => 'wss://ws.bitget.com/v2/ws/public',
       sub: t => ({ op: 'subscribe', args: [{ instType: 'USDT-FUTURES', channel: 'candle' + BITGET_TF[t], instId: SYMBOL }] }),
       ping: 'ping', pingMs: 25000,
-      msg: (m, t) => (m.arg && m.arg.channel === 'candle' + BITGET_TF[t] && m.data) ? m.data.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4]]) : null,
+      msg: (m, t) => (m.arg && m.arg.channel === 'candle' + BITGET_TF[t] && m.data) ? m.data.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4], +k[5] || 0]) : null,
     },
     {
       id: 'binance', name: 'Binance',
       rest: (t, n) => `https://fapi.binance.com/fapi/v1/klines?symbol=${SYMBOL}&interval=${t}&limit=${n}`,
-      parse: j => { if (!Array.isArray(j)) throw new Error(j.msg || 'bad data'); return j.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4]]); },
+      parse: j => { if (!Array.isArray(j)) throw new Error(j.msg || 'bad data'); return j.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4], +k[5] || 0]); },
       ws: t => `wss://fstream.binance.com/ws/${SYMBOL.toLowerCase()}@kline_${t}`,
       sub: null, ping: null, pingMs: 0,
-      msg: (m, t) => (m.k && m.k.i === t) ? [[+m.k.t, +m.k.o, +m.k.h, +m.k.l, +m.k.c]] : null,
+      msg: (m, t) => (m.k && m.k.i === t) ? [[+m.k.t, +m.k.o, +m.k.h, +m.k.l, +m.k.c, +m.k.v || 0]] : null,
     },
   ];
   // กราฟ Yahoo (GC=F): ไฟล์จาก GitHub Actions ช้า ~10 นาที จึงผสม: แท่ง Yahoo จริงถึงแท่งล่าสุดที่ Yahoo มี
@@ -1929,7 +1929,7 @@
     },
     get tf() { return tf; }, sym: SYM, cfg: SC, sfx: SYMSFX, psfx: PSFX,
     chart, series, chartEl, hooks: overlayHooks,
-    get oi() { return oi; }, get lastClose() { return lastClose; }, get cfgData() { return lastCfg; }, setLevels,
+    get oi() { return oi; }, get lastClose() { return lastClose; }, get cfgData() { return lastCfg; }, setLevels, get rawBars() { return rawBars; }, get adj() { return adj; }, beep: () => { try { beep(); } catch (e) {} },
     // ดึงข้อมูลชีตของสัญลักษณ์ใดก็ได้ (ใช้ในแดชบอร์ด dash.js)
     async fetchData(sym) {
       const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 20000);
@@ -1961,5 +1961,6 @@
 <script src="goldscalp.js"></script>
 <script src="dash.js?v=11704"></script>
 <script src="live.js?v=11601"></script>
+<script src="intraday.js?v=11900"></script>
 </body>
 </html>

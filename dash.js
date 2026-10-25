@@ -149,6 +149,7 @@
   #dash .fx span:nth-child(3n+1) { font-family: var(--sans); color: var(--muted); }
   #dash .oc-now { font-size: 12.5px; line-height: 1.7; margin: 4px 0 8px; } #dash .oc-t { font-size: 11.5px; color: var(--muted); }
   #dash .oc-tb { display: grid; gap: 4px; } #dash .oc-r { display: grid; grid-template-columns: 78px 76px 1fr; gap: 6px; font-size: 11px; line-height: 1.45; padding: 5px 7px; border-radius: 7px; background: rgba(138,147,173,.07); color: var(--muted); }
+  #dash .oc-r.oc4 { grid-template-columns: 52px 56px 1fr; }
   #dash .oc-r.oc3 { grid-template-columns: 78px 72px 1fr; } #dash .oc-r.on { background: rgba(224,180,76,.16); color: var(--text, #e8ecf8); outline: 1px solid rgba(224,180,76,.55); }
   #dash .fx span:nth-child(3n+2), #dash .fx span:nth-child(3n) { text-align: right; }
   `;
@@ -497,8 +498,25 @@
     } else {
       opt = `<h3 style="margin-top:12px">② Options: ราคา × OI Call/Put</h3><div class="note">ยังไม่มีบันทึกก่อนหน้าของสัญญา ${esc(cfg.contract || '–')} ที่ OI ต่างจากตอนนี้ (OI เปลี่ยนแค่ตอนเปิดวันกับหลังตลาดปิด) จะเทียบได้เมื่อ OI สัญญานี้ถูกอัพเดทรอบถัดไป</div>`;
     }
-    if (!fut && !opt) return '';
-    return `<div class="card"><h3>🔎 เปรียบเทียบ OI ตามบทความ</h3>${fut}${opt}</div>`;
+    // ---- ③ ข้ามวัน: สัดส่วน Put/Call OI × ราคา (สัญญารายวันคนละตัว จึงเทียบสัดส่วน ไม่ใช่ยอดสัญญา) ----
+    let day = '';
+    const H = (A && A.hist || []).filter(h => h && isFinite(h[2]) && isFinite(h[3]) && h[2] > 0 && isFinite(h[4]));
+    const byDay = new Map(); H.forEach(h => byDay.set(String(h[0]).split(' ')[0], h)); // เก็บรอบสุดท้ายของแต่ละวัน
+    const days = [...byDay.values()].slice(-6);
+    if (days.length >= 2) {
+      const L = days[days.length - 1], P = days[days.length - 2];
+      const pcrL = L[3] / L[2], pcrP = P[3] / P[2];
+      const dP = pct(L[4], P[4]), dR = pct(pcrL, pcrP);
+      const pd = dir(dP, 0.1), rd = dir(dR, 1);
+      const hit = pd && rd ? OPT_T.find(r => r.y === (rd > 0 ? 'P' : 'C') && r.p === pd && r.o === 1) : null;
+      day = `<h3 style="margin-top:12px">③ ข้ามวัน: สัดส่วน Put/Call × ราคา <span style="font-weight:400;color:var(--muted)">(${esc(P[0].split(' ')[0])} → ${esc(L[0].split(' ')[0])})</span></h3>
+        <div class="oc-now">ราคา <b class="${pd > 0 ? 'up' : pd < 0 ? 'dn' : ''}">${arrow(pd)} ${sgp(dP)}</b> · Put/Call OI <b class="${rd > 0 ? 'dn' : rd < 0 ? 'up' : ''}">${pcrP.toFixed(2)} → ${pcrL.toFixed(2)} ${arrow(rd)}</b>
+          ${hit ? `<br>${rd > 0 ? 'Put เพิ่มขึ้นเมื่อเทียบกับ Call' : 'Call เพิ่มขึ้นเมื่อเทียบกับ Put'} → ${hit.m} <span class="oc-t">${esc(hit.t)}</span>` : '<br><span class="oc-t">ราคาหรือสัดส่วนแทบไม่เปลี่ยน ยังไม่เข้าเงื่อนไข</span>'}</div>
+        <div class="oc-tb">${days.map((h, i) => { const r = h[3] / h[2], pr = i ? days[i - 1] : null; return `<div class="oc-r oc4"><span>${esc(String(h[0]).split(' ')[0])}</span><span>${esc(h[1] || '')}</span><span>ราคา ${Number(h[4]).toFixed(1)}${pr ? ` ${arrow(dir(pct(h[4], pr[4]), 0.1))}` : ''} · Put/Call ${r.toFixed(2)}${pr ? ` ${arrow(dir(pct(r, pr[3] / pr[2]), 1))}` : ''}</span></div>`; }).join('')}</div>
+        <div class="note">สัญญา OI รายวันหมดอายุทุกวัน ยอดสัญญาเทียบข้ามวันไม่ได้ จึงเทียบ "สัดส่วน" Put/Call แทน: สัดส่วนเพิ่ม = Put เพิ่มเร็วกว่า Call (ใช้แถว Put OI ▲ ในตาราง) · สัดส่วนลด = Call เพิ่มเร็วกว่า (ใช้แถว Call OI ▲) · อ่านเป็นแนวโน้มเท่านั้น</div>`;
+    }
+    if (!fut && !opt && !day) return '';
+    return `<div class="card"><h3>🔎 เปรียบเทียบ OI ตามบทความ</h3>${fut}${opt}${day}</div>`;
   }
 
   // ---------- ออปชันสัญญาวันนี้แบบสด (จาก live.js / Worker) ----------

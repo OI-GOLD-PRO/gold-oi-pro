@@ -349,7 +349,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '2.0.1';
+  const APP_VER = '2.0.2';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -552,13 +552,10 @@
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    drawSessions(w, h);
-    drawNews(w, h);
-    drawOIBars(w, h);
-    drawSpotAxis(w, h);
-    drawGoldLevels(w, h);
-    drawDrawings(w, h);
-    drawMeasure(w, h);
+    // วาดทีละชั้น: ชั้นไหนพังจะไม่ทำให้ชั้นอื่น (เช่นกรอบ OI) หายไปด้วย
+    [drawSessions, drawNews, drawOIBars, drawSpotAxis, drawGoldLevels, drawDrawings, drawMeasure].forEach(f => {
+      try { ctx.save(); f(w, h); } catch (e) { console.error(e); } finally { ctx.restore(); ctx.globalAlpha = 1; ctx.setLineDash([]); }
+    });
     overlayHooks.forEach(f => { try { f(ctx, w, h); } catch (e) { console.error(e); } });
   }
 
@@ -856,6 +853,7 @@
     const ts = chart.timeScale(), plotW = ts.width(), plotH = h - ts.height();
     const lr = ts.getVisibleLogicalRange(); if (!lr) return;
     const i0 = Math.max(1, Math.floor(lr.from) - 1), i1 = Math.min(rawBars.length - 1, Math.ceil(lr.to) + 1);
+    if (i0 > i1 || !rawBars[i0 - 1]) return; // ช่วงเปลี่ยน TF ช่วงที่มองเห็นอาจยังเป็นของ TF เดิม
     const x0 = ts.logicalToCoordinate(i0), x1 = ts.logicalToCoordinate(i0 + 1);
     const sp = (x0 !== null && x1 !== null) ? x1 - x0 : 6;
     ctx.strokeStyle = C('--muted'); ctx.globalAlpha = 0.45; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
@@ -2141,7 +2139,7 @@
 <script src="goldscalp.js"></script>
 <script src="dash.js?v=11904"></script>
 <script src="live.js?v=11601"></script>
-<script src="intraday.js?v=11902"></script>
+<script src="intraday.js?v=20002"></script>
 <script src="aitray.js?v=20001"></script>
 </body>
 </html>

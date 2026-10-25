@@ -74,7 +74,7 @@
   }
   function dropLines() { [lineV, lineU, lineD].forEach(s => { if (s) try { O.chart.removeSeries(s); } catch (e) {} }); lineV = lineU = lineD = null; R = null; O.markDirty(); }
 
-  let lastKey = '';
+  let lastKey = '', lastTf = null;
   function compute() {
     if (!cfg.on) return;
     ensureLines();
@@ -82,6 +82,8 @@
     const vol = new Map((O.rawBars || []).map(k => [Math.floor(k[0] / 1000) + TZ, k[5] || 0]));
     const key = [B.length, B[B.length - 1].time, B[B.length - 1].close, O.tf, JSON.stringify(cfg), O.oi && O.oi.rows.length].join('|');
     if (key === lastKey) return; lastKey = key;
+    // เปลี่ยน TF: ล้างเส้น VWAP ของ TF เดิมก่อน (กันจุดเวลาเก่าค้างทำให้แกนเวลา/ตำแหน่งแท่งเพี้ยน)
+    if (lastTf !== O.tf) { lastTf = O.tf; try { lineV.setData([]); lineU.setData([]); lineD.setData([]); } catch (e) {} }
     // VWAP รายวัน (เริ่ม 05:00)
     const V = [], U = [], D = [], vw = [];
     let sess = null, pv = 0, vv = 0, pv2 = 0;

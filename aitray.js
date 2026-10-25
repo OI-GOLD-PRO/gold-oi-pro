@@ -1,4 +1,4 @@
-// ถาดลับ AI Price Action: ปัดซ้ายบริเวณกลางจอด้านบนของกราฟ → ถาดสไลด์ออกมาครึ่งจอบน
+// ถาดลับ AI Price Action: ปัดซ้ายที่ข้อความ "OI · Powered by … · V…" บนหัวแอป → ถาดสไลด์ออกมาครึ่งจอบน
 // กดปุ่ม → แอนิเมชัน AI + กราฟวิ่ง → DeepSeek อ่านกราฟสด ณ ตอนนั้น (แท่งเทียน + Price Action ที่ระบบตรวจไว้ + แนว OI/EM/gmf/VWAP) → ควรเข้าออเดอร์ไหม
 (() => {
   'use strict';
@@ -269,18 +269,22 @@
   tray.addEventListener('touchstart', e => { if (e.touches.length === 1) tx = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }; }, { passive: true });
   tray.addEventListener('touchend', e => { if (!tx) return; const t = e.changedTouches[0], dx = t.clientX - tx.x, dy = t.clientY - tx.y; if (dx > 70 && Math.abs(dy) < Math.abs(dx) * 0.6 && Date.now() - tx.t < 600) close(); tx = null; }, { passive: true });
 
-  // ปัดซ้ายเร็วๆ บริเวณกลางจอ ครึ่งบนของกราฟ = เปิดถาด (คืนตำแหน่งกราฟที่ถูกลากไปให้ด้วย)
-  const ce = O.chartEl; let g = null;
-  ce.addEventListener('touchstart', e => {
-    g = null; if (e.touches.length !== 1) return;
-    const r = ce.getBoundingClientRect(), t = e.touches[0], x = t.clientX - r.left, y = t.clientY - r.top;
-    if (y > r.height * 0.45 || x < r.width * 0.15 || x > r.width * 0.85) return;
-    g = { x: t.clientX, y: t.clientY, t: Date.now(), range: O.chart.timeScale().getVisibleLogicalRange() };
-  }, { passive: true, capture: true });
-  ce.addEventListener('touchend', e => {
-    if (!g) return; const t = e.changedTouches[0], dx = t.clientX - g.x, dy = t.clientY - g.y, dt = Date.now() - g.t, rg = g.range; g = null;
-    if (dx < -80 && Math.abs(dy) < Math.abs(dx) * 0.5 && dt < 450) { open(); if (rg) [0, 120, 400].forEach(ms => setTimeout(() => { try { O.chart.timeScale().setVisibleLogicalRange(rg); } catch (er) {} }, ms)); }
-  }, { passive: true, capture: true });
+  // ปัดซ้ายที่ข้อความ "OI · Powered by … · V…" บนหัวแอป = เปิดถาด (ใช้ได้ทั้งนิ้วและเมาส์)
+  const src = $('src');
+  if (src) {
+    const st2 = document.createElement('style');
+    st2.textContent = '#src { touch-action: pan-y; padding: 10px 0; margin: -10px 0; cursor: grab; -webkit-user-select: none; user-select: none; }';
+    document.head.appendChild(st2);
+    let g = null;
+    src.addEventListener('pointerdown', e => { g = { x: e.clientX, y: e.clientY, t: Date.now() }; }, { passive: true });
+    const end = e => {
+      if (!g) return; const dx = e.clientX - g.x, dy = e.clientY - g.y, dt = Date.now() - g.t; g = null;
+      if (dx < -40 && Math.abs(dy) < Math.abs(dx) * 0.7 && dt < 800) open();
+    };
+    src.addEventListener('pointerup', end, { passive: true });
+    src.addEventListener('pointercancel', end, { passive: true });
+    src.addEventListener('pointerleave', e => { if (g && e.pointerType === 'mouse') end(e); }, { passive: true });
+  }
 
   window.OI_aitray = { open, close, get result() { return result; }, snapshot };
 })();

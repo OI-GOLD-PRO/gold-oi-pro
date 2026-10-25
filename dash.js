@@ -452,7 +452,9 @@
     const now = Date.now(), th = ms => new Date(ms + 7 * 3600e3);
     const d0 = th(now); const dow = (d0.getUTCDay() + 6) % 7;
     const monTH = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), d0.getUTCDate() - dow) - 7 * 3600e3;
-    const list = cal.filter(e => e.ms >= Math.min(monTH, now - 24 * 3600e3) && e.ms <= now + 8 * 864e5);
+    // ส.–อา.: แสดงสัปดาห์หน้า (ผลย้อนหลังแค่ 24 ชม.) · จ.–ศ.: ตั้งแต่วันจันทร์ของสัปดาห์นี้
+    const start = dow >= 5 ? now - 24 * 3600e3 : monTH;
+    const list = cal.filter(e => e.ms >= start && e.ms <= now + 8 * 864e5);
     if (!list.length) return '';
     const days = new Map();
     list.forEach(e => { const k = th(e.ms).toISOString().slice(0, 10); if (!days.has(k)) days.set(k, []); days.get(k).push(e); });

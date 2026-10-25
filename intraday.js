@@ -29,6 +29,19 @@
   // เวลาไทยบนแกน (วินาที) → อยู่ในโซนห้ามเทรดไหม
   const inNews = tChart => { const tu = tChart - TZ; return news.some(n => tu >= n - cfg.nb * 60 && tu <= n + cfg.na * 60); };
 
+  // ---------- ระดับของวันเทรดย้อนหลัง (Worker บันทึกตอนเปิดวัน 05:00 น.) ----------
+  let hist = new Map();
+  async function loadHist() {
+    try {
+      const j = await (await fetch('https://gc-yahoo.oigoldpro.workers.dev/levels', { cache: 'no-store' })).json();
+      hist = new Map((j.hist || []).map(h => [h.sess, h])); lastKey = '';
+    } catch (e) {}
+  }
+  loadHist(); setInterval(loadHist, 15 * 60e3);
+  // เลขวันเทรด (นับจากแกนเวลาไทย) → yyyymmdd ของวันที่เริ่ม 05:00 น.
+  const sessYmd = s => { const d = new Date((s * 86400 + SESS) * 1000); return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate(); };
+  const histLevels = h => ({ cw: h.cw, pw: h.pw, em: h.openEM ? { top: h.openF + h.openEM, bot: h.openF - h.openEM } : null, flip: h.M ?? null, past: true });
+
   // ---------- ระดับราคา ----------
   function levels(px) {
     const L = window.OILive && window.OILive.calc, oi = O.oi;
@@ -84,14 +97,17 @@
       } else { if (!(V.length && V[V.length - 1].time === b.time)) { V.push({ time: b.time }); U.push({ time: b.time }); D.push({ time: b.time }); } vw[i] = null; }
     });
     try { lineV.setData(V); lineU.setData(U); lineD.setData(D); } catch (e) {}
-    // สัญญาณ: เฉพาะ M15/H1 · เฉพาะแท่งที่ปิดแล้วของวันเทรดปัจจุบันและวันก่อน
+    // สัญญาณ: เฉพาะ M15/H1 · วันนี้ใช้ระดับสด · วันก่อนหน้าใช้ระดับที่บันทึกไว้ของวันนั้น (ไม่มีบันทึก = ไม่แสดง)
     const sigs = [];
-    const px = B[B.length - 1].close, L = levels(px);
+    const px = B[B.length - 1].close, Lnow = levels(px);
+    let L = Lnow, nPast = 0;
     if (cfg.sig && (O.tf === '15m' || O.tf === '1h')) {
       const todayS = Math.floor((B[B.length - 1].time - SESS) / 86400), tol = 2;
       for (let i = 1; i < B.length - 1; i++) {
         const b = B[i], s = Math.floor((b.time - SESS) / 86400);
-        if (s !== todayS || vw[i] === null || inNews(b.time)) continue; // ระดับ EM/Wall เป็นของวันนี้ จึงหาสัญญาณเฉพาะวันเทรดปัจจุบัน
+        if (vw[i] === null || inNews(b.time)) continue;
+        if (s === todayS) L = Lnow;
+        else { const h = hist.get(sessYmd(s)); if (!h) continue; L = histLevels(h); }
         const rng = b.high - b.low; if (rng < 1.5) continue;
         const up = b.high - Math.max(b.open, b.close), dn = Math.min(b.open, b.close) - b.low;
         const topLv = [L.cw, L.em && L.em.top].filter(v => v !== null && v !== undefined), botLv = [L.pw, L.em && L.em.bot].filter(v => v !== null && v !== undefined);
@@ -100,16 +116,18 @@
           const sl = b.high + Math.max(1.5, rng * 0.15), e = b.close;
           const t2c = [L.pw, L.em && L.em.bot].filter(v => v !== null && v !== undefined && v < e - 2).sort((a, c) => c - a)[0];
           const t1 = vw[i] < e - 1 ? vw[i] : (t2c !== undefined ? (e + t2c) / 2 : e - (sl - e));
+          if (L.past) nPast++;
           sigs.push({ i, time: b.time, dir: -1, e, sl, t1, t2: t2c !== undefined ? t2c : e - 2 * (sl - e), lvl: hitTop, star: L.flip !== null && e < L.flip });
         } else if (hitBot !== undefined && dn >= 0.6 * rng && b.close > vw[i]) {
           const sl = b.low - Math.max(1.5, rng * 0.15), e = b.close;
           const t2c = [L.cw, L.em && L.em.top].filter(v => v !== null && v !== undefined && v > e + 2).sort((a, c) => a - c)[0];
           const t1 = vw[i] > e + 1 ? vw[i] : (t2c !== undefined ? (e + t2c) / 2 : e + (e - sl));
+          if (L.past) nPast++;
           sigs.push({ i, time: b.time, dir: 1, e, sl, t1, t2: t2c !== undefined ? t2c : e + 2 * (e - sl), lvl: hitBot, star: L.flip !== null && e > L.flip });
         }
       }
     }
-    R = { B, sigs, L, vwapNow: vw[vw.length - 1] };
+    R = { B, sigs, L: Lnow, nPast, vwapNow: vw[vw.length - 1] };
     // แจ้งเตือนสัญญาณใหม่บนแท่งที่เพิ่งปิด
     const last = sigs[sigs.length - 1];
     if (last && last.i === B.length - 2) {
@@ -179,7 +197,7 @@
     const el = $('ivInfo'); if (!el) return;
     if (!cfg.on || !R) { el.textContent = ''; return; }
     const tfOk = O.tf === '15m' || O.tf === '1h';
-    el.textContent = `VWAP ${R.vwapNow ? R.vwapNow.toFixed(2) : '–'} · Call Wall ${R.L.cw ?? '–'} · Put Wall ${R.L.pw ?? '–'}` + (cfg.sig ? (tfOk ? ` · ${R.sigs.length} สัญญาณ` : ' · ลูกศรแสดงเฉพาะ M15/H1') : '');
+    el.textContent = `VWAP ${R.vwapNow ? R.vwapNow.toFixed(2) : '–'} · Call Wall ${R.L.cw ?? '–'} · Put Wall ${R.L.pw ?? '–'}` + (cfg.sig ? (tfOk ? ` · ${R.sigs.length} สัญญาณ` + (R.nPast ? ` (ย้อนหลัง ${R.nPast})` : '') + ` · บันทึกระดับ ${hist.size} วัน` : ' · ลูกศรแสดงเฉพาะ M15/H1') : '');
   }
   function section() {
     const d = document.createElement('div');

@@ -91,6 +91,7 @@
   #dash .cleg i { display: inline-block; width: 10px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
   #dash .msg { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px; }
   #dash .note { font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+  @supports (-webkit-touch-callout: none) { #dash { padding-top: calc(env(safe-area-inset-top, 0px) + 28px) !important; } #aiwrap { padding-top: env(safe-area-inset-top, 0px); } }
   @media (max-width: 440px) { #dash .dtt { display: none; } #dash .dtop { gap: 6px; padding: 10px 10px 8px; } #dash .dtabs button { padding: 5px 8px; } }
   #dash .aibtn { background: linear-gradient(135deg, #1b2a4a, #2a1b4a); border: 1px solid #5b7cff; color: #cfe0ff; border-radius: 10px; padding: 6px 10px; font: 600 12px var(--sans); white-space: nowrap; box-shadow: 0 0 10px rgba(91,124,255,.35); }
   #dash .aibtn:active { transform: scale(.96); }
@@ -121,6 +122,14 @@
   #aiwrap .tm { font: 10.5px var(--mono); color: #6f7ea8; margin-top: 6px; position: relative; }
   #aiwrap .err { color: #ff8a9a; font-size: 12.5px; margin-top: 10px; line-height: 1.5; position: relative; }
   #aiwrap button { margin-top: 12px; background: #1b2a4a; border: 1px solid #5b7cff; color: #cfe0ff; border-radius: 10px; padding: 7px 16px; font: 600 12px var(--sans); position: relative; }
+  #dash .cal { display: grid; gap: 10px; }
+  #dash .cal .day { font: 600 12px var(--sans); color: var(--gold); margin-bottom: 4px; }
+  #dash .cal .ev { display: grid; grid-template-columns: 42px 12px 1fr; gap: 6px; align-items: start; font-size: 12px; line-height: 1.45; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+  #dash .cal .ev.past { opacity: .6; }
+  #dash .cal .ev .t { font: 11px var(--mono); color: var(--muted); padding-top: 1px; }
+  #dash .cal .ev .d { width: 9px; height: 9px; border-radius: 50%; margin-top: 4px; }
+  #dash .cal .ev small { display: block; color: var(--muted); font: 10.5px var(--mono); }
+  #dash .cal .ev b.g { color: var(--put); } #dash .cal .ev b.b { color: var(--call); }
   #dash .cf { border-radius: 12px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; }
   #dash .cf.bull { background: rgba(47,191,143,.12); border: 1px solid rgba(47,191,143,.5); }
   #dash .cf.bear { background: rgba(229,87,107,.12); border: 1px solid rgba(229,87,107,.5); }
@@ -232,6 +241,7 @@
   async function load(force) {
     $('dBody').innerHTML = '<div class="msg">กำลังโหลดข้อมูลล่าสุดจากชีต…</div>';
     loadCOT(force).then(() => { pubCot(); if (!box.hidden && cur === 'gold') show(); });
+    loadCal().then(() => { if (!box.hidden) show(); });
     await Promise.all(Object.keys(SY).map(async s => {
       if (!force && cache[s]) return;
       try { cache[s] = { d: await O.fetchData(s), at: new Date() }; } catch (e) { cache[s] = { err: e.message || String(e) }; }
@@ -427,6 +437,39 @@
       <div class="note" style="margin-top:8px">gmf itd สด = OI ของวัน + IV สด + เวลาที่เหลือ คำนวณทุก 1 นาที · แบบ "ปรับตามซื้อ/ขาย" ใช้ยอดซื้อ/ขายวันนี้แทนสมมติฐาน Call+/Put− (เป็นค่าประมาณ) · ป้ายบนกราฟ C▲ = Call ถูกซื้อ, C▼ = Call ถูกขาย, P▲/P▼ เช่นกัน, 🔥 = เงินใหม่ (volume ≥ OI และเทรดหนา)</div></div>`;
   }
 
+  // ---------- ปฏิทินข่าว USD ทั้งสัปดาห์ (news.json จาก GitHub Actions: Forex Factory + FXStreet) ----------
+  let cal = null;
+  async function loadCal() {
+    try {
+      const r = await fetch(`https://raw.githubusercontent.com/${location.hostname.endsWith('.github.io') ? location.hostname.split('.')[0] : 'OI-GOLD-PRO'}/gold-oi-pro/main/news.json?t=${Math.floor(Date.now() / 120000)}`, { cache: 'no-store' });
+      const j = await r.json();
+      cal = (j.events || []).filter(e => e.c === 'USD').map(e => ({ ...e, ms: Date.parse(e.date) })).filter(e => isFinite(e.ms)).sort((a, b) => a.ms - b.ms);
+    } catch (e) { cal = cal || null; }
+  }
+  function calCard() {
+    if (!cal || !cal.length) return '';
+    // ตั้งแต่วันจันทร์ของสัปดาห์นี้ (เวลาไทย) ถึง 7 วันข้างหน้า
+    const now = Date.now(), th = ms => new Date(ms + 7 * 3600e3);
+    const d0 = th(now); const dow = (d0.getUTCDay() + 6) % 7;
+    const monTH = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), d0.getUTCDate() - dow) - 7 * 3600e3;
+    const list = cal.filter(e => e.ms >= Math.min(monTH, now - 24 * 3600e3) && e.ms <= now + 8 * 864e5);
+    if (!list.length) return '';
+    const days = new Map();
+    list.forEach(e => { const k = th(e.ms).toISOString().slice(0, 10); if (!days.has(k)) days.set(k, []); days.get(k).push(e); });
+    const dn = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+    const html = [...days.entries()].map(([k, evs]) => {
+      const d = new Date(k + 'T00:00:00Z');
+      const isToday = k === th(now).toISOString().slice(0, 10);
+      return `<div><div class="day">${isToday ? '▶ วันนี้ · ' : ''}${dn[d.getUTCDay()]} ${d.getUTCDate()}/${d.getUTCMonth() + 1}</div>${evs.map(e => {
+        const t = th(e.ms).toISOString().slice(11, 16), past = e.ms <= now;
+        const res = e.actual ? `ออก <b class="${e.better === true ? 'g' : e.better === false ? 'b' : ''}">${esc(e.actual)}</b> (คาด ${esc(e.forecast || '–')})${e.better === true ? ' · ดีกว่าคาด → หนุนดอลลาร์ กดทอง' : e.better === false ? ' · แย่กว่าคาด → หนุนทอง' : ''}`
+          : `${past ? 'รอผล' : 'คาด'} ${esc(e.forecast || '–')} · ก่อนหน้า ${esc(e.previous || '–')}`;
+        return `<div class="ev${past ? ' past' : ''}"><span class="t">${t}</span><span class="d" style="background:${e.i === 'H' ? '#ef4444' : '#f59e0b'}"></span><div>${esc(e.title)}<small>${res}</small></div></div>`;
+      }).join('')}</div>`;
+    }).join('');
+    return `<div class="card"><h3>📅 ปฏิทินข่าว USD สัปดาห์นี้ (เวลาไทย · 🔴 แรง 🟠 กลาง)</h3><div class="cal">${html}</div><div class="note" style="margin-top:6px">ที่มา Forex Factory + FXStreet · อัปเดตอัตโนมัติ · ผลจริงขึ้นหลังข่าวออกไม่กี่นาที</div></div>`;
+  }
+
   // ---------- คำนวณจากข้อมูล OI + Volume ----------
   function calc(d) {
     const map = new Map();
@@ -561,11 +604,12 @@
     if (A && (A.summary || A.watch)) parts.push(`<div class="card"><h3>สรุปแนวโน้ม</h3><div style="font-size:13px;line-height:1.6">${esc(A.summary || '')}</div>${A.watch ? `<div class="alert" style="margin-top:10px">🎯 ${esc(A.watch)}</div>` : ''}</div>`);
 
     // 9) ข่าว
-    if (A && ((A.news && A.news.length) || (A.events && A.events.length))) {
+    if (A && ((A.news && A.news.length) || (A.events && A.events.length && !(cal && cal.length)))) {
       const im = v => v > 0 ? '<span class="im pos">หนุนขึ้น</span>' : v < 0 ? '<span class="im neg">กดดันลง</span>' : '<span class="im neu">กลาง</span>';
       parts.push(`<div class="card"><h3>📰 ข่าวที่มีผล</h3><div class="news">${(A.news || []).map(n => `<div class="nw">${im(n.imp)}<div>${esc(n.t)}<br><a href="${esc(n.url || '#')}" target="_blank" rel="noopener">${esc(n.src || '')} · ${esc(n.time || '')}</a></div></div>`).join('')}</div>
-        ${A.events && A.events.length ? `<h3 style="margin-top:12px">ปฏิทินที่ต้องจับตา</h3><ul>${A.events.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`);
+        ${A.events && A.events.length && !(cal && cal.length) ? `<h3 style="margin-top:12px">ปฏิทินที่ต้องจับตา</h3><ul>${A.events.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>`);
     }
+    parts.push(calCard());
 
     // 10) กราฟย้อนหลัง
     if (A && ((A.px && A.px.length > 1) || (A.hist && A.hist.length))) parts.push(`<div class="card chart"><h3>ประวัติราคา futures และ OI รวม (จาก log)</h3>${histSvg(A, S)}</div>`);

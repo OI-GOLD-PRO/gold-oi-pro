@@ -132,7 +132,8 @@
     levels.sort((a, b) => b.p - a.p);
     const last = B.slice(-40);
     const sw = closed.slice(-30), hi = sw.reduce((a, b) => b.high > a.high ? b : a), lo = sw.reduce((a, b) => b.low < a.low ? b : a);
-    const nowMs = Date.now(), nx = news.filter(e => e.ms > nowMs - 30 * 60e3).sort((a, b) => a.ms - b.ms)[0];
+    const nowMs = Date.now(), nx = news.filter(e => e.ms > nowMs - 30 * 60e3 && e.ms < nowMs + 3 * 3600e3).sort((a, b) => a.ms - b.ms)[0];
+    const lastBarAgeMin = Math.round((nowMs / 1000 + TZ - B[B.length - 1].time) / 60);
     return {
       sym: (O.cfg && O.cfg.name) || 'XAUUSD', tf: TFN[O.tf] || O.tf, time_th: new Date(nowMs + TZ * 1000).toISOString().slice(0, 16).replace('T', ' '),
       price: Math.round(px * 100) / 100, atr: Math.round(atr * 100) / 100,
@@ -141,6 +142,7 @@
       swing_30: { high: hi.high, high_time: hhmm(hi.time), low: lo.low, low_time: hhmm(lo.time) },
       patterns: patterns(B, atr, levels),
       levels, nearest_above: levels.filter(l => l.p > px).slice(-1)[0] || null, nearest_below: levels.filter(l => l.p < px)[0] || null,
+      market: lastBarAgeMin > 30 ? `ตลาดปิดอยู่ ข้อมูลล่าสุดเมื่อ ${lastBarAgeMin} นาทีก่อน (วิเคราะห์เพื่อเตรียมแผนตอนตลาดเปิด)` : 'ตลาดเปิด ข้อมูลสด',
       red_news: nx ? { title: nx.t, minutes_from_now: Math.round((nx.ms - nowMs) / 60e3), forecast: nx.f || null } : null,
       bars_note: 'bars: [เวลาไทย, open, high, low, close, volume] เก่า→ใหม่ แท่งสุดท้ายยังไม่ปิด',
       bars: last.map(b => [hhmm(b.time), +b.open.toFixed(2), +b.high.toFixed(2), +b.low.toFixed(2), +b.close.toFixed(2), vol.get(b.time) || 0]),

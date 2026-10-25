@@ -453,7 +453,7 @@
     try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
     return st;
   }
-  function oiCompareCard(d, cfg, m, ref) {
+  function oiCompareCard(d, cfg, m, ref, A) {
     const dir = (v, th) => v === null || !isFinite(v) ? 0 : v > th ? 1 : v < -th ? -1 : 0;
     const arrow = x => x > 0 ? '▲' : x < 0 ? '▼' : '▬';
     const pct = (a, b) => b ? (a - b) / b * 100 : null;
@@ -472,21 +472,30 @@
         <div class="note">ตารางต้นฉบับกำหนด Volume "สูง" ทุกแถว (OI Futures ใช้รายงาน CFTC รายสัปดาห์ จึงเป็นภาพรวมสัปดาห์ ไม่ใช่รายวัน)</div>`;
     }
     // ---- Options: ราคา × OI ของ Call / Put เทียบการอัพเดทครั้งก่อน ----
-    const st = oiSnap(d, cfg, m, ref);
+    // ก่อนอื่นใช้ประวัติที่ AI บันทึกไว้ใน dashboard (hist: [เวลา, สัญญา, Call OI รวม, Put OI รวม, ราคา futures]) เฉพาะสัญญาเดียวกัน
+    // ถ้าไม่มี ใช้ยอดที่แอปบันทึกในเครื่องนี้แทน
+    let st = null;
+    const ctr = String(cfg.contract || '');
+    const ch = (A && A.hist || []).filter(h => h && String(h[1]) === ctr && isFinite(h[2]) && isFinite(h[3]) && isFinite(h[4]));
+    const diff = (a, b) => b ? Math.abs(a - b) / b : 0;
+    let pv = null;
+    for (let i = ch.length - 1; i >= 0; i--) { if (diff(m.C, ch[i][2]) > 0.002 || diff(m.P, ch[i][3]) > 0.002) { pv = ch[i]; break; } }
+    if (pv && ref !== null) st = { prev: { stamp: String(pv[0]), c: pv[2], p: pv[3], px: Number(pv[4]) }, cur: { stamp: 'ตอนนี้', c: m.C, p: m.P, px: ref } };
+    else { const sn = oiSnap(d, cfg, m, ref); if (sn && sn.prev) st = sn; }
     let opt = '';
     if (st && st.prev && st.cur.px !== null && st.prev.px !== null && ref !== null) {
       const dP = pct(st.cur.px, st.prev.px), dC = pct(st.cur.c, st.prev.c), dPu = pct(st.cur.p, st.prev.p);
       const pd = dir(dP, 0.1), cd = dir(dC, 0.5), ud = dir(dPu, 0.5);
       const hc = pd && cd ? OPT_T.find(r => r.y === 'C' && r.p === pd && r.o === cd) : null;
       const hp = pd && ud ? OPT_T.find(r => r.y === 'P' && r.p === pd && r.o === ud) : null;
-      opt = `<h3 style="margin-top:12px">② Options: ราคา × OI Call/Put <span style="font-weight:400;color:var(--muted)">(เทียบอัพเดทก่อน ${esc(st.prev.stamp)} → ${esc(st.cur.stamp)})</span></h3>
+      opt = `<h3 style="margin-top:12px">② Options: ราคา × OI Call/Put <span style="font-weight:400;color:var(--muted)">(เทียบ ${esc(st.prev.stamp)} → ${esc(st.cur.stamp)})</span></h3>
         <div class="oc-now">ราคา <b class="${pd > 0 ? 'up' : pd < 0 ? 'dn' : ''}">${arrow(pd)} ${sgp(dP)}</b><br>
           Call OI <b class="${cd > 0 ? 'up' : cd < 0 ? 'dn' : ''}">${arrow(cd)} ${sgp(dC)}</b>${hc ? ` → ${hc.m} ${esc(hc.t)}` : ' → ยังไม่เข้าเงื่อนไข'}<br>
           Put OI <b class="${ud > 0 ? 'dn' : ud < 0 ? 'up' : ''}">${arrow(ud)} ${sgp(dPu)}</b>${hp ? ` → ${hp.m} ${esc(hp.t)}` : ' → ยังไม่เข้าเงื่อนไข'}</div>
         <div class="oc-tb">${OPT_T.map(r => `<div class="oc-r oc3${r === hc || r === hp ? ' on' : ''}"><span>${r.p > 0 ? 'ราคาพุ่ง ▲' : 'ราคาดิ่ง ▼'}</span><span>${r.y === 'C' ? 'Call' : 'Put'} OI ${r.o > 0 ? '▲' : '▼'}</span><span>${esc(r.t)}</span></div>`).join('')}</div>
-        <div class="note">เทียบ OI รวมทุก strike ของสัญญา ${esc(cfg.contract || '–')} ระหว่างการอัพเดทล่าสุดกับครั้งก่อนที่เปิดดูบนเครื่องนี้ · ถ้าสัญญาเปลี่ยนจะเริ่มเทียบใหม่</div>`;
+        <div class="note">เทียบ OI รวมทุก strike ของสัญญา ${esc(cfg.contract || '–')} กับบันทึกครั้งก่อนที่ OI เปลี่ยน (ประวัติจากผลวิเคราะห์ AI) · สัญญารายวันหมดอายุทุกวัน จึงเทียบข้ามสัญญาไม่ได้ ต้องเป็นสัญญาเดียวกัน (OI เปลี่ยนตอนเปิดวันกับหลังตลาดปิด)</div>`;
     } else {
-      opt = `<h3 style="margin-top:12px">② Options: ราคา × OI Call/Put</h3><div class="note">เก็บยอด OI ของการอัพเดทนี้ไว้แล้ว (${esc(cfg.contract || '–')} · ${esc(d.stamp || cfg.offset_time || '–')}) จะเปรียบเทียบได้เมื่อมีการอัพเดท OI ครั้งถัดไป (ต้องเปิดแอปบนเครื่องนี้ทั้งสองรอบ)</div>`;
+      opt = `<h3 style="margin-top:12px">② Options: ราคา × OI Call/Put</h3><div class="note">ยังไม่มีบันทึกก่อนหน้าของสัญญา ${esc(cfg.contract || '–')} ที่ OI ต่างจากตอนนี้ (OI เปลี่ยนแค่ตอนเปิดวันกับหลังตลาดปิด) จะเทียบได้เมื่อ OI สัญญานี้ถูกอัพเดทรอบถัดไป</div>`;
     }
     if (!fut && !opt) return '';
     return `<div class="card"><h3>🔎 เปรียบเทียบ OI ตามบทความ</h3>${fut}${opt}</div>`;
@@ -664,7 +673,7 @@
     }
 
     // 1.5) COT + Gamma (เฉพาะทองคำ)
-    if (cur === 'gold') { parts.push(cotCard(price, cfg)); parts.push(cotGroupsCard()); { const gref = isFinite(gcSheet) && gcSheet > 0 ? gcSheet : price; parts.push(oiBarsCard(gref, cfg)); parts.push(oiCompareCard(d, cfg, m, gref)); } parts.push(liveCard(price)); }
+    if (cur === 'gold') { parts.push(cotCard(price, cfg)); parts.push(cotGroupsCard()); { const gref = isFinite(gcSheet) && gcSheet > 0 ? gcSheet : price; parts.push(oiBarsCard(gref, cfg)); parts.push(oiCompareCard(d, cfg, m, gref, A)); } parts.push(liveCard(price)); }
 
     // 2) ป้ายเตือนราคาใกล้แนว
     if (price !== null) {

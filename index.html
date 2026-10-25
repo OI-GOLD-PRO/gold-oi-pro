@@ -252,7 +252,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.19.06';
+  const APP_VER = '1.20.01';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1023,6 +1023,7 @@
 
   function fire(r, price, kind) {
     hit = { strike: r.strike, until: Date.now() + 60000 }; dirty = true;
+    if (pushOn) return; // เปิด Web Push แล้ว: เซิร์ฟเวอร์เป็นคนเตือน (กันเตือนซ้ำ 2 ทาง)
     beep();
     try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
     const side = zRank(r) ? (r.c >= r.p ? 'แนวต้าน' : 'แนวรับ') + (isVolLine(r) ? ' + Vol' : '') : 'Vol วันนี้';
@@ -1058,7 +1059,7 @@
   // ข่าวแดง USD: เตือนก่อนออก 10 นาที (ครั้งเดียวต่อเวลาข่าว)
   const NEWS_WARN = 10 * 60000, newsWarned = new Set();
   function checkNewsAlert() {
-    if (!alertsOn || !news.length) return;
+    if (!alertsOn || pushOn || !news.length) return;
     const now = Date.now();
     const due = news.filter(e => e.i === 'H' && e.ms - now <= NEWS_WARN && e.ms - now > 0 && !newsWarned.has(e.ms));
     if (!due.length) return;
@@ -1076,6 +1077,48 @@
     try { if (alertsOn && 'wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
   }
 
+  // ---------- Web Push: เตือนได้แม้ปิดแอป (Worker เช็กทุก 2 นาทีแล้วส่งมา) ----------
+  const PUSH_API = 'https://gc-yahoo.oigoldpro.workers.dev/push/';
+  let pushOn = false, swReg = null;
+  try { pushOn = localStorage.getItem('oi_push') === '1'; } catch (e) {}
+  const pushOK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const isStandalone = () => window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  const keyBytes = b64 => { const s = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((b64.length + 3) % 4)); return Uint8Array.from(s, ch => ch.charCodeAt(0)); };
+  const postSub = (path, sub, off) => fetch(PUSH_API + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sub: sub.toJSON(), off: !!off }) }).then(r => r.json());
+  if (pushOK() && !EMBED) {
+    navigator.serviceWorker.register('sw.js').then(async reg => {
+      swReg = reg;
+      const sub = await reg.pushManager.getSubscription();
+      pushOn = !!sub && Notification.permission === 'granted';
+      try { localStorage.setItem('oi_push', pushOn ? '1' : '0'); } catch (e) {}
+      if (sub) postSub('sub', sub).catch(() => {}); // ยืนยันกับเซิร์ฟเวอร์ทุกครั้งที่เปิดแอป
+    }).catch(() => {});
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (!e.data || e.data.type !== 'oi-push' || !alertsOn) return;
+      beep(); showToast(`<b>${esc(e.data.title)}</b><br>${esc(e.data.body).replace(/\n/g, '<br>')}`);
+    });
+  }
+  async function enablePush() {
+    if (!pushOK()) { showToast(/iP(hone|ad|od)/.test(navigator.userAgent) && !isStandalone() ? '📲 iPhone: ต้องเปิดจากไอคอนบนหน้าโฮมถึงจะรับแจ้งเตือนตอนปิดแอปได้ (Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม)' : 'เครื่องนี้ไม่รองรับแจ้งเตือนตอนปิดแอป · ใช้ Telegram แทนได้', 8000); return; }
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { showToast('ไม่ได้อนุญาตแจ้งเตือน · เปิดได้ที่ ตั้งค่า → การแจ้งเตือน → OI Gold Pro', 8000); return; }
+      const reg = swReg || await navigator.serviceWorker.register('sw.js');
+      await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) { const { key } = await (await fetch(PUSH_API + 'key', { cache: 'no-store' })).json(); sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) }); }
+      const r = await postSub('sub', sub);
+      if (!r.ok) throw new Error(r.error || 'sub');
+      pushOn = true; try { localStorage.setItem('oi_push', '1'); } catch (e) {}
+      postSub('test', sub).catch(() => {});
+      showToast('📲 เปิดแจ้งเตือนแบบปิดแอปแล้ว · กำลังส่งข้อความทดสอบเข้าเครื่อง', 6000);
+    } catch (e) { showToast('เปิดแจ้งเตือนแบบปิดแอปไม่สำเร็จ: ' + esc(e.message || e), 8000); }
+  }
+  async function disablePush() {
+    pushOn = false; try { localStorage.setItem('oi_push', '0'); } catch (e) {}
+    try { const reg = swReg || await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription(); if (sub) { await postSub('sub', sub, true).catch(() => {}); await sub.unsubscribe(); } } catch (e) {}
+  }
+
   function paintBell() {
     const b = $('bell'); b.textContent = alertsOn ? '🔔' : '🔕'; b.classList.toggle('on', alertsOn);
   }
@@ -1088,11 +1131,13 @@
       resetArming(lastClose, true);
       beep();
       keepAwake();
-      showToast(`🔔 เปิดแจ้งเตือนแล้ว: ${alertZones().length} โซนที่ไฮไลต์ + เส้น Volume เตือนเมื่อราคาถึงโซน (ซ้ำได้ทุก 1 ชม.) · M5 ปิดพ้นโซนเกิน $2 (ครั้งเดียว) · ข่าวแดงก่อนออก 10 นาที · เปิดแอปค้างไว้เพื่อให้เตือนได้`);
+      showToast(`🔔 เปิดแจ้งเตือนแล้ว: ${alertZones().length} โซนที่ไฮไลต์ + เส้น Volume เตือนเมื่อราคาถึงโซน (ซ้ำได้ทุก 1 ชม.) · M5 ปิดพ้นโซนเกิน $2 (ครั้งเดียว) · ข่าวแดงก่อนออก 10 นาที`);
+      if (!EMBED) enablePush();
     } else {
       try { wakeLock && wakeLock.release(); } catch (e) {}
       wakeLock = null;
       showToast('🔕 ปิดแจ้งเตือนแล้ว');
+      if (pushOn) disablePush();
     }
     paintBell();
   });

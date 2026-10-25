@@ -188,10 +188,18 @@ function runAI_(reason) {
 function aiWeb_(e) {
   const p = (e && e.parameter) || {};
   const out = o => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
-  if (p.api !== 'ai') return out({ error: 'bad api' });
+  if (p.api !== 'ai' && p.api !== 'ai_pa') return out({ error: 'bad api' });
   let ok = false;
   try { const r = JSON.parse(doGet({ parameter: { api: 'login', code: p.code || '' } }).getContent()); ok = !!(r && (r.ok || r.legacy)); } catch (err) { ok = false; }
   if (!ok) return out({ error: 'auth' });
+  if (p.api === 'ai_pa') {
+    let snap = null; try { snap = JSON.parse((e.postData && e.postData.contents) || 'null'); } catch (err) {}
+    if (!snap || !Array.isArray(snap.bars) || snap.bars.length < 10) return out({ error: 'ข้อมูลกราฟไม่พอ' });
+    const cache = CacheService.getScriptCache(), ck = 'pa_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(p.code))).slice(0, 16);
+    if (cache.get(ck)) return out({ error: 'กดถี่เกินไป รอ 20 วินาทีแล้วลองใหม่' });
+    cache.put(ck, '1', 20);
+    try { return out({ ok: true, pa: aiPA_(snap) }); } catch (err) { return out({ error: String(err.message || err).slice(0, 300) }); }
+  }
   const cache = CacheService.getScriptCache();
   const last = cache.get('ai_web_last');
   if (last) return out({ ok: true, cached: true, dash: JSON.parse(last) });
@@ -206,4 +214,43 @@ function aiWeb_(e) {
   } catch (err) {
     return out({ error: String(err.message || err).slice(0, 300) });
   } finally { lock.releaseLock(); }
+}
+
+
+// ---------- ถาดลับ: AI อ่าน Price Action ของกราฟสด ณ ตอนกด แล้วตัดสินว่าควรเข้าออเดอร์ไหม ----------
+// snap มาจากแอป: { sym, tf, time_th, price, atr, bars: [[t,o,h,l,c,v]...] (เก่า→ใหม่, แท่งสุดท้าย = กำลังวิ่ง), patterns, levels, vwap, ema20, ema50, swing }
+function aiPA_(snap) {
+  const key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY');
+  if (!key) throw new Error('ยังไม่ได้ใส่ DEEPSEEK_API_KEY');
+  const price = Number(snap.price), atr = Math.max(0.5, Number(snap.atr) || 3);
+  const sys = [
+    'คุณคือเทรดเดอร์ Price Action ทองคำมืออาชีพ วิเคราะห์จากกราฟสดที่ส่งมา ณ ตอนนี้ แล้วตัดสินว่าควรเข้าออเดอร์ตอนนี้ไหม',
+    'ใช้เฉพาะตัวเลขในข้อมูล ห้ามแต่งราคาใหม่ · patterns คือรูปแบบแท่งเทียนที่ระบบตรวจไว้แล้ว (เชื่อถือได้) ให้ใช้เป็นหลัก ห้ามอ้างรูปแบบที่ไม่มีใน patterns',
+    'bars เรียงเก่า→ใหม่ แท่งสุดท้ายยังไม่ปิด (forming) อย่าตัดสินจากแท่งที่ยังไม่ปิดอย่างเดียว',
+    'levels คือแนวจาก Options (Call Wall = แนวต้าน, Put Wall = แนวรับ, กรอบ EM, gmf, Max Pain, โซน OI, เส้น Volume) ราคาเหนือ gmf M มักแกว่งกรอบ ใต้ gmf M มักวิ่งแรงตามทาง',
+    'หลักตัดสิน: เข้าเฉพาะเมื่อมี Price Action ชัดที่แนวสำคัญ และ R:R ถึง TP2 อย่างน้อย 1:1.5 · ถ้าไม่ชัด อยู่กลางกรอบ หรือใกล้ข่าวแดง ให้ WAIT',
+    'SL ต้องอยู่หลังไส้/โครงสร้าง ห่างจาก entry 0.5-2.5 เท่า ATR · TP1/TP2 ใช้แนวที่มีในข้อมูลหรือ VWAP',
+    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: action ("BUY"|"SELL"|"WAIT"), confidence (0-100), pattern (ชื่อ Price Action ที่เห็นสั้นๆ หรือ "ไม่มีสัญญาณชัด"), pa (อธิบาย Price Action แท่งล่าสุด 1-2 ประโยค), context (ราคาอยู่ตรงไหนเทียบแนวสำคัญ 1 ประโยค), entry, sl, tp1, tp2 (ตัวเลข; ถ้า WAIT ให้ใส่ราคาที่ควรรอเข้าแทน หรือ null), reasons (array 2-4 ข้อ ข้อละ 1 ประโยค), invalid (ถ้า... แผนนี้ใช้ไม่ได้ 1 ประโยค), wait_for (ถ้า WAIT: ต้องเห็นอะไรก่อนเข้า 1 ประโยค)',
+  ].join('\n');
+  const body = { model: AI_MODEL, temperature: 0.2, response_format: { type: 'json_object' }, max_tokens: 1200,
+    messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(snap) }] };
+  const res = aiFetchJson_('https://api.deepseek.com/chat/completions', { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + key }, payload: JSON.stringify(body) });
+  const A = aiParseJson_(res.choices[0].message.content);
+  const num = v => { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
+  const out = { action: String(A.action || 'WAIT').toUpperCase(), confidence: Math.max(0, Math.min(100, Math.round(Number(A.confidence) || 0))),
+    pattern: String(A.pattern || ''), pa: String(A.pa || ''), context: String(A.context || ''), entry: num(A.entry), sl: num(A.sl), tp1: num(A.tp1), tp2: num(A.tp2),
+    reasons: (Array.isArray(A.reasons) ? A.reasons : [A.reasons]).filter(Boolean).map(String).slice(0, 4), invalid: String(A.invalid || ''), wait_for: String(A.wait_for || ''),
+    price, tf: snap.tf, time_th: snap.time_th, model: AI_MODEL };
+  if (['BUY', 'SELL', 'WAIT'].indexOf(out.action) < 0) out.action = 'WAIT';
+  // ตรวจความสมเหตุสมผลของแผน: ทิศ SL/TP ถูก, entry ใกล้ราคา, ระยะ SL สมจริง → ไม่ผ่าน = WAIT
+  if (out.action !== 'WAIT') {
+    const b = out.action === 'BUY', e = out.entry, bad = [];
+    if (!e || Math.abs(e - price) > 3 * atr) bad.push('entry ไกลราคาเกินไป');
+    if (!out.sl || (b ? out.sl >= e : out.sl <= e)) bad.push('SL ผิดฝั่ง');
+    if (!out.tp1 || (b ? out.tp1 <= e : out.tp1 >= e)) bad.push('TP ผิดฝั่ง');
+    if (out.sl && e && Math.abs(e - out.sl) > 4 * atr) bad.push('SL กว้างเกิน');
+    if (bad.length) { out.action = 'WAIT'; out.checked = 'ระบบปรับเป็นรอ: ' + bad.join(', '); }
+    else { const tp = out.tp2 || out.tp1; out.rr = Math.round(Math.abs(tp - e) / Math.max(0.01, Math.abs(e - out.sl)) * 10) / 10; }
+  }
+  return out;
 }

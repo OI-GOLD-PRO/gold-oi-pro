@@ -413,16 +413,38 @@
       <div class="tile"><small>Expected Move ถึงหมดอายุ</small><b style="color:#9aa7ff">±${f1(c.em)}</b><em>${c.openEM ? `กรอบวันนี้ ${f1(c.openF - c.openEM)} – ${f1(c.openF + c.openEM)}` : ''}</em></div>
       <div class="tile"><small>Skew (IV Put25Δ − Call25Δ)</small><b class="${c.skew > 1.5 ? 'dn' : c.skew < -1.5 ? 'up' : ''}">${c.skew === null ? '–' : (c.skew > 0 ? '+' : '') + c.skew.toFixed(1) + ' จุด'}</b><em>${skTxt}</em></div>
     </div>`);
-    // GEX ราย strike ±10 strike รอบราคา
+    // ความกลัวของตลาด: จาก OI Put/Call ที่มากที่สุด + สัดส่วน Put/Call OI รวม
+    if (c.match) {
+      const sk = c.strikes.filter(s => s.c + s.p > 0);
+      const mP = sk.reduce((m, s) => s.p > (m ? m.p : 0) ? s : m, null), mC = sk.reduce((m, s) => s.c > (m ? m.c : 0) ? s : m, null);
+      const tP = sk.reduce((a, s) => a + s.p, 0), tC = sk.reduce((a, s) => a + s.c, 0);
+      if (mP && mC && tC > 0) {
+        const pcr = tP / tC, ratio = mP.p / mC.c;
+        const lvl = ratio >= 1.15 || pcr >= 1.2 ? 'fear' : ratio <= 0.87 || pcr <= 0.8 ? 'greed' : 'neutral';
+        const txt = { fear: '😨 กลัวขาลง · นักลงทุนซื้อประกันฝั่ง Put หนา', greed: '🚀 ไล่ซื้อขาขึ้น · Call OI หนากว่า', neutral: '⚖️ สมดุล · Put/Call ใกล้กัน' }[lvl];
+        const col = lvl === 'fear' ? 'dn' : lvl === 'greed' ? 'up' : '';
+        const dist = k => px === null ? '' : ` (${k >= px ? 'เหนือราคา +' : 'ใต้ราคา −'}${Math.abs(k - px).toFixed(1)})`;
+        parts.push(`<h3 style="margin-top:12px">😨 ความกลัวของตลาด (จาก OI ที่มากที่สุด)</h3><div class="tiles">
+          <div class="tile"><small>Put OI สูงสุด (กลัวลง)</small><b class="dn">${mP.k}</b><em>${Math.round(mP.p).toLocaleString('en-US')} สัญญา${dist(mP.k)}</em></div>
+          <div class="tile"><small>Call OI สูงสุด (หวังขึ้น)</small><b class="up">${mC.k}</b><em>${Math.round(mC.c).toLocaleString('en-US')} สัญญา${dist(mC.k)}</em></div>
+          <div class="tile"><small>Put/Call OI รวม</small><b class="${pcr >= 1.2 ? 'dn' : pcr <= 0.8 ? 'up' : ''}">${pcr.toFixed(2)}</b><em>Put ${Math.round(tP).toLocaleString('en-US')} / Call ${Math.round(tC).toLocaleString('en-US')}</em></div>
+          <div class="tile"><small>สรุปอารมณ์ตลาด</small><b class="${col}" style="font-size:13px">${txt}</b><em>Put สูงสุด ÷ Call สูงสุด = ${ratio.toFixed(2)}×</em></div></div>
+          <div class="note">&gt;1.2 = ตลาดกลัว/ป้องกันความเสี่ยง · &lt;0.8 = ตลาดมั่นใจขาขึ้น · Put OI สูงสุดมักเป็นแนวรับ แต่ถ้าราคาหลุดจะเร่งลงแรง</div>`);
+      }
+    }
+    // GEX ราย strike: แยก Put (แดง ซ้าย) และ Call (เขียว ขวา) ให้เห็นทั้งสองฝั่ง
     const near = c.strikes.filter(s => s.c + s.p > 0).sort((a, b) => Math.abs(a.k - px) - Math.abs(b.k - px)).slice(0, 15).sort((a, b) => b.k - a.k);
     if (c.match && near.length) {
-      const mx = Math.max(1, ...near.map(s => Math.abs(s.gex)));
+      const F2 = c.S0 * c.S0 * 0.01 * 100;
+      const cg = s => (s.gC || 0) * s.c * F2, pg = s => (s.gP || 0) * s.p * F2;
+      const mx = Math.max(1, ...near.map(s => Math.max(cg(s), pg(s))));
       parts.push(`<h3 style="margin-top:12px">GEX ราย strike (เขียว = Call ดึงราคาให้นิ่ง / แดง = Put เร่งให้วิ่ง)</h3><div style="display:grid;gap:3px">${near.map(s => {
-        const wpx = Math.round(Math.abs(s.gex) / mx * 100), pos = s.gex >= 0;
+        const wc = Math.round(cg(s) / mx * 100), wp = Math.round(pg(s) / mx * 100);
         const isPx = Math.abs(s.k - px) < 2.5;
         return `<div style="display:grid;grid-template-columns:46px 1fr 1fr;align-items:center;gap:4px;font:10.5px var(--mono)${isPx ? ';background:rgba(224,180,76,.12);border-radius:4px' : ''}"><span>${s.k}</span>
-          <div style="display:flex;justify-content:flex-end">${pos ? '' : `<i style="display:block;height:8px;width:${wpx}%;background:var(--put);border-radius:2px"></i>`}</div>
-          <div>${pos ? `<i style="display:block;height:8px;width:${wpx}%;background:var(--call);border-radius:2px"></i>` : ''}</div></div>`; }).join('')}</div>`);
+          <div style="display:flex;justify-content:flex-end">${wp ? `<i style="display:block;height:8px;width:${wp}%;background:var(--put);border-radius:2px"></i>` : ''}</div>
+          <div>${wc ? `<i style="display:block;height:8px;width:${wc}%;background:var(--call);border-radius:2px"></i>` : ''}</div></div>`; }).join('')}</div>
+        <div class="note">แต่ละ strike แสดงแรง Gamma ของ Put (ซ้าย) และ Call (ขวา) แยกกัน · ถ้าฝั่ง Call ว่างทุกแถว แปลว่า Call OI/Gamma ช่วงนี้น้อยมาก</div>`);
     }
     // ซื้อ/ขายสุทธิ + เงินใหม่
     const act = c.strikes.filter(s => s.vc + s.vp > 0).sort((a, b) => (b.vc + b.vp) - (a.vc + a.vp)).slice(0, 8).sort((a, b) => b.k - a.k);

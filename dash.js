@@ -147,6 +147,9 @@
   #dash details { margin-top: 8px; } #dash summary { font-size: 11.5px; color: var(--muted); cursor: pointer; }
   #dash .fx { display: grid; grid-template-columns: 1fr 44px 56px; gap: 2px 8px; font: 11px var(--mono); margin-top: 6px; }
   #dash .fx span:nth-child(3n+1) { font-family: var(--sans); color: var(--muted); }
+  #dash .oc-now { font-size: 12.5px; line-height: 1.7; margin: 4px 0 8px; } #dash .oc-t { font-size: 11.5px; color: var(--muted); }
+  #dash .oc-tb { display: grid; gap: 4px; } #dash .oc-r { display: grid; grid-template-columns: 78px 76px 1fr; gap: 6px; font-size: 11px; line-height: 1.45; padding: 5px 7px; border-radius: 7px; background: rgba(138,147,173,.07); color: var(--muted); }
+  #dash .oc-r.oc3 { grid-template-columns: 78px 72px 1fr; } #dash .oc-r.on { background: rgba(224,180,76,.16); color: var(--text, #e8ecf8); outline: 1px solid rgba(224,180,76,.55); }
   #dash .fx span:nth-child(3n+2), #dash .fx span:nth-child(3n) { text-align: right; }
   `;
   document.head.appendChild(st);
@@ -420,6 +423,75 @@
       <div class="note">แท่งยาว = OI มาก · ตัวหนาคือ strike ที่ OI สูงสุดในช่วงที่แสดง · แถบทองคือ strike ใกล้ราคา</div></div>`;
   }
 
+  // ---------- วิเคราะห์เปรียบเทียบ OI ตามตารางในบทความ (ราคา × OI × Volume / Option OI) ----------
+  const FUT_T = [
+    { p: 1, o: 1, t: 'เงินใหม่ไหลเข้า รายใหญ่กำลังไล่ซื้อและถือยาว', m: '🟢 ขาขึ้นแข็งแรง' },
+    { p: 1, o: -1, t: 'ราคาขึ้นเพราะคนแห่ปิดสถานะ Short ไม่ใช่คนอยากซื้อเพิ่ม ระวังราคาจะร่วง', m: '🟠 ขึ้นเพราะ Short Covering' },
+    { p: -1, o: 1, t: 'เงินใหม่ไหลเข้าฝั่งขาย รายใหญ่กำลังลงขายและมองว่าราคาจะลงได้อีก', m: '🔴 ขาลงแข็งแรง' },
+    { p: -1, o: -1, t: 'คนที่ซื้อไว้ทนขาดทุนไม่ไหว เลยยอมคัทลอส แต่ไม่มีแรงขายใหม่เพิ่ม', m: '🟡 ลงเพราะคัทลอส ใกล้หมดแรงลง' },
+  ];
+  const OPT_T = [
+    { p: 1, o: 1, y: 'C', t: 'เงินใหม่ไหลเข้า เงินเก็งกำไรเยอะขึ้น', m: '🟢' },
+    { p: 1, o: -1, y: 'C', t: 'แรงเก็งกำไรลดลง คนไม่กล้าตาม', m: '🟠' },
+    { p: -1, o: 1, y: 'C', t: 'ดูจะมีแรงรับซื้อ ถ้า Futures เข้าก็แปลว่าเก็บของ พร้อมวิ่ง', m: '🟡' },
+    { p: -1, o: -1, y: 'C', t: 'ตลาดบอกตัวใครตัวมัน Dip ก่อนค่อยว่ากัน', m: '🔴' },
+    { p: 1, o: 1, y: 'P', t: 'มีคนตั้งใจจะขายเยอะ ราคามักจะโดนกดลงหลังจากนั้น', m: '🔴' },
+    { p: 1, o: -1, y: 'P', t: 'โดนลาก ตัวเบา', m: '🟢' },
+    { p: -1, o: 1, y: 'P', t: 'คนเก็งกำไรขาลงเพิ่ม หรือคนป้องกันความเสี่ยงเพิ่ม เคสนี้ตอบยาก', m: '🟠' },
+    { p: -1, o: -1, y: 'P', t: 'คนไม่กล้า Short ตาม หรือราคาลงเร็วไป ออกได้สองหน้า', m: '🟡' },
+  ];
+  // บันทึกยอด OI รวมของสัญญาที่อัพเดทไว้ในเครื่อง เพื่อเทียบกับการอัพเดทครั้งก่อน (ต้องมี ≥ 2 ครั้ง)
+  function oiSnap(d, cfg, m, ref) {
+    const KEY = 'oi_snap_v1', stamp = String(d.stamp || cfg.offset_time || ''), contract = String(cfg.contract || '');
+    if (!stamp || !contract) return null;
+    let st = null;
+    try { st = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+    const now = { stamp, c: m.C, p: m.P, px: ref };
+    if (!st || st.contract !== contract) st = { contract, cur: now, prev: null };
+    else if (st.cur && st.cur.stamp !== stamp) st = { contract, cur: now, prev: st.cur };
+    else if (st.cur) st.cur = Object.assign({}, st.cur, { px: ref !== null ? ref : st.cur.px });
+    try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
+    return st;
+  }
+  function oiCompareCard(d, cfg, m, ref) {
+    const dir = (v, th) => v === null || !isFinite(v) ? 0 : v > th ? 1 : v < -th ? -1 : 0;
+    const arrow = x => x > 0 ? '▲' : x < 0 ? '▼' : '▬';
+    const pct = (a, b) => b ? (a - b) / b * 100 : null;
+    const sgp = v => v === null ? '–' : (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+    // ---- Futures: ราคา × OI รายสัปดาห์ (CFTC) ----
+    let fut = '';
+    const R = cot && cot.rows, hasPx = cot && cot.px && cot.px.length;
+    if (R && R.length > 1 && hasPx) {
+      const p0 = pxOn(cot.px, R[0].d), p1 = pxOn(cot.px, R[1].d);
+      const dP = p0 !== null && p1 !== null ? pct(p0, p1) : null, dO = pct(R[0].oi, R[1].oi);
+      const pd = dir(dP, 0.15), od = dir(dO, 0.3);
+      const hit = pd && od ? FUT_T.find(r => r.p === pd && r.o === od) : null;
+      fut = `<h3 style="margin-top:4px">① Futures: ราคา × Open Interest <span style="font-weight:400;color:var(--muted)">(สัปดาห์ถึง ${esc(R[0].d)})</span></h3>
+        <div class="oc-now">ราคา <b class="${pd > 0 ? 'up' : pd < 0 ? 'dn' : ''}">${arrow(pd)} ${sgp(dP)}</b> · OI ทั้งตลาด <b class="${od > 0 ? 'up' : od < 0 ? 'dn' : ''}">${arrow(od)} ${sgp(dO)}</b> (${Math.round(R[0].oi).toLocaleString('en-US')} สัญญา)${hit ? ` → <b>${hit.m}</b><br><span class="oc-t">${esc(hit.t)}</span>` : '<br><span class="oc-t">ราคาหรือ OI แทบไม่เปลี่ยน ยังไม่เข้าเงื่อนไขในตาราง</span>'}</div>
+        <div class="oc-tb">${FUT_T.map(r => `<div class="oc-r${r === hit ? ' on' : ''}"><span>${r.p > 0 ? 'ราคาพุ่ง ▲' : 'ราคาดิ่ง ▼'}</span><span>OI ${r.o > 0 ? 'เพิ่ม ▲' : 'ลด ▼'}</span><span>${esc(r.t)}</span></div>`).join('')}</div>
+        <div class="note">ตารางต้นฉบับกำหนด Volume "สูง" ทุกแถว (OI Futures ใช้รายงาน CFTC รายสัปดาห์ จึงเป็นภาพรวมสัปดาห์ ไม่ใช่รายวัน)</div>`;
+    }
+    // ---- Options: ราคา × OI ของ Call / Put เทียบการอัพเดทครั้งก่อน ----
+    const st = oiSnap(d, cfg, m, ref);
+    let opt = '';
+    if (st && st.prev && st.cur.px !== null && st.prev.px !== null && ref !== null) {
+      const dP = pct(st.cur.px, st.prev.px), dC = pct(st.cur.c, st.prev.c), dPu = pct(st.cur.p, st.prev.p);
+      const pd = dir(dP, 0.1), cd = dir(dC, 0.5), ud = dir(dPu, 0.5);
+      const hc = pd && cd ? OPT_T.find(r => r.y === 'C' && r.p === pd && r.o === cd) : null;
+      const hp = pd && ud ? OPT_T.find(r => r.y === 'P' && r.p === pd && r.o === ud) : null;
+      opt = `<h3 style="margin-top:12px">② Options: ราคา × OI Call/Put <span style="font-weight:400;color:var(--muted)">(เทียบอัพเดทก่อน ${esc(st.prev.stamp)} → ${esc(st.cur.stamp)})</span></h3>
+        <div class="oc-now">ราคา <b class="${pd > 0 ? 'up' : pd < 0 ? 'dn' : ''}">${arrow(pd)} ${sgp(dP)}</b><br>
+          Call OI <b class="${cd > 0 ? 'up' : cd < 0 ? 'dn' : ''}">${arrow(cd)} ${sgp(dC)}</b>${hc ? ` → ${hc.m} ${esc(hc.t)}` : ' → ยังไม่เข้าเงื่อนไข'}<br>
+          Put OI <b class="${ud > 0 ? 'dn' : ud < 0 ? 'up' : ''}">${arrow(ud)} ${sgp(dPu)}</b>${hp ? ` → ${hp.m} ${esc(hp.t)}` : ' → ยังไม่เข้าเงื่อนไข'}</div>
+        <div class="oc-tb">${OPT_T.map(r => `<div class="oc-r oc3${r === hc || r === hp ? ' on' : ''}"><span>${r.p > 0 ? 'ราคาพุ่ง ▲' : 'ราคาดิ่ง ▼'}</span><span>${r.y === 'C' ? 'Call' : 'Put'} OI ${r.o > 0 ? '▲' : '▼'}</span><span>${esc(r.t)}</span></div>`).join('')}</div>
+        <div class="note">เทียบ OI รวมทุก strike ของสัญญา ${esc(cfg.contract || '–')} ระหว่างการอัพเดทล่าสุดกับครั้งก่อนที่เปิดดูบนเครื่องนี้ · ถ้าสัญญาเปลี่ยนจะเริ่มเทียบใหม่</div>`;
+    } else {
+      opt = `<h3 style="margin-top:12px">② Options: ราคา × OI Call/Put</h3><div class="note">เก็บยอด OI ของการอัพเดทนี้ไว้แล้ว (${esc(cfg.contract || '–')} · ${esc(d.stamp || cfg.offset_time || '–')}) จะเปรียบเทียบได้เมื่อมีการอัพเดท OI ครั้งถัดไป (ต้องเปิดแอปบนเครื่องนี้ทั้งสองรอบ)</div>`;
+    }
+    if (!fut && !opt) return '';
+    return `<div class="card"><h3>🔎 เปรียบเทียบ OI ตามบทความ</h3>${fut}${opt}</div>`;
+  }
+
   // ---------- ออปชันสัญญาวันนี้แบบสด (จาก live.js / Worker) ----------
   function liveCard(price) {
     const L = window.OILive, c = L && L.calc;
@@ -467,9 +539,9 @@
         const wc = Math.round(cg(s) / mx * 100), wp = Math.round(pg(s) / mx * 100);
         const isPx = Math.abs(s.k - px) < 2.5;
         return `<div style="display:grid;grid-template-columns:46px 1fr 1fr;align-items:center;gap:4px;font:10.5px var(--mono)${isPx ? ';background:rgba(224,180,76,.12);border-radius:4px' : ''}"><span>${s.k}</span>
-          <div style="display:flex;justify-content:flex-end">${wp ? `<i style="display:block;height:8px;width:${wp}%;background:var(--put);border-radius:2px"></i>` : ''}</div>
-          <div>${wc ? `<i style="display:block;height:8px;width:${wc}%;background:var(--call);border-radius:2px"></i>` : ''}</div></div>`; }).join('')}</div>
-        <div class="note">แต่ละ strike แสดงแรง Gamma ของ Put (ซ้าย) และ Call (ขวา) แยกกัน · ถ้าฝั่ง Call ว่างทุกแถว แปลว่า Call OI/Gamma ช่วงนี้น้อยมาก</div>`);
+          <div style="display:flex;justify-content:flex-end">${wc ? `<i style="display:block;height:8px;width:${wc}%;background:var(--call);border-radius:2px"></i>` : ''}</div>
+          <div>${wp ? `<i style="display:block;height:8px;width:${wp}%;background:var(--put);border-radius:2px"></i>` : ''}</div></div>`; }).join('')}</div>
+        <div class="note">แต่ละ strike แสดงแรง Gamma ของ Call (ซ้าย) และ Put (ขวา) แยกกัน · ถ้าฝั่ง Call (ซ้าย) ว่างทุกแถว แปลว่า Call OI/Gamma ช่วงนี้น้อยมาก</div>`);
     }
     // ซื้อ/ขายสุทธิ + เงินใหม่
     const act = c.strikes.filter(s => s.vc + s.vp > 0).sort((a, b) => (b.vc + b.vp) - (a.vc + a.vp)).slice(0, 8).sort((a, b) => b.k - a.k);
@@ -592,7 +664,7 @@
     }
 
     // 1.5) COT + Gamma (เฉพาะทองคำ)
-    if (cur === 'gold') { parts.push(cotCard(price, cfg)); parts.push(cotGroupsCard()); parts.push(oiBarsCard(isFinite(gcSheet) && gcSheet > 0 ? gcSheet : price, cfg)); parts.push(liveCard(price)); }
+    if (cur === 'gold') { parts.push(cotCard(price, cfg)); parts.push(cotGroupsCard()); { const gref = isFinite(gcSheet) && gcSheet > 0 ? gcSheet : price; parts.push(oiBarsCard(gref, cfg)); parts.push(oiCompareCard(d, cfg, m, gref)); } parts.push(liveCard(price)); }
 
     // 2) ป้ายเตือนราคาใกล้แนว
     if (price !== null) {

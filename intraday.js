@@ -91,7 +91,7 @@
       const todayS = Math.floor((B[B.length - 1].time - SESS) / 86400), tol = 2;
       for (let i = 1; i < B.length - 1; i++) {
         const b = B[i], s = Math.floor((b.time - SESS) / 86400);
-        if (s < todayS - 1 || vw[i] === null || inNews(b.time)) continue;
+        if (s !== todayS || vw[i] === null || inNews(b.time)) continue; // ระดับ EM/Wall เป็นของวันนี้ จึงหาสัญญาณเฉพาะวันเทรดปัจจุบัน
         const rng = b.high - b.low; if (rng < 1.5) continue;
         const up = b.high - Math.max(b.open, b.close), dn = Math.min(b.open, b.close) - b.low;
         const topLv = [L.cw, L.em && L.em.top].filter(v => v !== null && v !== undefined), botLv = [L.pw, L.em && L.em.bot].filter(v => v !== null && v !== undefined);

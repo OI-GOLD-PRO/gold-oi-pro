@@ -252,7 +252,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.19.05';
+  const APP_VER = '1.19.06';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -903,9 +903,10 @@
   let m5Bucket = null, m5Last = null;
 
   const zRank = r => { const rC = r.c > 0 ? (oi.rankC.get(r.strike) || 0) : 0, rP = r.p > 0 ? (oi.rankP.get(r.strike) || 0) : 0; return rC && (!rP || r.c >= r.p) ? rC : rP; };
-  const alertZones = () => (oi && oi.offset !== null) ? oi.rows.filter(r => zRank(r) > 0) : [];
+  const isVolLine = r => !!(oi && oi.topV && oi.topV.includes(r.strike)); // เส้นเหลือง Volume วันนี้ 5 อันดับ
+  const alertZones = () => (oi && oi.offset !== null) ? oi.rows.filter(r => zRank(r) > 0 || isVolLine(r)) : [];
   // ขอบโซนตรงกับที่วาด: อันดับ 1-5 โซนเต็ม, 6-10 ครึ่งความกว้าง
-  const zoneEdges = r => { const h = zRank(r) <= 5 ? ZONE_HALF : ZONE_HALF / 2; return { lo: r.price - h, hi: r.price + h }; };
+  const zoneEdges = r => { const k = zRank(r), h = k && k <= 5 ? ZONE_HALF : ZONE_HALF / 2; return { lo: r.price - h, hi: r.price + h }; };
   const sessDay = () => Math.floor((Date.now() / 1000 + TZ_SHIFT - 5 * 3600) / 86400); // วันเทรดเริ่ม 05:00 น.
 
   // จำสถานะโซนไว้ตลอด: ซิงก์ชีต/ปรับ offset ทุกนาทีจะไม่รีเซ็ตสถานะ
@@ -1024,7 +1025,7 @@
     hit = { strike: r.strike, until: Date.now() + 60000 }; dirty = true;
     beep();
     try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
-    const side = r.c >= r.p ? 'แนวต้าน' : 'แนวรับ';
+    const side = zRank(r) ? (r.c >= r.p ? 'แนวต้าน' : 'แนวรับ') + (isVolLine(r) ? ' + Vol' : '') : 'Vol วันนี้';
     const info = `strike <b>${r.strike}</b> (${SC.note} ${r.price.toFixed(SC.dec)}) · Call ${r.c} · Put ${r.p}`;
     if (kind === 'up' || kind === 'down') showToast(`🚀 <b>เบรกเอ้า${kind === 'up' ? 'ขึ้น' : 'ลง'}</b> M5 ปิด <b>${price.toFixed(SC.dec === 0 ? 0 : 2)}</b> พ้นโซน ${side} ${info}`);
     else showToast(`🔔 ราคา <b>${price.toFixed(SC.dec === 0 ? 0 : 2)}</b> เข้าโซน ${side} ${info}`);
@@ -1087,7 +1088,7 @@
       resetArming(lastClose, true);
       beep();
       keepAwake();
-      showToast(`🔔 เปิดแจ้งเตือนแล้ว: ${alertZones().length} โซนที่ไฮไลต์ เตือนเมื่อราคาถึงโซน (ซ้ำได้ทุก 1 ชม.) · M5 ปิดพ้นโซนเกิน $2 (ครั้งเดียว) · ข่าวแดงก่อนออก 10 นาที · เปิดแอปค้างไว้เพื่อให้เตือนได้`);
+      showToast(`🔔 เปิดแจ้งเตือนแล้ว: ${alertZones().length} โซนที่ไฮไลต์ + เส้น Volume เตือนเมื่อราคาถึงโซน (ซ้ำได้ทุก 1 ชม.) · M5 ปิดพ้นโซนเกิน $2 (ครั้งเดียว) · ข่าวแดงก่อนออก 10 นาที · เปิดแอปค้างไว้เพื่อให้เตือนได้`);
     } else {
       try { wakeLock && wakeLock.release(); } catch (e) {}
       wakeLock = null;

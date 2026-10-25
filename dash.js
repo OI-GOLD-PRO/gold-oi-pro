@@ -1,4 +1,4 @@
-// แดชบอร์ดวิเคราะห์ตลาด (ทองคำ / น้ำมัน)
+// แดชบอร์ดวิเคราะห์ตลาดทองคำ
 // ข้อมูลมาจาก Apps Script (?api=data) ทุกครั้งที่เปิดหน้า:
 //   - levels + cfg.volume  → คำนวณ PCR, Max Pain, ความแข็งของแนว, Volume × OI ในหน้าเว็บ
 //   - cfg.dash (JSON)      → ผลวิเคราะห์ที่เขียนจากแชททุกครั้งที่ "อัพเดท": แนวโน้ม คะแนน เข็มวัด แนวสำคัญ ความคิด MM ข่าว ประวัติ
@@ -9,9 +9,8 @@
   const $ = id => document.getElementById(id);
   const SY = {
     gold: { label: 'ทองคำ', ico: '🥇', dec: 0, pdec: 2, near: 6, unit: '$' },
-    oil: { label: 'น้ำมัน', ico: '🛢️', dec: 2, pdec: 2, near: 0.5, unit: '$' },
   };
-  let cur = SY[O.sym] ? O.sym : 'gold';
+  let cur = 'gold'; // แดชบอร์ดเหลือทองคำอย่างเดียว (ตัดน้ำมันออก)
   const cache = {};
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
@@ -92,7 +91,7 @@
   #dash .msg { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px; }
   #dash .note { font-size: 10.5px; color: var(--muted); line-height: 1.5; }
   @supports (-webkit-touch-callout: none) { #dash { padding-top: calc(env(safe-area-inset-top, 0px) + 28px) !important; } #aiwrap { padding-top: env(safe-area-inset-top, 0px); } }
-  @media (max-width: 440px) { #dash .dtt { display: none; } #dash .dtop { gap: 6px; padding: 10px 10px 8px; } #dash .dtabs button { padding: 5px 8px; } }
+  @media (max-width: 440px) { #dash .dtop h2 { font-size: 14px; } #dash .dtop { gap: 6px; padding: 10px 10px 8px; } #dash .dtabs button { padding: 5px 8px; } }
   #dash .aibtn { background: linear-gradient(135deg, #1b2a4a, #2a1b4a); border: 1px solid #5b7cff; color: #cfe0ff; border-radius: 10px; padding: 6px 10px; font: 600 12px var(--sans); white-space: nowrap; box-shadow: 0 0 10px rgba(91,124,255,.35); }
   #dash .aibtn:active { transform: scale(.96); }
   #aiwrap { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(4,8,20,.88); animation: aifade .25s ease-out; }
@@ -162,12 +161,12 @@
 
   const box = document.createElement('div');
   box.id = 'dash'; box.hidden = true;
-  box.innerHTML = `<div class="dtop"><h2>📊 <span class="dtt">วิเคราะห์ตลาด</span></h2><div class="dtabs" id="dTabs"></div>
+  box.innerHTML = `<div class="dtop"><h2>📊 <span class="dtt">วิเคราะห์ทองคำ</span></h2><div class="dtabs" id="dTabs"></div>
     <button class="aibtn" id="dAI" aria-label="ให้ AI วิเคราะห์ตอนนี้">🤖 วิเคราะห์</button>
     <button class="icon" id="dReload" aria-label="โหลดใหม่">⟳</button><button class="icon" id="dClose" aria-label="ปิด">✕</button></div>
     <div class="dbody" id="dBody"></div>`;
   document.body.appendChild(box);
-  const tabs = () => { $('dTabs').innerHTML = Object.keys(SY).map(k => `<button data-s="${k}" class="${k === cur ? 'on' : ''}">${SY[k].ico} ${SY[k].label}</button>`).join(''); };
+  const tabs = () => { if (Object.keys(SY).length < 2) { $('dTabs').innerHTML = ''; return; } $('dTabs').innerHTML = Object.keys(SY).map(k => `<button data-s="${k}" class="${k === cur ? 'on' : ''}">${SY[k].ico} ${SY[k].label}</button>`).join(''); };
   $('dTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; cur = b.dataset.s; tabs(); show(); });
   $('dClose').addEventListener('click', () => { box.hidden = true; });
   // ปัดไปทางขวาเพื่อกลับไปหน้ากราฟ (เหมือนปุ่มย้อนกลับ) · ต้องลากแนวนอนชัดเจน ≥ 80px และไม่ใช่การเลื่อนขึ้นลง

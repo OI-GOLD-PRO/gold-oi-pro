@@ -265,6 +265,13 @@
     $('paGo').onclick = run;
     if (result) bindResult();
   }
+  function newsHTML(r) {
+    if (!r.news_summary && !(r.news && r.news.length)) return r.headlines_n === 0 ? '<div class="muted">📰 ดึงข่าวล่าสุดไม่ได้รอบนี้</div>' : '';
+    const bc = /หนุน/.test(r.news_bias) ? '#2fe3a6' : /กด/.test(r.news_bias) ? '#ff6b82' : '#c9d1ea';
+    const ago = m => m < 60 ? m + ' นาที' : Math.round(m / 60) + ' ชม.';
+    const items = (r.news || []).map(n => `<div style="display:flex;gap:6px;padding:4px 0;border-top:1px solid #1a2246;font-size:12px;line-height:1.45"><span style="width:16px;text-align:center;font-weight:700;color:${n.impact === '+' ? '#2fe3a6' : n.impact === '-' ? '#ff6b82' : '#8a93ad'}">${n.impact === '+' ? '▲' : n.impact === '-' ? '▼' : '•'}</span><span>${esc(n.th)}<br><small style="color:#6f7896">${esc(n.src)} · ${ago(n.ago_min)}ที่แล้ว</small></span></div>`).join('');
+    return `<div style="margin:8px 0;padding:6px 10px;border:1px solid #1f2850;border-radius:10px;background:#0f1533"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:13px">📰 ข่าวล่าสุด</b>${r.news_bias ? `<span style="font-size:12px;font-weight:700;color:${bc}">${esc(r.news_bias)}</span>` : ''}</div>${r.news_summary ? `<p style="margin:4px 0 2px;font-size:12px;color:#c9d1ea">${esc(r.news_summary)}</p>` : ''}${items}</div>`;
+  }
   function mtfHTML(r) {
     const v = r.tf_view; if (!v || typeof v !== 'object') return '';
     const rows = ['H4', 'H1', 'M15', 'M5'].filter(k => v[k]).map(k => { const t = r.mtf && r.mtf[k]; const tr = t ? t.trend : ''; const ic = tr === 'ขึ้น' ? '🟢' : tr === 'ลง' ? '🔴' : '⚪';
@@ -286,6 +293,7 @@
     return `${old ? '<div class="muted">ผลล่าสุด</div>' : ''}<div class="act"><span class="badge ${r.action}">${r.action === 'WAIT' ? 'รอ' : r.action}</span>
       <div class="conf"><small>ความมั่นใจ ${conf}% · ${esc(r.tf)} · ${esc((r.time_th || '').slice(11))} น. · ราคา ${f2(r.price)}</small><div class="bar"><i style="width:${old ? conf : 0}%"></i></div></div></div>
       <div class="pat">${esc(r.pattern)}</div><p>${esc(r.pa)}</p><p style="color:#a9b4d6">${esc(r.context)}</p>
+      ${newsHTML(r)}
       ${mtfHTML(r)}
       ${absHTML(r)}
       ${r.entry || r.sl || r.tp1 ? `<div class="plan"><div><small>${r.action === 'WAIT' ? 'รอเข้า' : 'Entry'}</small>${f2(r.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(r.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(r.tp1)}</span></div><div><small>TP2${r.rr ? ' · R:R 1:' + r.rr : ''}</small><span style="color:#2fe3a6">${f2(r.tp2)}</span></div></div>` : ''}
@@ -308,7 +316,7 @@
     busy = true;
     const draw = snap._draw, pats = snap.patterns;
     const patTxt = pats.length ? pats.slice(0, 2).map(p => p.name.split(' (')[0]).join(' + ') : 'ไม่พบรูปแบบชัด';
-    const steps = [`▸ อ่านแท่งเทียน ${snap.tf} 40 แท่ง · ATR ${f2(snap.atr)}`, '▸ อ่านหลาย TF: H4 / H1 / M15 / M5…', `▸ Price Action ${snap.tf}: ${patTxt}`, `▸ Absorption ${snap.absorption.count_40 !== undefined ? snap.absorption.rate_40_pct + '% · ' + snap.absorption.bias : '–'}`, `▸ เทียบแนว ${snap.levels.length} ระดับ (OI / EM / gmf / VWAP)`, '▸ DeepSeek กำลังตัดสินใจ…'];
+    const steps = [`▸ อ่านแท่งเทียน ${snap.tf} 40 แท่ง · ATR ${f2(snap.atr)}`, '▸ อ่านหลาย TF: H4 / H1 / M15 / M5…', '▸ อ่านข่าวล่าสุด…', `▸ Price Action ${snap.tf}: ${patTxt}`, `▸ Absorption ${snap.absorption.count_40 !== undefined ? snap.absorption.rate_40_pct + '% · ' + snap.absorption.bias : '–'}`, `▸ เทียบแนว ${snap.levels.length} ระดับ (OI / EM / gmf / VWAP)`, '▸ DeepSeek กำลังตัดสินใจ…'];
     bd().innerHTML = `<canvas id="paCv"></canvas><div class="think">AI กำลังวิเคราะห์<i></i><i></i><i></i></div><div class="steps">${steps.map(s => `<div>${esc(s)}</div>`).join('')}</div>`;
     const cv = $('paCv'), st = [...bd().querySelectorAll('.steps div')];
     // กราฟวิ่งไวๆ: เลื่อนจากแท่งเก่าไปล่าสุด แล้วสแกนซ้ำ จนกว่าผลจะมา
@@ -319,7 +327,7 @@
       const upto = cyc < 1500 ? Math.max(1, Math.round(40 + (all.length - 40) * (cyc / 1500))) : all.length;
       const W = cv.clientWidth - 46, scan = cyc >= 1500 ? (cyc - 1500) / 1100 * W : null;
       drawMini(cv, all, Math.min(all.length, upto), scan, null, cyc >= 1500 ? lv : null);
-      const k = Math.min(5, Math.floor(el / 700));
+      const k = Math.min(6, Math.floor(el / 650));
       st.forEach((d, i) => { d.className = i < k ? 'ok' : i === k ? 'on' : ''; });
       anim = requestAnimationFrame(loop);
     };

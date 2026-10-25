@@ -106,8 +106,39 @@ function aiGather_() {
     max_pain: mp, expected_move: o.em, expected_move_range_today: o.openEM ? [Math.round((o.openF - o.openEM) * 10) / 10, Math.round((o.openF + o.openEM) * 10) / 10] : null,
     skew_put25_minus_call25_volpts: p25 !== null && c25 !== null ? Math.round((p25 - c25) * 1000) / 10 : null,
     total_oi_call: totOI[0], total_oi_put: totOI[1], total_vol_call: totV[0], total_vol_put: totV[1],
-    facts, strikes: tbl, cot, calendar: cal,
+    facts, strikes: tbl, cot, calendar: cal, headlines: aiNews_().slice(0, 10),
   };
+}
+
+// ---------- ข่าวล่าสุด (พาดหัว) จาก RSS: Google News + FXStreet · แคช 10 นาที ----------
+function aiNews_() {
+  const cache = CacheService.getScriptCache(), hit = cache.get('ai_news');
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  const feeds = [
+    ['https://news.google.com/rss/search?q=gold+price+when:1d&hl=en-US&gl=US&ceid=US:en', 'g'],
+    ['https://news.google.com/rss/search?q=(Fed+OR+dollar+OR+treasury+yields)+gold+when:1d&hl=en-US&gl=US&ceid=US:en', 'g'],
+    ['https://www.fxstreet.com/rss/news', 'fx'],
+  ];
+  const now = Date.now(), seen = {}, out = [];
+  const reqs = feeds.map(f => ({ url: f[0], muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0' } }));
+  let res = []; try { res = UrlFetchApp.fetchAll(reqs); } catch (e) { return []; }
+  res.forEach((r, i) => {
+    if (r.getResponseCode() !== 200) return;
+    let items = [];
+    try { items = XmlService.parse(r.getContentText()).getRootElement().getChild('channel').getChildren('item'); } catch (e) { return; }
+    items.forEach(it => {
+      let t = (it.getChildText('title') || '').trim(), src = '';
+      const ms = Date.parse(it.getChildText('pubDate') || ''); if (!t || !isFinite(ms) || now - ms > 36 * 36e5) return;
+      if (feeds[i][1] === 'g') { const m = t.match(/^(.*) - ([^-]+)$/); if (m) { t = m[1].trim(); src = m[2].trim(); } const se = it.getChild('source'); if (se) src = se.getText() || src; }
+      else { src = 'FXStreet'; if (!/gold|xau|fed|dollar|usd|yield|inflation|cpi|pce|nfp|payroll|powell|tariff|geopolit/i.test(t)) return; }
+      const k = t.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60); if (seen[k]) return; seen[k] = 1;
+      out.push({ t: t.slice(0, 160), src, ms, url: (it.getChildText('link') || '').trim(), ago_min: Math.round((now - ms) / 60e3), time_th: aiFmt_(new Date(ms), 'dd/MM HH:mm') });
+    });
+  });
+  out.sort((a, b) => b.ms - a.ms);
+  const top = out.slice(0, 15);
+  try { cache.put('ai_news', JSON.stringify(top), 600); } catch (e) {}
+  return top;
 }
 
 // อ่าน JSON จากคำตอบ AI แบบทนทาน: ตัด ```json ออก และเอาเฉพาะ object แรกที่วงเล็บครบ (กันกรณีมีข้อความหรือ JSON ต่อท้าย)
@@ -136,9 +167,10 @@ function runAI_(reason) {
     'ใช้ facts สำหรับตำแหน่งราคาเทียบ gmf / Max Pain / กรอบ EM ห้ามคำนวณระยะเอง',
     'หลักตีความ: ราคาใต้ gamma_flip_30d = gamma ลบ ราคามักวิ่งแรงตามทาง / เหนือ = แกว่งกรอบ · OI Call หนา = แนวต้าน, OI Put หนา = แนวรับ · call_net_buy > 0 = มีคนซื้อ Call (เก็งขึ้น), < 0 = ขาย Call (ตั้งเพดาน) · put_net_buy > 0 = ซื้อ Put (ป้องกัน/เก็งลง), < 0 = ขาย Put (รับซื้อ) · skew บวก = Put แพง ตลาดกลัวขาลง · COT ใช้ดูภาพใหญ่รายสัปดาห์ · retail_long_pct สูงผิดปกติ = เตือนใกล้ยอด',
     'ห้ามใช้ชื่อฟิลด์ภาษาอังกฤษแบบ snake_case ในข้อความ ให้เรียกว่า: gamma_flip_today = "gmf itd", gamma_flip_30d = "gmf M", max_pain = "Max Pain", net_gex = "Net GEX", expected_move = "กรอบ EM", retail_long_pct = "รายย่อยถือ Long", managed_money_net = "กองทุนสุทธิ", skew = "Skew", oi_call/oi_put = "OI Call/Put", vol_call/vol_put = "Volume Call/Put"',
+    'headlines คือพาดหัวข่าวล่าสุด (ภาษาอังกฤษ, ago_min = กี่นาทีที่แล้ว) ใช้ประกอบภาพรวม: ข่าวที่หนุนทอง (ดอลลาร์อ่อน, ผลตอบแทนพันธบัตรลง, Fed ผ่อนคลาย, ความเสี่ยงภูมิรัฐศาสตร์) หรือกดทอง · อ้างข่าวได้เฉพาะที่มีใน headlines ห้ามแต่งข่าว',
     'mm ต้องเป็น array ของ string 3-4 ข้อ ข้อละ 1 ประโยค เช่น ["MM ขาย Call 4250 ตั้งเพดาน ...", "..."] ห้ามเป็น object · events ไม่ต้องส่ง (ระบบสร้างเอง)',
     'ข้อความ t ของแต่ละแนวต้องสอดคล้องกับ k: แนวเหนือราคาปัจจุบันคือแนวต้าน แนวใต้ราคาคือแนวรับ',
-    'ตอบเป็น JSON เท่านั้น ภาษาไทย กระชับ มีฟิลด์: trend ("up"|"down"|"side"), trend_label (ไม่เกิน 30 ตัวอักษร), score (จำนวนเต็ม -100..100 = ทิศแนวโน้ม), gauge (0..100 แรงกดดัน 0=ขายเต็ม 100=ซื้อเต็ม), headline (ไม่เกิน 140 ตัวอักษร), summary (3-5 ประโยค), levels (4-7 รายการ {p, k:"R"|"S"|"P", t: เหตุผลสั้นพร้อมตัวเลข, s: 1-3 ความแข็ง}), mm (3-4 ข้อ ความคิด/ตำแหน่ง MM), events (ปฏิทินที่ต้องจับตา พร้อมผลถ้าออกแล้ว), watch (สถานการณ์ ถ้า…แล้ว… คั่นด้วย " / "), warn (ข้อควรระวัง 1 ประโยค)',
+    'ตอบเป็น JSON เท่านั้น ภาษาไทย กระชับ มีฟิลด์: trend ("up"|"down"|"side"), trend_label (ไม่เกิน 30 ตัวอักษร), score (จำนวนเต็ม -100..100 = ทิศแนวโน้ม), gauge (0..100 แรงกดดัน 0=ขายเต็ม 100=ซื้อเต็ม), headline (ไม่เกิน 140 ตัวอักษร), summary (3-5 ประโยค), levels (4-7 รายการ {p, k:"R"|"S"|"P", t: เหตุผลสั้นพร้อมตัวเลข, s: 1-3 ความแข็ง}), mm (3-4 ข้อ ความคิด/ตำแหน่ง MM), events (ปฏิทินที่ต้องจับตา พร้อมผลถ้าออกแล้ว), news (ข่าวจาก headlines ที่มีผลกับทอง สูงสุด 5 ข้อ เรียงสำคัญก่อน: {i: ลำดับใน headlines เริ่ม 0, th: สรุปพาดหัวเป็นไทยสั้นๆ, imp: 1 หนุนทอง | -1 กดทอง | 0 กลาง}), watch (สถานการณ์ ถ้า…แล้ว… คั่นด้วย " / "), warn (ข้อควรระวัง 1 ประโยค)',
   ].join('\n');
   const body = { model: AI_MODEL, temperature: 0.3, response_format: { type: 'json_object' }, max_tokens: 2500,
     messages: [{ role: 'system', content: sys }, { role: 'user', content: 'เหตุผลที่วิเคราะห์รอบนี้: ' + reason + '\nเวลาไทย: ' + aiFmt_(new Date(), 'yyyy-MM-dd HH:mm') + '\nข้อมูล:\n' + JSON.stringify(data) }] };
@@ -156,6 +188,8 @@ function runAI_(reason) {
   // ปฏิทิน: สร้างจากข้อมูลจริง (ไม่ให้ AI ตีความตัวเลขข่าวเอง)
   // ข่าวที่ยังไม่ออก (ใกล้สุดก่อน) + ข่าวที่เพิ่งออกใน 24 ชม.
   const calSort = data.calendar.filter(e => e.ms > Date.now()).slice(0, 6).concat(data.calendar.filter(e => e.ms <= Date.now() && Date.now() - e.ms < 24 * 36e5).reverse().slice(0, 2));
+  // ข่าว: ผูกกับพาดหัวจริงด้วยลำดับ (กัน AI แต่งข่าว)
+  A.news = (Array.isArray(A.news) ? A.news : []).map(n => { const h = data.headlines[Number(n && n.i)]; return h ? { t: clean(n.th) || h.t, src: h.src, time: h.time_th + ' น.', url: h.url, imp: Number(n.imp) > 0 ? 1 : Number(n.imp) < 0 ? -1 : 0 } : null; }).filter(Boolean).slice(0, 5);
   A.events = calSort.map(e => e.time_th + ' ' + (e.impact === 'high' ? '🔴 ' : '🟠 ') + e.title + (e.actual ? ` ออก ${e.actual} (คาด ${e.forecast || '–'})${e.better_than_forecast === true ? ' ดีกว่าคาด → หนุนดอลลาร์' : e.better_than_forecast === false ? ' แย่กว่าคาด → หนุนทอง' : ''}` : ` ยังไม่ออก · คาด ${e.forecast || '–'} ก่อนหน้า ${e.previous || '–'}`));
   (A.levels || []).forEach(l => { l.t = clean(l.t); });
   // แนวเหนือราคา = แนวต้าน, ใต้ราคา = แนวรับ (ยกเว้น P = จุดดึงดูด)
@@ -176,7 +210,7 @@ function runAI_(reason) {
   hist.splice(0, hist.length, ...dedupe(hist)); pxh.splice(0, pxh.length, ...dedupe(pxh));
   const dash = { v: 1, updated: stamp, sym: 'gold', contract: data.contract, price: data.futures_price, price_note: 'Gold.F ' + (data.gold_f_time || '') + ' · AI: ' + reason,
     trend: ['up', 'down', 'side'].indexOf(A.trend) >= 0 ? A.trend : 'side', trend_label: String(A.trend_label || '').slice(0, 40), score: Math.max(-100, Math.min(100, Math.round(Number(A.score) || 0))), gauge: Math.max(0, Math.min(100, Math.round(Number(A.gauge) || 50))),
-    headline: String(A.headline || '').slice(0, 200), summary: String(A.summary || '').slice(0, 1200), levels, mm: (A.mm || []).slice(0, 5).map(String), news: [],
+    headline: String(A.headline || '').slice(0, 200), summary: String(A.summary || '').slice(0, 1200), levels, mm: (A.mm || []).slice(0, 5).map(String), news: A.news || [],
     events: (A.events || []).slice(0, 6).map(String), watch: String(A.watch || '').slice(0, 400), warn: String(A.warn || '').slice(0, 300) + ' (วิเคราะห์โดย DeepSeek จากข้อมูลจริง ไม่ใช่คำแนะนำการลงทุน)', hist, px: pxh };
   sh.getRange(row, 1, 1, 2).setValues([['dash', JSON.stringify(dash)]]);
   console.log('AI dash updated: ' + reason + ' · ' + dash.trend_label);
@@ -231,17 +265,22 @@ function aiPA_(snap) {
     'levels คือแนวจาก Options (Call Wall = แนวต้าน, Put Wall = แนวรับ, กรอบ EM, gmf, Max Pain, โซน OI, เส้น Volume) ราคาเหนือ gmf M มักแกว่งกรอบ ใต้ gmf M มักวิ่งแรงตามทาง',
     'หลักตัดสิน: เข้าเฉพาะเมื่อมี Price Action ชัดที่แนวสำคัญ และ R:R ถึง TP2 อย่างน้อย 1:1.5 · ถ้าไม่ชัด อยู่กลางกรอบ หรือใกล้ข่าวแดง ให้ WAIT',
     'absorption คือแท่งที่ Volume สูงแต่ราคาไปไม่ไกล (มีออเดอร์ใหญ่รอรับ) ระบบคำนวณไว้แล้ว: rate_40_pct = อัตราการเกิดใน 40 แท่ง, side buy = ซื้อรับแรงขาย (หนุนขึ้น), sell = ขายรับแรงซื้อ (กดลง) · Absorption ที่แนวสำคัญ + Pin Bar/ปฏิเสธราคา = สัญญาณกลับตัวที่แข็งแรงขึ้น · Absorption ถี่แต่ราคาไม่ไปไหน = สะสม/แจกจ่ายของ รอเบรก',
+    'headlines = พาดหัวข่าวล่าสุดภาษาอังกฤษ (ago_min = กี่นาทีที่แล้ว) ใช้ประกอบ: ข่าวหนุนทอง = ดอลลาร์อ่อน/ยีลด์ลง/Fed ผ่อนคลาย/ความเสี่ยงภูมิรัฐศาสตร์ · ข่าวกดทอง = ดอลลาร์แข็ง/ยีลด์ขึ้น/Fed เข้มงวด/risk-on · ห้ามแต่งข่าวที่ไม่มีใน headlines · ข่าวแรงสวนทางกับแผน = ลดความมั่นใจ',
     'SL ต้องอยู่หลังไส้/โครงสร้าง ห่างจาก entry 0.5-2.5 เท่า ATR ของ M15 (atr_m15) · TP เป็นเป้าในวัน · TP1/TP2 ใช้แนวที่มีในข้อมูลหรือ VWAP',
-    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: action ("BUY"|"SELL"|"WAIT"), confidence (0-100), pattern (ชื่อ Price Action ที่เห็นสั้นๆ หรือ "ไม่มีสัญญาณชัด"), pa (อธิบาย Price Action แท่งล่าสุด 1-2 ประโยค), context (ราคาอยู่ตรงไหนเทียบแนวสำคัญ 1 ประโยค), entry, sl, tp1, tp2 (ตัวเลข; ถ้า WAIT ให้ใส่ราคาที่ควรรอเข้าแทน หรือ null), reasons (array 2-4 ข้อ ข้อละ 1 ประโยค), invalid (ถ้า... แผนนี้ใช้ไม่ได้ 1 ประโยค), tf_view (object {H4, H1, M15, M5} แต่ละค่า 1 ประโยคสั้น: ทิศ + สิ่งที่เห็น), align (สรุปว่าไทม์เฟรมสอดคล้องหรือขัดกัน ไม่เกิน 40 ตัวอักษร), absorption (ตีความ Absorption จากข้อมูล 1-2 ประโยค: ถี่ไหม ฝั่งไหนรับ เกิดที่แนวไหน มีผลกับการเข้าออเดอร์อย่างไร), wait_for (ถ้า WAIT: ต้องเห็นอะไรก่อนเข้า 1 ประโยค)',
+    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: action ("BUY"|"SELL"|"WAIT"), confidence (0-100), pattern (ชื่อ Price Action ที่เห็นสั้นๆ หรือ "ไม่มีสัญญาณชัด"), pa (อธิบาย Price Action แท่งล่าสุด 1-2 ประโยค), context (ราคาอยู่ตรงไหนเทียบแนวสำคัญ 1 ประโยค), entry, sl, tp1, tp2 (ตัวเลข; ถ้า WAIT ให้ใส่ราคาที่ควรรอเข้าแทน หรือ null), reasons (array 2-4 ข้อ ข้อละ 1 ประโยค), invalid (ถ้า... แผนนี้ใช้ไม่ได้ 1 ประโยค), tf_view (object {H4, H1, M15, M5} แต่ละค่า 1 ประโยคสั้น: ทิศ + สิ่งที่เห็น), align (สรุปว่าไทม์เฟรมสอดคล้องหรือขัดกัน ไม่เกิน 40 ตัวอักษร), news_bias ("หนุนทอง"|"กดทอง"|"กลาง"), news_summary (สรุปข่าวล่าสุดที่มีผลกับทองเป็นภาษาไทย 1-2 ประโยค), news_items (array สูงสุด 4 ข้อ {i: ลำดับข่าวใน headlines เริ่ม 0, th: แปล/สรุปพาดหัวเป็นไทยสั้นๆ, impact: "+"|"-"|"0" ผลต่อทอง}), absorption (ตีความ Absorption จากข้อมูล 1-2 ประโยค: ถี่ไหม ฝั่งไหนรับ เกิดที่แนวไหน มีผลกับการเข้าออเดอร์อย่างไร), wait_for (ถ้า WAIT: ต้องเห็นอะไรก่อนเข้า 1 ประโยค)',
   ].join('\n');
-  const body = { model: AI_MODEL, temperature: 0.2, response_format: { type: 'json_object' }, max_tokens: 1800,
+  let heads = []; try { heads = aiNews_().slice(0, 10); } catch (e) {}
+  snap.headlines = heads.map(h => ({ t: h.t, src: h.src, ago_min: h.ago_min }));
+  const body = { model: AI_MODEL, temperature: 0.2, response_format: { type: 'json_object' }, max_tokens: 2200,
     messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(snap) }] };
   const res = aiFetchJson_('https://api.deepseek.com/chat/completions', { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + key }, payload: JSON.stringify(body) });
   const A = aiParseJson_(res.choices[0].message.content);
   const num = v => { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
   const out = { action: String(A.action || 'WAIT').toUpperCase(), confidence: Math.max(0, Math.min(100, Math.round(Number(A.confidence) || 0))),
     pattern: String(A.pattern || ''), pa: String(A.pa || ''), context: String(A.context || ''), entry: num(A.entry), sl: num(A.sl), tp1: num(A.tp1), tp2: num(A.tp2),
-    reasons: (Array.isArray(A.reasons) ? A.reasons : [A.reasons]).filter(Boolean).map(String).slice(0, 4), invalid: String(A.invalid || ''), absorption: String(A.absorption || ''), align: String(A.align || ''), tf_view: (() => { const v = A.tf_view && typeof A.tf_view === 'object' ? A.tf_view : {}; const o = {}; ['H4', 'H1', 'M15', 'M5'].forEach(k => { if (v[k]) o[k] = String(typeof v[k] === 'object' ? Object.values(v[k]).join(' ') : v[k]); }); return o; })(), wait_for: String(A.wait_for || ''),
+    reasons: (Array.isArray(A.reasons) ? A.reasons : [A.reasons]).filter(Boolean).map(String).slice(0, 4), invalid: String(A.invalid || ''), absorption: String(A.absorption || ''), align: String(A.align || ''), news_bias: String(A.news_bias || ''), news_summary: String(A.news_summary || ''),
+    news: (Array.isArray(A.news_items) ? A.news_items : []).map(n => { const h = heads[Number(n && n.i)]; return h ? { th: String(n.th || h.t), en: h.t, src: h.src, time_th: h.time_th, ago_min: h.ago_min, impact: ['+', '-', '0'].indexOf(String(n.impact)) >= 0 ? String(n.impact) : '0' } : null; }).filter(Boolean).slice(0, 4),
+    headlines_n: heads.length, tf_view: (() => { const v = A.tf_view && typeof A.tf_view === 'object' ? A.tf_view : {}; const o = {}; ['H4', 'H1', 'M15', 'M5'].forEach(k => { if (v[k]) o[k] = String(typeof v[k] === 'object' ? Object.values(v[k]).join(' ') : v[k]); }); return o; })(), wait_for: String(A.wait_for || ''),
     price, tf: snap.tf, time_th: snap.time_th, model: AI_MODEL };
   if (['BUY', 'SELL', 'WAIT'].indexOf(out.action) < 0) out.action = 'WAIT';
   // ตรวจความสมเหตุสมผลของแผน: ทิศ SL/TP ถูก, entry ใกล้ราคา, ระยะ SL สมจริง → ไม่ผ่าน = WAIT

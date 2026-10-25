@@ -233,9 +233,9 @@
   // อินโทร: ปิดเมื่อกราฟพร้อม (เล่นอย่างน้อย 1.2 วินาที) · เกิน 2.5 วินาทีแสดงสถานะ · เกิน 6 วินาทีเข้าแอปเลย · แตะเพื่อข้าม · ออฟไลน์มีปุ่มลองใหม่
   (function () {
     var el = document.getElementById('splash'), t0 = Date.now(), closed = false, pend = '', MIN = 1200, SHOW_ST = 2500, MAX = 6000;
+    if (/[?&]pane=b/.test(location.search)) { el.remove(); window.OISplash = { done: function () {}, status: function () {}, start: function () {} }; return; }
     var saved = null; try { saved = localStorage.getItem('oi_code'); } catch (e) {}
-    if (/[?&]pane=b/.test(location.search) || !saved) { el.remove(); window.OISplash = { done: function () {}, status: function () {} }; return; }
-    var st = document.getElementById('spSt');
+    var running = false, gen = 0, st = document.getElementById('spSt');
     function close() { if (closed) return; closed = true; el.classList.add('out'); setTimeout(function () { el.remove(); }, 500); }
     function paint() { if (!closed && Date.now() - t0 >= SHOW_ST && navigator.onLine !== false) st.textContent = pend; }
     function offline() {
@@ -244,21 +244,30 @@
       st.innerHTML = '📡 ไม่มีอินเทอร์เน็ต<br><button class="retry" id="spRetry">ลองใหม่</button>';
       document.getElementById('spRetry').onclick = function (e) { e.stopPropagation(); location.reload(); };
     }
-    // ราคาล่าสุดจากครั้งก่อน นับขึ้นให้ดูมีชีวิต
-    var px = null; try { px = JSON.parse(localStorage.getItem('oi_splash_px') || 'null'); } catch (e) {}
-    if (px && isFinite(px.p)) {
-      var pel = document.getElementById('spPx'), s0 = t0 + 1200;
-      (function step() { var now = Date.now(), k = Math.min(1, Math.max(0, (now - s0) / 600)); if (now >= s0) pel.textContent = px.n + ' ' + (px.p - 60 * Math.pow(1 - k, 3)).toFixed(2); if (k < 1 && !closed) requestAnimationFrame(step); })();
+    // เริ่มเล่น: เปิดแอปที่ล็อกอินค้างไว้ = เล่นทันที · ยังไม่ล็อกอิน = ซ่อนไว้ แล้วเล่นหลังกดเข้าสู่ระบบสำเร็จ
+    function start() {
+      if (running || closed) return; running = true; t0 = Date.now(); var g = ++gen;
+      el.style.display = '';
+      // ราคาล่าสุดจากครั้งก่อน นับขึ้นให้ดูมีชีวิต
+      var px = null; try { px = JSON.parse(localStorage.getItem('oi_splash_px') || 'null'); } catch (e) {}
+      if (px && isFinite(px.p)) {
+        var pel = document.getElementById('spPx'), s0 = t0 + 1200;
+        (function step() { var now = Date.now(), k = Math.min(1, Math.max(0, (now - s0) / 600)); if (now >= s0) pel.textContent = px.n + ' ' + (px.p - 60 * Math.pow(1 - k, 3)).toFixed(2); if (k < 1 && !closed) requestAnimationFrame(step); })();
+      }
+      setTimeout(paint, SHOW_ST);
+      setTimeout(function () { if (g !== gen || !running || navigator.onLine === false) return; close(); }, MAX);
+      if (navigator.onLine === false) setTimeout(offline, 600);
     }
-    el.addEventListener('click', close);
-    setTimeout(paint, SHOW_ST);
-    setTimeout(function () { if (navigator.onLine === false) return; close(); }, MAX);
-    if (navigator.onLine === false) setTimeout(offline, 600);
-    window.addEventListener('offline', offline);
+    el.addEventListener('click', function () { if (running) close(); });
+    window.addEventListener('offline', function () { if (running) offline(); });
     window.OISplash = {
-      done: function (p, n) { try { if (isFinite(p)) localStorage.setItem('oi_splash_px', JSON.stringify({ p: p, n: n || 'XAUUSD' })); } catch (e) {} setTimeout(close, Math.max(0, MIN - (Date.now() - t0))); },
+      start: start,
+      // หน้าใส่รหัสขึ้น (รหัสหมดอายุ/ผิด): ซ่อนอินโทรไว้ก่อน รอล็อกอินใหม่
+      login: function () { if (!running || closed) return; running = false; el.style.display = 'none'; st.textContent = ''; },
+      done: function (p, n) { try { if (isFinite(p)) localStorage.setItem('oi_splash_px', JSON.stringify({ p: p, n: n || 'XAUUSD' })); } catch (e) {} if (!running) return; setTimeout(close, Math.max(0, MIN - (Date.now() - t0))); },
       status: function (t) { pend = t; paint(); }
     };
+    if (saved) start(); else el.style.display = 'none';
   })();
   </script>
   <div id="login">
@@ -340,7 +349,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '1.20.02';
+  const APP_VER = '1.20.03';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1956,14 +1965,14 @@
     $('loginErr').textContent = msg || '';
     $('loginVer').textContent = 'V' + APP_VER;
     $('login').hidden = false;
-    window.OISplash && OISplash.done();
+    window.OISplash && OISplash.login();
     $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ';
   }
   function enterApp(code, expire, name) {
     authCode = code; authExpire = expire || null;
     try { localStorage.setItem('oi_code', code); } catch (e) {}
     $('login').hidden = true;
-    if (!started) { started = true; loadTF(tf); if (!EMBED) { loadNews(); scheduleNews(); } }
+    if (!started) { window.OISplash && OISplash.start(); started = true; loadTF(tf); if (!EMBED) { loadNews(); scheduleNews(); } }
     loadSheet();
     // กรอบต้อนรับแสดงวันละครั้ง (ตามวันที่ไทย) เปิดแอปรอบถัดไปในวันเดียวกันจะไม่ขึ้นอีก
     let welcomeToday = null;

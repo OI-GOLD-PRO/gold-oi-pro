@@ -240,6 +240,7 @@
   async function load(force) {
     $('dBody').innerHTML = '<div class="msg">กำลังโหลดข้อมูลล่าสุดจากชีต…</div>';
     loadCOT(force).then(() => { pubCot(); if (!box.hidden && cur === 'gold') show(); });
+    if (window.OICotGroups) OICotGroups.load(force).then(() => { if (!box.hidden && cur === 'gold') show(); });
     loadCal().then(() => { if (!box.hidden) show(); });
     await Promise.all(Object.keys(SY).map(async s => {
       if (!force && cache[s]) return;
@@ -386,6 +387,12 @@
         <span>คะแนนสุดท้าย</span><span></span><span class="${cl(k.score)}">${k.score > 0 ? '+' : ''}${k.score}</span></div>
         <div class="note" style="margin-top:6px">ปัจจัย 1–4 หารด้วยค่าเปลี่ยนแปลงสูงสุดในอดีต (COT 3 ปี, ราคา 1 ปี) · ปัจจัย 6–7 เทียบช่วงต่ำสุด–สูงสุด 3 ปี · DXY: นักเก็งกำไรดอลลาร์ (Legacy, ICE DXY) เปลี่ยนเกิน 2% ของ OI → ซื้อดอลลาร์ −5 / ขายดอลลาร์ +5 · คะแนน ≥ +20 = ขาขึ้น, ≤ −20 = ขาลง</div></details>
       <div class="note" style="margin-top:6px">COT ช้า 3 วัน (ข้อมูลวันอังคาร ประกาศคืนวันศุกร์) ใช้ดูภาพใหญ่ ส่วน gmf ใช้ดูจังหวะ · ที่มา CFTC Disaggregated COMEX Gold</div></div>`;
+  }
+
+  // COT แยกรายกลุ่ม: กองทุน / Commercial / Non-commercial / รายย่อย (cotgroups.js)
+  function cotGroupsCard() {
+    if (!window.OICotGroups) return '';
+    return `<div class="card"><h3>🏦 COT แยกกลุ่ม · กองทุน · Commercial · Non-commercial · รายย่อย</h3>${window.OICotGroups.html()}</div>`;
   }
 
   // ---------- ออปชันสัญญาวันนี้แบบสด (จาก live.js / Worker) ----------
@@ -538,7 +545,7 @@
     }
 
     // 1.5) COT + Gamma (เฉพาะทองคำ)
-    if (cur === 'gold') { parts.push(cotCard(price, cfg)); parts.push(liveCard(price)); }
+    if (cur === 'gold') { parts.push(cotCard(price, cfg)); parts.push(cotGroupsCard()); parts.push(liveCard(price)); }
 
     // 2) ป้ายเตือนราคาใกล้แนว
     if (price !== null) {

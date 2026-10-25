@@ -73,6 +73,10 @@ function aiGather_() {
   const topC = ks.filter(s => s.oiC > 0).sort((a, b) => b.oiC - a.oiC).slice(0, 6), topP = ks.filter(s => s.oiP > 0).sort((a, b) => b.oiP - a.oiP).slice(0, 6);
   const strikes = {}; near.concat(topC, topP).forEach(s => { strikes[s.k] = s; });
   const tbl = Object.values(strikes).sort((a, b) => b.k - a.k).map(s => ({ k: s.k, oi_call: s.oiC, oi_put: s.oiP, vol_call: s.vC, vol_put: s.vP, call_net_buy: Math.round(s.buyC - s.sellC), put_net_buy: Math.round(s.buyP - s.sellP) }));
+  // OI เฉพาะ strike ใกล้ราคา (±50) และกำแพง OI สูงสุด — ใช้เทียบข้ามวัน (สัญญารายวันเปลี่ยนทุกวัน)
+  const band = ks.filter(s => Math.abs(s.k - price) <= 50);
+  const nearOI = band.reduce((a, s) => [a[0] + s.oiC, a[1] + s.oiP], [0, 0]);
+  const wallC = ks.filter(s => s.oiC > 0).sort((a, b) => b.oiC - a.oiC)[0], wallP = ks.filter(s => s.oiP > 0).sort((a, b) => b.oiP - a.oiP)[0];
   const totOI = ks.reduce((a, s) => [a[0] + s.oiC, a[1] + s.oiP], [0, 0]), totV = ks.reduce((a, s) => [a[0] + s.vC, a[1] + s.vP], [0, 0]);
   // COT (CFTC) ทองคำ + DXY
   let cot = null;
@@ -105,7 +109,7 @@ function aiGather_() {
     gamma_flip_today: o.itd, gamma_flip_30d: o.gmfM && o.gmfM.M, net_gex_today_musd: o.gexItd, net_gex_30d_musd: o.gmfM && o.gmfM.gexM,
     max_pain: mp, expected_move: o.em, expected_move_range_today: o.openEM ? [Math.round((o.openF - o.openEM) * 10) / 10, Math.round((o.openF + o.openEM) * 10) / 10] : null,
     skew_put25_minus_call25_volpts: p25 !== null && c25 !== null ? Math.round((p25 - c25) * 1000) / 10 : null,
-    total_oi_call: totOI[0], total_oi_put: totOI[1], total_vol_call: totV[0], total_vol_put: totV[1],
+    total_oi_call: totOI[0], total_oi_put: totOI[1], near_oi_call: nearOI[0], near_oi_put: nearOI[1], wall_call: wallC ? [wallC.k, wallC.oiC] : null, wall_put: wallP ? [wallP.k, wallP.oiP] : null, total_vol_call: totV[0], total_vol_put: totV[1],
     facts, strikes: tbl, cot, calendar: cal, headlines: aiNews_().slice(0, 10),
   };
 }
@@ -202,7 +206,7 @@ function runAI_(reason) {
   // รันซ้ำภายใน 30 นาที: แทนจุดล่าสุดแทนการต่อท้าย
   const lastLab = (old.px || []).slice(-1)[0];
   if (lastLab && Math.abs(new Date('2026-' + lastLab[0].replace(' ', 'T') + ':00+07:00').getTime() - Date.now()) < 30 * 60e3) { old.px = old.px.slice(0, -1); old.hist = (old.hist || []).slice(0, -1); }
-  const hist = (old.hist || []).concat([[lab, data.contract, data.total_oi_call, data.total_oi_put, data.futures_price]]).slice(-20);
+  const hist = (old.hist || []).concat([[lab, data.contract, data.total_oi_call, data.total_oi_put, data.futures_price, data.near_oi_call, data.near_oi_put, data.wall_call, data.wall_put]]).slice(-20);
   const pxh = (old.px || []).concat([[lab, data.futures_price]]).slice(-30);
   // ตัดจุดที่ห่างจากจุดถัดไปไม่ถึง 30 นาที (รันซ้ำติดกัน) เก็บจุดหลัง
   const tOf = l => new Date(new Date().getFullYear() + '-' + String(l).replace(' ', 'T') + ':00+07:00').getTime();

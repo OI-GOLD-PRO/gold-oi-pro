@@ -505,15 +505,20 @@
     const days = [...byDay.values()].slice(-6);
     if (days.length >= 2) {
       const L = days[days.length - 1], P = days[days.length - 2];
-      const pcrL = L[3] / L[2], pcrP = P[3] / P[2];
+      const hasN = h => isFinite(h[5]) && isFinite(h[6]) && h[5] > 0;
+      const nearOK = hasN(L) && hasN(P);
+      const pcrOf = h => nearOK ? h[6] / h[5] : h[3] / h[2];   // ถ้ามี OI ใกล้ราคาให้ใช้ (ตรงกับแรงจริงรอบราคา) ไม่งั้นใช้ OI รวม
+      const pcrL = pcrOf(L), pcrP = pcrOf(P);
       const dP = pct(L[4], P[4]), dR = pct(pcrL, pcrP);
       const pd = dir(dP, 0.1), rd = dir(dR, 1);
       const hit = pd && rd ? OPT_T.find(r => r.y === (rd > 0 ? 'P' : 'C') && r.p === pd && r.o === 1) : null;
+      const wk = h => Array.isArray(h[7]) && Array.isArray(h[8]) ? [h[7][0], h[8][0]] : null, wl = wk(L), wp = wk(P);
+      const walls = wl && wp ? `<div class="note">กำแพง OI สูงสุด: Call ${wp[0]} → ${wl[0]} (${wl[0] > wp[0] ? 'ขยับขึ้น = แนวต้านสูงขึ้น' : wl[0] < wp[0] ? 'ขยับลง = แนวต้านต่ำลง' : 'เท่าเดิม'}) · Put ${wp[1]} → ${wl[1]} (${wl[1] > wp[1] ? 'ขยับขึ้น = แนวรับสูงขึ้น' : wl[1] < wp[1] ? 'ขยับลง = แนวรับต่ำลง' : 'เท่าเดิม'})</div>` : '';
       day = `<h3 style="margin-top:12px">③ ข้ามวัน: สัดส่วน Put/Call × ราคา <span style="font-weight:400;color:var(--muted)">(${esc(P[0].split(' ')[0])} → ${esc(L[0].split(' ')[0])})</span></h3>
         <div class="oc-now">ราคา <b class="${pd > 0 ? 'up' : pd < 0 ? 'dn' : ''}">${arrow(pd)} ${sgp(dP)}</b> · Put/Call OI <b class="${rd > 0 ? 'dn' : rd < 0 ? 'up' : ''}">${pcrP.toFixed(2)} → ${pcrL.toFixed(2)} ${arrow(rd)}</b>
           ${hit ? `<br>${rd > 0 ? 'Put เพิ่มขึ้นเมื่อเทียบกับ Call' : 'Call เพิ่มขึ้นเมื่อเทียบกับ Put'} → ${hit.m} <span class="oc-t">${esc(hit.t)}</span>` : '<br><span class="oc-t">ราคาหรือสัดส่วนแทบไม่เปลี่ยน ยังไม่เข้าเงื่อนไข</span>'}</div>
-        <div class="oc-tb">${days.map((h, i) => { const r = h[3] / h[2], pr = i ? days[i - 1] : null; return `<div class="oc-r oc4"><span>${esc(String(h[0]).split(' ')[0])}</span><span>${esc(h[1] || '')}</span><span>ราคา ${Number(h[4]).toFixed(1)}${pr ? ` ${arrow(dir(pct(h[4], pr[4]), 0.1))}` : ''} · Put/Call ${r.toFixed(2)}${pr ? ` ${arrow(dir(pct(r, pr[3] / pr[2]), 1))}` : ''}</span></div>`; }).join('')}</div>
-        <div class="note">สัญญา OI รายวันหมดอายุทุกวัน ยอดสัญญาเทียบข้ามวันไม่ได้ จึงเทียบ "สัดส่วน" Put/Call แทน: สัดส่วนเพิ่ม = Put เพิ่มเร็วกว่า Call (ใช้แถว Put OI ▲ ในตาราง) · สัดส่วนลด = Call เพิ่มเร็วกว่า (ใช้แถว Call OI ▲) · อ่านเป็นแนวโน้มเท่านั้น</div>`;
+        <div class="oc-tb">${days.map((h, i) => { const r = pcrOf(h), pr = i ? days[i - 1] : null; return `<div class="oc-r oc4"><span>${esc(String(h[0]).split(' ')[0])}</span><span>${esc(h[1] || '')}</span><span>ราคา ${Number(h[4]).toFixed(1)}${pr ? ` ${arrow(dir(pct(h[4], pr[4]), 0.1))}` : ''} · Put/Call ${r.toFixed(2)}${pr ? ` ${arrow(dir(pct(r, pcrOf(pr)), 1))}` : ''}${Array.isArray(h[7]) && Array.isArray(h[8]) ? ` · Call ${h[7][0]} / Put ${h[8][0]}` : ''}</span></div>`; }).join('')}</div>${walls}
+        <div class="note">สัญญา OI รายวันหมดอายุทุกวัน ยอดสัญญาเทียบข้ามวันไม่ได้ จึงเทียบ "สัดส่วน" Put/Call (ใช้ OI ±50 รอบราคาเมื่อมีข้อมูล ไม่งั้นใช้ OI รวม) แทน: สัดส่วนเพิ่ม = Put เพิ่มเร็วกว่า Call (ใช้แถว Put OI ▲ ในตาราง) · สัดส่วนลด = Call เพิ่มเร็วกว่า (ใช้แถว Call OI ▲) · อ่านเป็นแนวโน้มเท่านั้น</div>`;
     }
     if (!fut && !opt && !day) return '';
     return `<div class="card"><h3>🔎 เปรียบเทียบ OI ตามบทความ</h3>${fut}${opt}${day}</div>`;

@@ -177,6 +177,48 @@
     };
   }
 
+  // ---------- หลายไทม์เฟรม (เน้นเทรดในวัน): H4 = ทิศใหญ่, H1 = โครงสร้าง, M15 = จุดตั้งเทรด, M5 = จังหวะเข้า ----------
+  const atrOf = (cl, n) => { const s = cl.slice(-(n + 1)); let a = 0; for (let i = 1; i < s.length; i++) a += Math.max(s[i].high - s[i].low, Math.abs(s[i].high - s[i - 1].close), Math.abs(s[i].low - s[i - 1].close)); return a / Math.max(1, s.length - 1); };
+  function structure(cl) {
+    // จุดกลับตัวแบบ fractal 2 แท่งซ้าย-ขวา → เทียบ 2 จุดล่าสุด
+    const H = [], L = [];
+    for (let i = 2; i < cl.length - 2; i++) {
+      const b = cl[i]; if (b.high > cl[i - 1].high && b.high > cl[i - 2].high && b.high >= cl[i + 1].high && b.high >= cl[i + 2].high) H.push(b.high);
+      if (b.low < cl[i - 1].low && b.low < cl[i - 2].low && b.low <= cl[i + 1].low && b.low <= cl[i + 2].low) L.push(b.low);
+    }
+    if (H.length < 2 || L.length < 2) return 'ยังไม่ชัด';
+    const hh = H[H.length - 1] > H[H.length - 2], hl = L[L.length - 1] > L[L.length - 2];
+    return hh && hl ? 'HH-HL (ขาขึ้น)' : !hh && !hl ? 'LH-LL (ขาลง)' : hh ? 'HH-LL (ขยายกรอบ)' : 'LH-HL (บีบตัว)';
+  }
+  function tfSummary(name, B, levels, nBars) {
+    if (!B || B.length < 60) return null;
+    const cl = B.slice(0, -1), last = cl[cl.length - 1], atr = atrOf(cl, 14), c = cl.map(b => b.close);
+    const e20 = ema(c, 20), e50 = ema(c, 50), e20p = ema(c.slice(0, -5), 20);
+    const trend = last.close > e20 && e20 > e50 && e20 > e20p ? 'ขึ้น' : last.close < e20 && e20 < e50 && e20 < e20p ? 'ลง' : 'ไซด์เวย์';
+    const sw = cl.slice(-30), hi = Math.max(...sw.map(b => b.high)), lo = Math.min(...sw.map(b => b.low));
+    const vol = new Map(B.map(b => [b.time, b.volume || 0]));
+    return {
+      tf: name, trend, structure: structure(cl.slice(-60)), atr: Math.round(atr * 100) / 100,
+      ema20: Math.round(e20 * 100) / 100, ema50: Math.round(e50 * 100) / 100,
+      range_30: { high: Math.round(hi * 100) / 100, low: Math.round(lo * 100) / 100, price_pos_pct: Math.round((B[B.length - 1].close - lo) / Math.max(0.01, hi - lo) * 100) },
+      patterns: patterns(B, atr, levels).filter(p => p.bar === 'แท่งล่าสุดที่ปิด' || p.bar === 'ย้อนหลัง 2 แท่ง'),
+      absorption: (({ rate_40_pct, count_40, count_last10, bias }) => ({ rate_40_pct, count_40, count_last10, bias }))(absorption(B, vol, atr, levels)),
+      bars: B.slice(-nBars).map(b => [hhmm(b.time), +b.open.toFixed(2), +b.high.toFixed(2), +b.low.toFixed(2), +b.close.toFixed(2), b.volume || 0]),
+    };
+  }
+  const MTF = [['H4', '4h', 160, 12], ['H1', '1h', 200, 20], ['M15', '15m', 200, 24], ['M5', '5m', 200, 24]];
+  async function multiTF(snap) {
+    const cur = O.tf, vol = new Map((O.rawBars || []).map(k => [Math.floor(k[0] / 1000) + TZ, k[5] || 0]));
+    const res = await Promise.all(MTF.map(async ([nm, t, n, nb]) => {
+      let B = null;
+      if (t === cur) B = (O.series.data() || []).map(b => Object.assign({}, b, { volume: vol.get(b.time) || 0 }));
+      else { try { B = await O.fetchTF(t, n); } catch (e) { B = null; } }
+      return tfSummary(nm, B, snap.levels, nb);
+    }));
+    const out = {}; res.forEach(r => { if (r) out[r.tf] = r; });
+    return out;
+  }
+
   // ---------- วาดกราฟในถาด ----------
   function drawMini(cv, bars, upto, scanX, plan, lvls) {
     const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
@@ -219,6 +261,12 @@
     $('paGo').onclick = run;
     if (result) bindResult();
   }
+  function mtfHTML(r) {
+    const v = r.tf_view; if (!v || typeof v !== 'object') return '';
+    const rows = ['H4', 'H1', 'M15', 'M5'].filter(k => v[k]).map(k => { const t = r.mtf && r.mtf[k]; const tr = t ? t.trend : ''; const ic = tr === 'ขึ้น' ? '🟢' : tr === 'ลง' ? '🔴' : '⚪';
+      return `<div style="display:flex;gap:8px;padding:3px 0;border-top:1px solid #1a2246"><b style="width:34px;font:700 12px var(--mono,monospace);color:#e0b44c">${k}</b><span style="font-size:12px;line-height:1.45">${ic} ${esc(v[k])}</span></div>`; }).join('');
+    return `<div style="margin:8px 0;padding:6px 10px;border:1px solid #1f2850;border-radius:10px;background:#0f1533"><b style="font-size:13px">🧭 หลายไทม์เฟรม</b>${r.align ? ` <span style="font-size:12px;color:${/สอดคล้อง/.test(r.align) ? '#2fe3a6' : '#f0a35b'}">· ${esc(r.align)}</span>` : ''}${rows}</div>`;
+  }
   function absHTML(r) {
     const a = r.abs; if (!a || a.count_40 === undefined) return '';
     const col = a.rate_40_pct >= 20 ? '#ffd97a' : a.rate_40_pct >= 10 ? '#c9d1ea' : '#8a93ad';
@@ -234,6 +282,7 @@
     return `${old ? '<div class="muted">ผลล่าสุด</div>' : ''}<div class="act"><span class="badge ${r.action}">${r.action === 'WAIT' ? 'รอ' : r.action}</span>
       <div class="conf"><small>ความมั่นใจ ${conf}% · ${esc(r.tf)} · ${esc((r.time_th || '').slice(11))} น. · ราคา ${f2(r.price)}</small><div class="bar"><i style="width:${old ? conf : 0}%"></i></div></div></div>
       <div class="pat">${esc(r.pattern)}</div><p>${esc(r.pa)}</p><p style="color:#a9b4d6">${esc(r.context)}</p>
+      ${mtfHTML(r)}
       ${absHTML(r)}
       ${r.entry || r.sl || r.tp1 ? `<div class="plan"><div><small>${r.action === 'WAIT' ? 'รอเข้า' : 'Entry'}</small>${f2(r.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(r.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(r.tp1)}</span></div><div><small>TP2${r.rr ? ' · R:R 1:' + r.rr : ''}</small><span style="color:#2fe3a6">${f2(r.tp2)}</span></div></div>` : ''}
       ${r.reasons && r.reasons.length ? `<ul>${r.reasons.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
@@ -255,7 +304,7 @@
     busy = true;
     const draw = snap._draw, pats = snap.patterns;
     const patTxt = pats.length ? pats.slice(0, 2).map(p => p.name.split(' (')[0]).join(' + ') : 'ไม่พบรูปแบบชัด';
-    const steps = [`▸ อ่านแท่งเทียน ${snap.tf} 40 แท่ง · ATR ${f2(snap.atr)}`, `▸ Price Action: ${patTxt}`, `▸ Absorption ${snap.absorption.count_40 !== undefined ? snap.absorption.rate_40_pct + '% · ' + snap.absorption.bias : '–'}`, `▸ เทียบแนว ${snap.levels.length} ระดับ (OI / EM / gmf / VWAP)`, '▸ DeepSeek กำลังตัดสินใจ…'];
+    const steps = [`▸ อ่านแท่งเทียน ${snap.tf} 40 แท่ง · ATR ${f2(snap.atr)}`, '▸ อ่านหลาย TF: H4 / H1 / M15 / M5…', `▸ Price Action ${snap.tf}: ${patTxt}`, `▸ Absorption ${snap.absorption.count_40 !== undefined ? snap.absorption.rate_40_pct + '% · ' + snap.absorption.bias : '–'}`, `▸ เทียบแนว ${snap.levels.length} ระดับ (OI / EM / gmf / VWAP)`, '▸ DeepSeek กำลังตัดสินใจ…'];
     bd().innerHTML = `<canvas id="paCv"></canvas><div class="think">AI กำลังวิเคราะห์<i></i><i></i><i></i></div><div class="steps">${steps.map(s => `<div>${esc(s)}</div>`).join('')}</div>`;
     const cv = $('paCv'), st = [...bd().querySelectorAll('.steps div')];
     // กราฟวิ่งไวๆ: เลื่อนจากแท่งเก่าไปล่าสุด แล้วสแกนซ้ำ จนกว่าผลจะมา
@@ -266,19 +315,25 @@
       const upto = cyc < 1500 ? Math.max(1, Math.round(40 + (all.length - 40) * (cyc / 1500))) : all.length;
       const W = cv.clientWidth - 46, scan = cyc >= 1500 ? (cyc - 1500) / 1100 * W : null;
       drawMini(cv, all, Math.min(all.length, upto), scan, null, cyc >= 1500 ? lv : null);
-      const k = Math.min(4, Math.floor(el / 750));
+      const k = Math.min(5, Math.floor(el / 700));
       st.forEach((d, i) => { d.className = i < k ? 'ok' : i === k ? 'on' : ''; });
       anim = requestAnimationFrame(loop);
     };
     anim = requestAnimationFrame(loop);
     const payload = Object.assign({}, snap); delete payload._draw;
-    const [res] = await Promise.all([O.aiCall('ai_pa', payload, 90000), new Promise(r => setTimeout(r, 2800))]);
+    try { payload.tfs = await multiTF(snap); } catch (e) { payload.tfs = {}; }
+    if (payload.tfs.M15) payload.atr_m15 = payload.tfs.M15.atr;
+    payload.style = 'เทรดในวัน (Intraday) ถือไม่ข้ามคืน: H4 ดูทิศใหญ่, H1 ดูโครงสร้าง/แนว, M15 หาจุดตั้งเทรด, M5 หาจังหวะเข้า';
+    const mtfTxt = Object.values(payload.tfs).map(t => `${t.tf} ${t.trend}`).join(' · ');
+    const stEl = bd().querySelectorAll('.steps div')[1]; if (stEl && mtfTxt) stEl.textContent = '▸ หลาย TF: ' + mtfTxt;
+    const [res] = await Promise.all([O.aiCall('ai_pa', payload, 90000), new Promise(r => setTimeout(r, 2000))]);
     cancelAnimationFrame(anim); busy = false;
     if (!res || !res.ok) {
       bd().innerHTML = `<div class="err">วิเคราะห์ไม่สำเร็จ: ${esc(res && res.error === 'auth' ? 'รหัสเข้าแอปหมดอายุ' : (res && res.error) || 'ไม่ทราบสาเหตุ')}</div><button class="go" id="paGo">ลองใหม่</button>`;
       $('paGo').onclick = run; return;
     }
-    result = res.pa; result.at = Date.now(); result.abs = snap.absorption; showPlan = result.action !== 'WAIT' || !!result.entry;
+    result = res.pa; result.at = Date.now(); result.abs = snap.absorption;
+    result.mtf = {}; Object.values(payload.tfs || {}).forEach(t => { result.mtf[t.tf] = { trend: t.trend }; }); showPlan = result.action !== 'WAIT' || !!result.entry;
     bd().innerHTML = `<canvas id="paCv"></canvas>` + resultHTML(result, false);
     drawMini($('paCv'), draw, draw.length, null, result, null);
     requestAnimationFrame(() => { const i = bd().querySelector('.conf .bar i'); if (i) i.style.width = (result.confidence || 0) + '%'; });

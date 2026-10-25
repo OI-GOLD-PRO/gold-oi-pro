@@ -90,7 +90,7 @@
   #dash .cleg i { display: inline-block; width: 10px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
   #dash .msg { padding: 40px 16px; text-align: center; color: var(--muted); font-size: 13px; }
   #dash .note { font-size: 10.5px; color: var(--muted); line-height: 1.5; }
-  @supports (-webkit-touch-callout: none) { #dash { padding-top: calc(env(safe-area-inset-top, 0px) + 28px) !important; } #aiwrap { padding-top: env(safe-area-inset-top, 0px); } }
+  @supports (-webkit-touch-callout: none) { #dash { padding-top: calc(env(safe-area-inset-top, 0px) + 6px) !important; } #aiwrap { padding-top: env(safe-area-inset-top, 0px); } }
   @media (max-width: 440px) { #dash .dtop h2 { font-size: 14px; } #dash .dtop { gap: 6px; padding: 10px 10px 8px; } #dash .dtabs button { padding: 5px 8px; } }
   #dash .aibtn { background: linear-gradient(135deg, #1b2a4a, #2a1b4a); border: 1px solid #5b7cff; color: #cfe0ff; border-radius: 10px; padding: 6px 10px; font: 600 12px var(--sans); white-space: nowrap; box-shadow: 0 0 10px rgba(91,124,255,.35); }
   #dash .aibtn:active { transform: scale(.96); }

@@ -395,6 +395,31 @@
     return `<div class="card"><h3>🏦 COT แยกกลุ่ม · กองทุน · Commercial · Non-commercial · รายย่อย</h3>${window.OICotGroups.html()}</div>`;
   }
 
+  // ---------- กราฟแท่ง OI ราย strike ของสัญญาที่อัพเดทในชีต (Call ซ้าย / Put ขวา) ----------
+  function oiBarsCard(ref, cfg) {
+    const o = O.oi; if (!o || !o.rows || !o.rows.length) return '';
+    const px = ref !== null && isFinite(ref) ? ref : null;
+    const rows = o.rows.filter(r => r.c + r.p > 0);
+    if (!rows.length) return '';
+    const near = (px === null ? rows.slice().sort((a, b) => (b.c + b.p) - (a.c + a.p)) : rows.slice().sort((a, b) => Math.abs(a.strike - px) - Math.abs(b.strike - px))).slice(0, 17).sort((a, b) => b.strike - a.strike);
+    const mx = Math.max(1, ...near.map(r => Math.max(r.c, r.p)));
+    const topC = Math.max(...near.map(r => r.c)), topP = Math.max(...near.map(r => r.p));
+    const f = n => Math.round(n).toLocaleString('en-US');
+    const tC = rows.reduce((a, r) => a + r.c, 0), tP = rows.reduce((a, r) => a + r.p, 0);
+    const bars = near.map(r => {
+      const wc = Math.round(r.c / mx * 100), wp = Math.round(r.p / mx * 100);
+      const isPx = px !== null && Math.abs(r.strike - px) < 2.5;
+      return `<div style="display:grid;grid-template-columns:1fr 50px 1fr;align-items:center;gap:4px;font:10.5px var(--mono)${isPx ? ';background:rgba(224,180,76,.12);border-radius:4px' : ''}">
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:4px">${r.c ? `<span style="color:var(--muted)${r.c === topC ? ';color:var(--call);font-weight:700' : ''}">${f(r.c)}</span><i style="display:block;height:8px;width:${wc}%;background:var(--call);border-radius:2px"></i>` : ''}</div>
+        <span style="text-align:center">${r.strike}</span>
+        <div style="display:flex;align-items:center;gap:4px">${r.p ? `<i style="display:block;height:8px;width:${wp}%;background:var(--put);border-radius:2px"></i><span style="color:var(--muted)${r.p === topP ? ';color:var(--put);font-weight:700' : ''}">${f(r.p)}</span>` : ''}</div></div>`;
+    }).join('');
+    return `<div class="card"><h3>📊 OI ราย strike · สัญญา ${esc(cfg.contract || '–')} (อัพเดท ${esc(cfg.offset_time || '–')})</h3>
+      <div style="display:flex;justify-content:space-between;font:600 11px var(--sans);margin:2px 0 6px"><span style="color:var(--call)">◀ Call OI รวม ${f(tC)}</span><span style="color:var(--put)">Put OI รวม ${f(tP)} ▶</span></div>
+      <div style="display:grid;gap:3px">${bars}</div>
+      <div class="note">แท่งยาว = OI มาก · ตัวหนาคือ strike ที่ OI สูงสุดในช่วงที่แสดง · แถบทองคือ strike ใกล้ราคา</div></div>`;
+  }
+
   // ---------- ออปชันสัญญาวันนี้แบบสด (จาก live.js / Worker) ----------
   function liveCard(price) {
     const L = window.OILive, c = L && L.calc;
@@ -567,7 +592,7 @@
     }
 
     // 1.5) COT + Gamma (เฉพาะทองคำ)
-    if (cur === 'gold') { parts.push(cotCard(price, cfg)); parts.push(cotGroupsCard()); parts.push(liveCard(price)); }
+    if (cur === 'gold') { parts.push(cotCard(price, cfg)); parts.push(cotGroupsCard()); parts.push(oiBarsCard(isFinite(gcSheet) && gcSheet > 0 ? gcSheet : price, cfg)); parts.push(liveCard(price)); }
 
     // 2) ป้ายเตือนราคาใกล้แนว
     if (price !== null) {

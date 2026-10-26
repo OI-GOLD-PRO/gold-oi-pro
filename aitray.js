@@ -234,6 +234,63 @@
     const hh = H[H.length - 1] > H[H.length - 2], hl = L[L.length - 1] > L[L.length - 2];
     return hh && hl ? 'HH-HL (ขาขึ้น)' : !hh && !hl ? 'LH-LL (ขาลง)' : hh ? 'HH-LL (ขยายกรอบ)' : 'LH-HL (บีบตัว)';
   }
+  // ---------- SMC (Smart Money Concepts) แบบตายตัว: Swing, BOS/CHoCH, Order Block, FVG, Premium/Discount, Liquidity ----------
+  function smc(cl, atr) {
+    const n = cl.length, r2 = v => Math.round(v * 100) / 100;
+    if (n < 30) return null;
+    // จุด swing แบบ fractal 2 แท่งซ้าย-ขวา
+    const sw = [];
+    for (let i = 2; i < n - 2; i++) {
+      const b = cl[i];
+      if (b.high > cl[i - 1].high && b.high > cl[i - 2].high && b.high >= cl[i + 1].high && b.high >= cl[i + 2].high) sw.push({ k: 'H', p: b.high, i });
+      if (b.low < cl[i - 1].low && b.low < cl[i - 2].low && b.low <= cl[i + 1].low && b.low <= cl[i + 2].low) sw.push({ k: 'L', p: b.low, i });
+    }
+    // เดินแท่งทีละแท่ง: ปิดเหนือ swing high ล่าสุดที่ยังไม่ถูกทำลาย = เบรกขึ้น (ทิศเดิมลง → CHoCH, ทิศเดิมขึ้น → BOS)
+    let trend = 0, lastH = null, lastL = null; const ev = [], obs = [];
+    const swAt = new Map(); sw.forEach(x => { const a = swAt.get(x.i + 2) || []; a.push(x); swAt.set(x.i + 2, a); }); // swing ยืนยันได้หลังผ่านไป 2 แท่ง
+    for (let i = 0; i < n; i++) {
+      (swAt.get(i) || []).forEach(x => { if (x.k === 'H') lastH = { ...x, broken: false }; else lastL = { ...x, broken: false }; });
+      const b = cl[i];
+      if (lastH && !lastH.broken && b.close > lastH.p) {
+        lastH.broken = true; const kind = trend < 0 ? 'CHoCH' : 'BOS'; trend = 1; ev.push({ kind, dir: 'ขึ้น', level: r2(lastH.p), i });
+        // Order Block ขาขึ้น = แท่งแดงสุดท้ายก่อนแรงส่งที่ทำให้เบรก
+        for (let j = i - 1; j >= Math.max(0, (lastL ? lastL.i : i - 15)); j--) if (cl[j].close < cl[j].open) { obs.push({ dir: 'bull', top: cl[j].high, bot: cl[j].low, i: j }); break; }
+      }
+      if (lastL && !lastL.broken && b.close < lastL.p) {
+        lastL.broken = true; const kind = trend > 0 ? 'CHoCH' : 'BOS'; trend = -1; ev.push({ kind, dir: 'ลง', level: r2(lastL.p), i });
+        for (let j = i - 1; j >= Math.max(0, (lastH ? lastH.i : i - 15)); j--) if (cl[j].close > cl[j].open) { obs.push({ dir: 'bear', top: cl[j].high, bot: cl[j].low, i: j }); break; }
+      }
+    }
+    const ago = i => n - 1 - i, px = cl[n - 1].close;
+    // OB ที่ยังไม่ถูกราคากลับมาแตะ (unmitigated)
+    const freshOB = d => obs.filter(o => o.dir === d).filter(o => !cl.slice(o.i + 3).some(b => d === 'bull' ? b.low <= o.top : b.high >= o.bot)).slice(-1)[0] || null;
+    const ob = d => { const o = freshOB(d); return o ? { top: r2(o.top), bottom: r2(o.bot), bars_ago: ago(o.i) } : null; };
+    // FVG (ช่องว่างราคา 3 แท่ง) ที่ยังเติมไม่เต็ม ขนาด ≥ 0.3 ATR
+    const fvg = [];
+    for (let i = 2; i < n; i++) {
+      const a = cl[i - 2], c = cl[i];
+      if (c.low > a.high && c.low - a.high >= 0.3 * atr) fvg.push({ dir: 'bull', top: c.low, bot: a.high, i });
+      if (c.high < a.low && a.low - c.high >= 0.3 * atr) fvg.push({ dir: 'bear', top: a.low, bot: c.high, i });
+    }
+    const openFvg = d => fvg.filter(f => f.dir === d && !cl.slice(f.i + 1).some(b => d === 'bull' ? b.low <= f.bot : b.high >= f.top)).slice(-2).map(f => ({ top: r2(f.top), bottom: r2(f.bot), bars_ago: ago(f.i) }));
+    // กรอบดีล (dealing range) = swing high/low ล่าสุด → Premium (เหนือ 50%) / Discount (ใต้ 50%)
+    const hs = sw.filter(x => x.k === 'H'), ls = sw.filter(x => x.k === 'L');
+    const rh = hs.length ? hs[hs.length - 1].p : null, rl = ls.length ? ls[ls.length - 1].p : null;
+    const hiR = rh !== null && rl !== null ? Math.max(rh, rl, ...cl.slice(-5).map(b => b.high)) : null, loR = rh !== null && rl !== null ? Math.min(rh, rl, ...cl.slice(-5).map(b => b.low)) : null;
+    const pos = hiR !== null && hiR > loR ? Math.round((px - loR) / (hiR - loR) * 100) : null;
+    // สภาพคล่อง: Equal Highs/Lows (2 swing ห่างกันไม่เกิน 0.15 ATR) ที่ยังไม่ถูกกวาด
+    const eq = (arr, k) => { for (let a = arr.length - 1; a > 0; a--) for (let b2 = a - 1; b2 >= Math.max(0, a - 4); b2--) if (Math.abs(arr[a].p - arr[b2].p) <= 0.15 * atr) { const lv = k === 'H' ? Math.max(arr[a].p, arr[b2].p) : Math.min(arr[a].p, arr[b2].p); const swept = cl.slice(arr[a].i + 1).some(b => k === 'H' ? b.high > lv : b.low < lv); if (!swept) return r2(lv); } return null; };
+    const last = ev[ev.length - 1] || null;
+    return {
+      bias: trend > 0 ? 'ขาขึ้น' : trend < 0 ? 'ขาลง' : 'ยังไม่ชัด',
+      last_event: last ? { type: last.kind, dir: last.dir, level: last.level, bars_ago: ago(last.i) } : null,
+      events: ev.slice(-4).map(e => `${e.kind} ${e.dir} @${e.level} (${ago(e.i)} แท่งก่อน)`),
+      swing_high: rh !== null ? r2(rh) : null, swing_low: rl !== null ? r2(rl) : null,
+      zone: pos === null ? null : pos >= 55 ? `Premium ${pos}%` : pos <= 45 ? `Discount ${pos}%` : `Equilibrium ${pos}%`,
+      bull_ob: ob('bull'), bear_ob: ob('bear'), bull_fvg: openFvg('bull'), bear_fvg: openFvg('bear'),
+      eq_highs: eq(hs, 'H'), eq_lows: eq(ls, 'L'),
+    };
+  }
   function tfSummary(name, B, levels, nBars) {
     if (!B || B.length < 60) return null;
     const cl = B.slice(0, -1), last = cl[cl.length - 1], atr = atrOf(cl, 14), c = cl.map(b => b.close);
@@ -244,6 +301,7 @@
     const vol = new Map(B.map(b => [b.time, b.volume || 0]));
     return {
       tf: name, trend, structure: struct, atr: Math.round(atr * 100) / 100,
+      smc: smc(cl.slice(name === 'H1' ? -150 : -120), atr),
       range_30: { high: Math.round(hi * 100) / 100, low: Math.round(lo * 100) / 100, price_pos_pct: Math.round((B[B.length - 1].close - lo) / Math.max(0.01, hi - lo) * 100) },
       patterns: patterns(B, atr, levels).filter(p => p.bar === 'แท่งล่าสุดที่ปิด' || p.bar === 'ย้อนหลัง 2 แท่ง'),
       absorption: (({ rate_40_pct, count_40, count_last10, bias }) => ({ rate_40_pct, count_40, count_last10, bias }))(absorption(B, vol, atr, levels)),
@@ -319,6 +377,14 @@
     const items = (r.news || []).map(n => `<div style="display:flex;gap:6px;padding:4px 0;border-top:1px solid #1a2246;font-size:12px;line-height:1.45"><span style="width:16px;text-align:center;font-weight:700;color:${n.impact === '+' ? '#2fe3a6' : n.impact === '-' ? '#ff6b82' : '#8a93ad'}">${n.impact === '+' ? '▲' : n.impact === '-' ? '▼' : '•'}</span><span>${esc(n.th)}<br><small style="color:#6f7896">${esc(n.src)} · ${ago(n.ago_min)}ที่แล้ว</small></span></div>`).join('');
     return `<div style="margin:8px 0;padding:6px 10px;border:1px solid #1f2850;border-radius:10px;background:#0f1533"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:13px">📰 ข่าวล่าสุด</b>${r.news_bias ? `<span style="font-size:12px;font-weight:700;color:${bc}">${esc(r.news_bias)}</span>` : ''}</div>${r.news_summary ? `<p style="margin:4px 0 2px;font-size:12px;color:#c9d1ea">${esc(r.news_summary)}</p>` : ''}${items}</div>`;
   }
+  function smcHTML(r) {
+    const S = r.smcH1; if (!S && !r.smc) return '';
+    const z = (o, c) => o ? `<span style="color:${c}">${f2(o.bottom)}–${f2(o.top)}</span>` : '–';
+    const fv = a => a && a.length ? a.map(f => `${f2(f.bottom)}–${f2(f.top)}`).join(', ') : '–';
+    const ev = S && S.last_event ? `<b style="color:${S.last_event.dir === 'ขึ้น' ? '#2fe3a6' : '#ff6b82'}">${S.last_event.type} ${S.last_event.dir}</b> @${f2(S.last_event.level)} · ${S.last_event.bars_ago} แท่งก่อน` : 'ยังไม่มี BOS/CHoCH';
+    const facts = S ? `<div style="font:11px var(--mono,monospace);color:#a9b4d6;line-height:1.6;margin-top:3px">โครงสร้าง: ${esc(S.bias)} · ${ev}<br>Swing H/L: ${f2(S.swing_high)} / ${f2(S.swing_low)} · ${esc(S.zone || '–')}<br>OB ซื้อ ${z(S.bull_ob, '#2fe3a6')} · OB ขาย ${z(S.bear_ob, '#ff6b82')}<br>FVG ขึ้น ${fv(S.bull_fvg)} · FVG ลง ${fv(S.bear_fvg)}${S.eq_highs || S.eq_lows ? `<br>Liquidity: ${S.eq_highs ? 'EQH ' + f2(S.eq_highs) : ''}${S.eq_highs && S.eq_lows ? ' · ' : ''}${S.eq_lows ? 'EQL ' + f2(S.eq_lows) : ''}` : ''}</div>` : '';
+    return `<div style="margin:8px 0;padding:6px 10px;border:1px solid #1f2850;border-radius:10px;background:#0f1533"><b style="font-size:13px">🏗️ โครงสร้างตลาด SMC (H1)</b>${facts}${r.smc ? `<p style="margin-top:5px">${esc(r.smc)}</p>` : ''}</div>`;
+  }
   function mtfHTML(r) {
     const v = r.tf_view; if (!v || typeof v !== 'object') return '';
     const rows = ['H4', 'H1', 'M15', 'M5', 'M1'].filter(k => v[k]).map(k => { const t = r.mtf && r.mtf[k]; const tr = t ? t.trend : ''; const ic = tr === 'ขึ้น' ? '🟢' : tr === 'ลง' ? '🔴' : '⚪';
@@ -342,6 +408,7 @@
       ${spkHTML('main')}
       <div class="pat">${esc(r.pattern)}</div><p>${esc(r.pa)}</p><p style="color:#a9b4d6">${esc(r.context)}</p>
       ${newsHTML(r)}
+      ${smcHTML(r)}
       ${mtfHTML(r)}
       ${absHTML(r)}
       ${r.entry || r.sl || r.tp1 ? `<div class="plan"><div><small>${r.action === 'WAIT' ? 'รอเข้า' : 'Entry'}</small>${f2(r.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(r.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(r.tp1)}</span></div><div><small>TP2${r.rr ? ' · R:R 1:' + r.rr : ''}</small><span style="color:#2fe3a6">${f2(r.tp2)}</span></div></div>` : ''}
@@ -548,7 +615,7 @@
       $('paGo').onclick = run; return;
     }
     result = res.pa; result.at = Date.now(); result.abs = snap.absorption; sideRes = null; sidePick = null;
-    result.mtf = {}; Object.values(payload.tfs || {}).forEach(t => { result.mtf[t.tf] = { trend: t.trend }; }); showPlan = result.action !== 'WAIT' || !!result.entry;
+    result.mtf = {}; Object.values(payload.tfs || {}).forEach(t => { result.mtf[t.tf] = { trend: t.trend }; }); result.smcH1 = payload.tfs && payload.tfs.H1 ? payload.tfs.H1.smc : null; showPlan = result.action !== 'WAIT' || !!result.entry;
     bd().innerHTML = `<canvas id="paCv"></canvas>` + resultHTML(result, false);
     drawMini($('paCv'), draw, draw.length, null, result, null);
     requestAnimationFrame(() => { const i = bd().querySelector('.conf .bar i'); if (i) i.style.width = (result.confidence || 0) + '%'; });

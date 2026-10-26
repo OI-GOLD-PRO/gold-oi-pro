@@ -7,7 +7,7 @@
 (() => {
   'use strict';
   const O = window.OI;
-  if (!O || !O.hooks || O.sym !== 'gold') return;
+  if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
   const $ = id => document.getElementById(id);
   const TZ = 7 * 3600, SESS = 5 * 3600; // แกนเวลาของกราฟเป็นเวลาไทย · วันเทรดเริ่ม 05:00
   const DEF = { on: false, sig: true, nb: 15, na: 30 };

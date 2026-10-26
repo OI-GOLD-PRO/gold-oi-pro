@@ -776,6 +776,7 @@
     if (A && A.warn) parts.push(`<div class="card warn">⚠️ ${esc(A.warn)}</div>`);
     parts.push(`<div class="note" style="text-align:center">ผลวิเคราะห์เป็นการอ่านข้อมูล OI / Volume / ข่าว ไม่ใช่สัญญาณเทรดที่รับประกันผล</div>`);
     body.innerHTML = `<div class="dwrap">${parts.join('')}</div>`;
+    window.OIColorize && OIColorize(body);
   }
 
   // กราฟเส้นราคา + แท่ง OI Call/Put ต่อรอบบันทึก

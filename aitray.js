@@ -261,6 +261,7 @@
     bd().innerHTML = `<button class="go" id="paGo">⚡ วิเคราะห์จังหวะเข้าตอนนี้</button>
       <div class="info">AI จะอ่านแท่งเทียน ${TFN[O.tf] || O.tf} ล่าสุด 40 แท่ง + Price Action ที่ระบบตรวจเจอ + แนว OI / EM / gmf / VWAP ณ ตอนกด แล้วบอกว่าควร BUY / SELL หรือรอ<br>เปลี่ยน TF ที่กราฟก่อนกด เพื่อให้วิเคราะห์ TF นั้น</div>` + (result ? resultHTML(result, true) : '');
     $('paGo').onclick = run;
+    window.OIColorize && OIColorize(bd());
     if (result) bindResult();
   }
   function newsHTML(r) {
@@ -347,6 +348,7 @@
     bd().innerHTML = `<canvas id="paCv"></canvas>` + resultHTML(result, false);
     drawMini($('paCv'), draw, draw.length, null, result, null);
     requestAnimationFrame(() => { const i = bd().querySelector('.conf .bar i'); if (i) i.style.width = (result.confidence || 0) + '%'; });
+    window.OIColorize && OIColorize(bd());
     bindResult(); O.markDirty();
     if (O.beep && result.action !== 'WAIT') O.beep();
   }

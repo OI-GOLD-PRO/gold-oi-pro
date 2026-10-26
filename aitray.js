@@ -61,6 +61,24 @@
   #paTray .sb.sell.on { background: rgba(229,87,107,.3); box-shadow: 0 0 18px rgba(229,87,107,.45); }
   #paTray .sides.busy .sb { opacity: .5; }
   #paTray .sres { margin-top: 10px; }
+  #paTray .sw .swv { position: relative; border-radius: 12px; overflow: hidden; }
+  #paTray .sw canvas { height: 140px; }
+  #paTray .sw.b canvas { border-color: #2fbf8f; box-shadow: inset 0 0 30px rgba(47,191,143,.25), 0 0 16px rgba(47,191,143,.25); }
+  #paTray .sw.s canvas { border-color: #e5576b; box-shadow: inset 0 0 30px rgba(229,87,107,.25), 0 0 16px rgba(229,87,107,.25); }
+  #paTray .arw { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 14px; pointer-events: none; }
+  #paTray .arw span { font: 900 46px var(--mono, monospace); opacity: 0; }
+  #paTray .sw.b .arw span { color: #2fe3a6; text-shadow: 0 0 18px #2fe3a6, 0 0 36px rgba(47,227,166,.6); animation: paUp 1.5s ease-in-out infinite; }
+  #paTray .sw.s .arw span { color: #ff6b82; text-shadow: 0 0 18px #ff6b82, 0 0 36px rgba(255,107,130,.6); animation: paDn 1.5s ease-in-out infinite; }
+  #paTray .arw span:nth-child(2) { animation-delay: .25s !important; } #paTray .arw span:nth-child(3) { animation-delay: .5s !important; }
+  @keyframes paUp { 0% { opacity: 0; transform: translateY(40px) scale(.7); } 40% { opacity: .95; } 100% { opacity: 0; transform: translateY(-46px) scale(1.15); } }
+  @keyframes paDn { 0% { opacity: 0; transform: translateY(-40px) scale(.7); } 40% { opacity: .95; } 100% { opacity: 0; transform: translateY(46px) scale(1.15); } }
+  #paTray .ring { position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; pointer-events: none; animation: paRing 1.8s linear infinite; }
+  #paTray .sw.b .ring { border: 2px solid transparent; border-top-color: #2fe3a6; border-right-color: rgba(47,227,166,.3); }
+  #paTray .sw.s .ring { border: 2px solid transparent; border-top-color: #ff6b82; border-right-color: rgba(255,107,130,.3); }
+  @keyframes paRing { to { transform: rotate(360deg); } }
+  #paTray .sw .think { color: inherit; } #paTray .sw.b .think { color: #2fe3a6; } #paTray .sw.s .think { color: #ff6b82; }
+  #paTray .sw.b .think i { background: #2fe3a6; } #paTray .sw.s .think i { background: #ff6b82; }
+  #paTray .sw .ctr { text-align: center; font-size: 12px; color: #8a93ad; margin-top: 2px; } #paTray .sw .ctr b { font: 800 22px var(--mono, monospace); color: #ffd97a; }
   #paTray .vd { display: flex; align-items: center; gap: 10px; }
   #paTray .vd .v { font: 800 15px var(--sans, sans-serif); padding: 6px 12px; border-radius: 10px; white-space: nowrap; animation: paPop .5s cubic-bezier(.2,1.5,.4,1) both; }
   #paTray .v.GO { background: rgba(47,191,143,.18); color: #2fe3a6; border: 1px solid #2fbf8f; }
@@ -282,8 +300,8 @@
   function paintIdle() {
     $('paSub').textContent = `${(O.cfg && O.cfg.name) || ''} · ${TFN[O.tf] || O.tf}`;
     bd().innerHTML = `<button class="go" id="paGo">⚡ วิเคราะห์จังหวะเข้าตอนนี้</button>
-      <div class="info">AI จะอ่านแท่งเทียน ${TFN[O.tf] || O.tf} ล่าสุด 40 แท่ง + Price Action ที่ระบบตรวจเจอ + แนว OI / EM / gmf / VWAP ณ ตอนกด แล้วบอกว่าควร BUY / SELL หรือรอ<br>เปลี่ยน TF ที่กราฟก่อนกด เพื่อให้วิเคราะห์ TF นั้น</div>` + (result ? resultHTML(result, true) : '');
-    $('paGo').onclick = run;
+      <div class="info">AI จะอ่านแท่งเทียน ${TFN[O.tf] || O.tf} ล่าสุด 40 แท่ง + Price Action ที่ระบบตรวจเจอ + แนว OI / EM / gmf / VWAP ณ ตอนกด แล้วบอกว่าควร BUY / SELL หรือรอ<br>เปลี่ยน TF ที่กราฟก่อนกด เพื่อให้วิเคราะห์ TF นั้น</div>` + sideBlock(true) + (result ? resultHTML(result, true) : '');
+    $('paGo').onclick = run; bindSides();
     window.OIColorize && OIColorize(bd());
     if (result) bindResult();
   }
@@ -321,7 +339,7 @@
       ${r.entry || r.sl || r.tp1 ? `<div class="plan"><div><small>${r.action === 'WAIT' ? 'รอเข้า' : 'Entry'}</small>${f2(r.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(r.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(r.tp1)}</span></div><div><small>TP2${r.rr ? ' · R:R 1:' + r.rr : ''}</small><span style="color:#2fe3a6">${f2(r.tp2)}</span></div></div>` : ''}
       ${r.reasons && r.reasons.length ? `<ul>${r.reasons.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
       ${r.wait_for && r.action === 'WAIT' ? `<p>⏳ ${esc(r.wait_for)}</p>` : ''}${r.invalid ? `<p class="warn">⚠️ ${esc(r.invalid)}</p>` : ''}${r.checked ? `<p class="warn">${esc(r.checked)}</p>` : ''}
-      <div class="sideQ"><b>คุณอยากเข้าฝั่งไหนตอนนี้? ให้ AI ประเมินต่อ</b><div class="sides${sideBusy ? ' busy' : ''}" id="paSides"><button class="sb buy${sidePick === 'BUY' ? ' on' : ''}" data-side="BUY">▲ BUY<small>ซื้อ</small></button><button class="sb sell${sidePick === 'SELL' ? ' on' : ''}" data-side="SELL">▼ SELL<small>ขาย</small></button></div><div class="sres" id="paSide">${sideRes ? sideHTML(sideRes, true) : sideBusy ? `<div class="think">AI กำลังประเมินฝั่ง ${sidePick} จากกราฟตอนนี้<i></i><i></i><i></i></div>` : ''}</div></div>
+      ${old ? '' : sideBlock()}
       <div class="row2"><button id="paPlan">${showPlan ? '🧹 ซ่อนแผนบนกราฟ' : '📍 แสดงแผนบนกราฟ'}</button><button id="paAgain">🔄 วิเคราะห์ใหม่</button></div>
       <div class="muted">วิเคราะห์โดย DeepSeek จากกราฟ ณ เวลาที่กด · ใช้ประกอบการตัดสินใจ ไม่ใช่คำแนะนำการลงทุน</div>`;
   }
@@ -329,10 +347,13 @@
     const p = $('paPlan'), a = $('paAgain');
     if (p) p.onclick = () => { showPlan = !showPlan; O.markDirty(); p.textContent = showPlan ? '🧹 ซ่อนแผนบนกราฟ' : '📍 แสดงแผนบนกราฟ'; };
     if (a) a.onclick = run;
-    bd().querySelectorAll('#paSides .sb').forEach(btn => { btn.onclick = () => askSide(btn.dataset.side); });
   }
 
   // ---------- ผู้ใช้เลือกฝั่ง → AI ประเมินต่อ (ใช้กราฟ ณ ตอนกด) ----------
+  function sideBlock(first) {
+    return `<div class="sideQ"><b>${first ? 'หรือเลือกฝั่งที่อยากเข้า ให้ AI วิเคราะห์ฝั่งนั้นเลย' : 'คุณอยากเข้าฝั่งไหนตอนนี้? ให้ AI ประเมินต่อ'}</b><div class="sides${sideBusy ? ' busy' : ''}" id="paSides"><button class="sb buy${sidePick === 'BUY' ? ' on' : ''}" data-side="BUY">▲ BUY<small>วิเคราะห์ฝั่งซื้อ</small></button><button class="sb sell${sidePick === 'SELL' ? ' on' : ''}" data-side="SELL">▼ SELL<small>วิเคราะห์ฝั่งขาย</small></button></div><div class="sres" id="paSide">${sideRes ? sideHTML(sideRes, true) : sideBusy ? sideWaitHTML(sidePick) : ''}</div></div>`;
+  }
+  function bindSides() { bd().querySelectorAll('#paSides .sb').forEach(btn => { btn.onclick = () => askSide(btn.dataset.side); }); if (sideBusy) startSideAnim(sidePick); }
   function sideHTML(r, old) {
     const vt = { GO: `✅ ควรเข้า ${r.side}`, WAIT: `⏳ รอก่อน`, NO: `⛔ ไม่ควร ${r.side}` }[r.verdict] || r.verdict;
     const pc = r.prob >= 60 ? '#2fe3a6' : r.prob >= 45 ? '#ffd97a' : '#ff6b82';
@@ -343,6 +364,31 @@
       <div class="pc"><div><b style="color:#2fe3a6">👍 ที่หนุน</b>${li(r.pros)}</div><div><b style="color:#ff6b82">⚠️ ที่สวนทาง</b>${li(r.cons)}</div></div>
       ${r.wait_for && r.verdict !== 'GO' ? `<p>⏳ ${esc(r.wait_for)}</p>` : ''}${r.invalid ? `<p class="warn">⚠️ ${esc(r.invalid)}</p>` : ''}${r.checked ? `<p class="warn">${esc(r.checked)}</p>` : ''}`;
   }
+  function sideWaitHTML(side) {
+    const b = side === 'BUY';
+    const steps = ['▸ อ่านกราฟสด ณ ตอนนี้', '▸ อ่านหลาย TF: H4 / H1 / M15 / M5', `▸ เช็คแนว OI / gmf / EM ฝั่ง ${b ? 'ซื้อ' : 'ขาย'}`, '▸ หาจุด Entry / SL / TP', '▸ ชั่งน้ำหนัก ที่หนุน vs ที่สวนทาง', '▸ คำนวณโอกาสสำเร็จ %'];
+    return `<div class="sw ${b ? 'b' : 's'}"><div class="swv"><canvas id="paSCv"></canvas><div class="arw"><span>${b ? '▲' : '▼'}</span><span>${b ? '▲' : '▼'}</span><span>${b ? '▲' : '▼'}</span></div><div class="ring"></div></div>
+      <div class="think">AI กำลังวิเคราะห์ฝั่ง ${side}<i></i><i></i><i></i></div><div class="steps" id="paSSt">${steps.map(t => `<div>${t}</div>`).join('')}</div>
+      <div class="ctr">โอกาส <b id="paSPct">--</b>%</div></div>`;
+  }
+  let sAnim = 0;
+  function startSideAnim(side) {
+    cancelAnimationFrame(sAnim);
+    const cv = $('paSCv'); if (!cv) return;
+    let lastTk = -1; const all = (O.series.data() || []).slice(-120), t0 = performance.now(), st = [...document.querySelectorAll('#paSSt div')], pct = $('paSPct');
+    const loop = now => {
+      if (!cv.isConnected) return;
+      const el = now - t0, cyc = el % 2200;
+      const upto = cyc < 1300 ? Math.max(1, Math.round(30 + (all.length - 30) * (cyc / 1300))) : all.length;
+      const W = cv.clientWidth - 46;
+      if (all.length > 5) drawMini(cv, all, Math.min(all.length, upto), cyc >= 1300 ? (cyc - 1300) / 900 * W : null, null, null);
+      const k = Math.min(st.length - 1, Math.floor(el / 900));
+      st.forEach((d, i) => { d.className = i < k ? 'ok' : i === k ? 'on' : ''; });
+      const tk = Math.floor(el / 90); if (pct && tk !== lastTk) { lastTk = tk; pct.textContent = String(Math.floor(Math.random() * 90 + 5)).padStart(2, '0'); }
+      sAnim = requestAnimationFrame(loop);
+    };
+    sAnim = requestAnimationFrame(loop);
+  }
   async function askSide(side) {
     if (sideBusy || busy) return;
     const s2 = snapshot();
@@ -350,15 +396,15 @@
     sideBusy = true; sidePick = side; sideRes = null;
     const box = $('paSide'), sides = $('paSides');
     if (sides) { sides.classList.add('busy'); sides.querySelectorAll('.sb').forEach(b => b.classList.toggle('on', b.dataset.side === side)); }
-    if (box) { box.innerHTML = `<div class="think">AI กำลังประเมินฝั่ง ${side} จากกราฟตอนนี้<i></i><i></i><i></i></div>`; box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    if (box) { box.innerHTML = sideWaitHTML(side); startSideAnim(side); box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
     try { navigator.vibrate && navigator.vibrate(10); } catch (e) {}
     const payload = Object.assign({}, s2); delete payload._draw;
     try { payload.tfs = await multiTF(s2); } catch (e) { payload.tfs = {}; }
     if (payload.tfs.M15) payload.atr_m15 = payload.tfs.M15.atr;
     payload.side = side;
     if (result) payload.prev = { action: result.action, confidence: result.confidence, pattern: result.pattern, entry: result.entry, sl: result.sl, tp1: result.tp1, tp2: result.tp2, reasons: result.reasons, price: result.price, time_th: result.time_th };
-    const res = await O.aiCall('ai_pa', payload, 90000);
-    sideBusy = false;
+    const [res] = await Promise.all([O.aiCall('ai_pa', payload, 90000), new Promise(r => setTimeout(r, 2500))]);
+    sideBusy = false; cancelAnimationFrame(sAnim);
     const box2 = $('paSide'), sides2 = $('paSides');
     if (sides2) sides2.classList.remove('busy');
     if (!res || !res.ok || !res.side) {
@@ -416,7 +462,7 @@
     drawMini($('paCv'), draw, draw.length, null, result, null);
     requestAnimationFrame(() => { const i = bd().querySelector('.conf .bar i'); if (i) i.style.width = (result.confidence || 0) + '%'; });
     window.OIColorize && OIColorize(bd());
-    bindResult(); O.markDirty();
+    bindResult(); bindSides(); O.markDirty();
     if (O.beep && result.action !== 'WAIT') O.beep();
   }
 

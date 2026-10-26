@@ -140,7 +140,7 @@
       oi.gmf.push({ p: gm.M, lab: 'gmf M', col: '--gmfm' });
     }
     if (c.gmf !== null) {
-      oi.gmf = (oi.gmf || []).filter(g => g.lab !== 'gmf itd');
+      oi.gmf = (oi.gmf || []).filter(g => !/^gmf itd/.test(g.lab)); // ลบทั้งของชีตและของสดรอบก่อน (ป้ายมี ↑/↓ ต่อท้าย)
       oi.gmf.push({ p: c.gmf, lab: 'gmf itd' + trend(), col: '--gmfi' });
     }
     oi.__live = st.at;
@@ -191,15 +191,15 @@
       near.forEach(s => {
         const r = rowOf.get(s.k), y = series.priceToCoordinate(r ? r.price : s.k); if (y === null || y < 26 || y > plotH - 8) return;
         const parts = [];
-        const sig = (b, sl, lab) => { const v = b + sl, n = b - sl; if (v >= 10 && Math.abs(n) >= Math.max(5, v * 0.2)) parts.push([lab + (n > 0 ? '▲' : '▼'), n > 0 ? C('--call') : C('--put')]); };
+        const sig = (b, sl, lab) => { const v = b + sl, n = b - sl; if (v >= 10 && Math.abs(n) >= Math.max(5, v * 0.2)) { parts.push([lab, lab === 'C' ? C('--call') : C('--put'), 0]); parts.push([n > 0 ? '▲' : '▼', n > 0 ? C('--call') : C('--put'), 4]); } }; // C เขียว P แดง · ▲ เขียว ▼ แดง
         sig(s.bc, s.sc, 'C'); sig(s.bp, s.sp, 'P');
         const v = s.vc + s.vp, o = s.c + s.p;
-        if (hot(s, vMax)) parts.push(['🔥', '#fff']);
+        if (hot(s, vMax)) parts.push(['🔥', '#fff', 4]);
         if (!parts.length) return;
         const L = r && oi.maxOI ? barMax * Math.max(r.c, r.p) / oi.maxOI : 0;
-        const wAll = parts.reduce((a, [t]) => a + ctx.measureText(t).width + 4, 0);
+        const wAll = parts.reduce((a, [t, , g]) => a + ctx.measureText(t).width + g, 0);
         let x = plotW - L - 6 - wAll;
-        parts.forEach(([t, col]) => { ctx.fillStyle = col; ctx.fillText(t, x, y + 7); x += ctx.measureText(t).width + 4; });
+        parts.forEach(([t, col, g]) => { ctx.fillStyle = col; ctx.fillText(t, x, y + 7); x += ctx.measureText(t).width + g; });
       });
       ctx.restore();
     }

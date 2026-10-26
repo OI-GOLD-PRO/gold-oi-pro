@@ -61,6 +61,11 @@
   #paTray .sb.sell.on { background: rgba(229,87,107,.3); box-shadow: 0 0 18px rgba(229,87,107,.45); }
   #paTray .sides.busy .sb { opacity: .5; }
   #paTray .sres { margin-top: 10px; }
+  #paTray .spk { display: flex; gap: 6px; margin: 6px 0; }
+  #paTray .spk button { padding: 7px 12px; border-radius: 10px; border: 1px solid #2a3358; background: #141b3a; color: #e8ecf6; font-size: 13px; }
+  #paTray .spk button[data-spk] { flex: 1; border-color: #22d3ee; color: #7fe9fb; }
+  #paTray .spk button.on { background: rgba(34,211,238,.18); box-shadow: 0 0 14px rgba(34,211,238,.35); animation: paSpk 1.2s ease-in-out infinite; }
+  @keyframes paSpk { 50% { box-shadow: 0 0 4px rgba(34,211,238,.2); } }
   #paTray .sw .swv { position: relative; border-radius: 12px; overflow: hidden; }
   #paTray .sw canvas { height: 140px; }
   #paTray .sw.b canvas { border-color: #2fbf8f; box-shadow: inset 0 0 30px rgba(47,191,143,.25), 0 0 16px rgba(47,191,143,.25); }
@@ -332,6 +337,7 @@
     const conf = r.confidence || 0;
     return `${old ? '<div class="muted">ผลล่าสุด</div>' : ''}<div class="act"><span class="badge ${r.action}">${r.action === 'WAIT' ? 'รอ' : r.action}</span>
       <div class="conf"><small>ความมั่นใจ ${conf}% · ${esc(r.tf)} · ${esc((r.time_th || '').slice(11))} น. · ราคา ${f2(r.price)}</small><div class="bar"><i style="width:${old ? conf : 0}%"></i></div></div></div>
+      ${spkHTML('main')}
       <div class="pat">${esc(r.pattern)}</div><p>${esc(r.pa)}</p><p style="color:#a9b4d6">${esc(r.context)}</p>
       ${newsHTML(r)}
       ${mtfHTML(r)}
@@ -349,6 +355,83 @@
     if (a) a.onclick = run;
   }
 
+  // ---------- อ่านผลเป็นเสียง (เสียงไทยในเครื่อง · กดเอง · อ่านทุกอย่างในผลนั้น) ----------
+  const SS = window.speechSynthesis;
+  const RATES = [['ช้า', 0.8], ['ปกติ', 1], ['เร็ว', 1.25]];
+  let rateI = 1; try { const v = Number(localStorage.getItem('oi_tts_rate')); if (v >= 0 && v < 3) rateI = v; } catch (e) {}
+  let spkOn = null;
+  function spkHTML(k) {
+    if (!SS) return '';
+    return `<div class="spk"><button data-spk="${k}" class="${spkOn === k ? 'on' : ''}">${spkOn === k ? '⏹ หยุดอ่าน' : '🔊 ฟังผลวิเคราะห์'}</button><button data-rate="1">ความเร็ว: ${RATES[rateI][0]}</button></div>`;
+  }
+  const n2 = v => (v === null || v === undefined || !isFinite(v)) ? '' : Number(v).toFixed(2).replace(/\.00$/, '');
+  const clean = t => String(t || '')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}▲▼▸•⏳⚠️🔊]/gu, ' ')
+    .replace(/R:R\s*1:([\d.]+)/g, 'กำไรต่อความเสี่ยง 1 ต่อ $1').replace(/±\s*/g, 'บวกลบ ').replace(/%/g, ' เปอร์เซ็นต์')
+    .replace(/Put\/Call/gi, 'พุทต่อคอล').replace(/(\d)\s*[-–]\s*(\d)/g, '$1 ถึง $2').replace(/\s*\/\s*/g, ' ต่อ ').replace(/[→←↔]/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  function mainSpeech(r) {
+    const L = [];
+    const act = r.action === 'WAIT' ? 'รอก่อน ยังไม่เข้า' : r.action === 'BUY' ? 'ซื้อ BUY' : 'ขาย SELL';
+    L.push(`ผลวิเคราะห์ไทม์เฟรม ${r.tf || ''} เวลา ${(r.time_th || '').slice(11)} ราคา ${n2(r.price)}`);
+    L.push(`คำแนะนำ ${act} ความมั่นใจ ${r.confidence || 0} เปอร์เซ็นต์`);
+    if (r.pattern) L.push(`รูปแบบราคา ${r.pattern}`);
+    if (r.pa) L.push(r.pa); if (r.context) L.push(r.context);
+    if (r.news_summary || (r.news && r.news.length)) {
+      L.push(`ข่าวล่าสุด ${r.news_bias || ''}`); if (r.news_summary) L.push(r.news_summary);
+      (r.news || []).forEach((n, i) => L.push(`ข่าวที่ ${i + 1} ${n.impact === '+' ? 'หนุนทอง' : n.impact === '-' ? 'กดทอง' : 'ผลกลาง'} ${n.th}`));
+    }
+    const v = r.tf_view || {};
+    if (Object.keys(v).length) { L.push('มุมมองหลายไทม์เฟรม'); ['H4', 'H1', 'M15', 'M5'].forEach(k => { if (v[k]) L.push(`${k} ${v[k]}`); }); if (r.align) L.push(`สรุป ${r.align}`); }
+    const a = r.abs;
+    if (a && a.count_40 !== undefined) L.push(`แอบซอร์ปชัน ${a.rate_40_pct} เปอร์เซ็นต์ เกิด ${a.count_40} จาก 40 แท่ง เอนไป ${a.bias} ซื้อรับ ${a.buy_side} ขายรับ ${a.sell_side}`);
+    if (r.absorption) L.push(r.absorption);
+    if (r.entry || r.sl || r.tp1) L.push(`แผน ${r.action === 'WAIT' ? 'ราคาที่รอเข้า' : 'จุดเข้า'} ${n2(r.entry)}${r.sl ? ' สต็อปลอส ' + n2(r.sl) : ''}${r.tp1 ? ' เป้าแรก ' + n2(r.tp1) : ''}${r.tp2 ? ' เป้าสอง ' + n2(r.tp2) : ''}${r.rr ? ' กำไรต่อความเสี่ยง 1 ต่อ ' + r.rr : ''}`);
+    (r.reasons || []).forEach((t, i) => L.push(`เหตุผลข้อ ${i + 1} ${t}`));
+    if (r.wait_for && r.action === 'WAIT') L.push(`สิ่งที่ต้องรอ ${r.wait_for}`);
+    if (r.invalid) L.push(`ข้อควรระวัง ${r.invalid}`);
+    if (r.checked) L.push(r.checked);
+    return L;
+  }
+  function sideSpeech(r) {
+    const L = [], vt = { GO: `ควรเข้า ${r.side}`, WAIT: `รอก่อน ยังไม่ควรเข้า ${r.side} ตอนนี้`, NO: `ไม่ควรเข้า ${r.side}` }[r.verdict] || '';
+    L.push(`ผลวิเคราะห์ฝั่ง ${r.side === 'BUY' ? 'ซื้อ BUY' : 'ขาย SELL'} เวลา ${(r.time_th || '').slice(11)} ราคา ${n2(r.price)}`);
+    L.push(`${vt} โอกาสถึงเป้าแรกก่อนโดนสต็อปลอส ${r.prob} เปอร์เซ็นต์`);
+    if (r.summary) L.push(r.summary);
+    if (r.entry || r.sl || r.tp1) L.push(`แผน ${r.verdict === 'GO' ? 'จุดเข้า' : 'ราคาที่รอเข้า'} ${n2(r.entry)}${r.sl ? ' สต็อปลอส ' + n2(r.sl) : ''}${r.tp1 ? ' เป้าแรก ' + n2(r.tp1) : ''}${r.tp2 ? ' เป้าสอง ' + n2(r.tp2) : ''}${r.rr ? ' กำไรต่อความเสี่ยง 1 ต่อ ' + r.rr : ''}`);
+    if (r.pros && r.pros.length) { L.push('ที่หนุน'); r.pros.forEach((t, i) => L.push(`ข้อ ${i + 1} ${t}`)); }
+    if (r.cons && r.cons.length) { L.push('ที่สวนทาง'); r.cons.forEach((t, i) => L.push(`ข้อ ${i + 1} ${t}`)); }
+    if (r.wait_for && r.verdict !== 'GO') L.push(`สิ่งที่ต้องรอ ${r.wait_for}`);
+    if (r.invalid) L.push(`ข้อควรระวัง ${r.invalid}`);
+    if (r.checked) L.push(r.checked);
+    return L;
+  }
+  function thVoice() { const vs = SS.getVoices() || []; return vs.find(v => /^th/i.test(v.lang) && /premium|enhanced/i.test(v.name)) || vs.find(v => /^th/i.test(v.lang)) || null; }
+  function spkUI() { bd().querySelectorAll('[data-spk]').forEach(b => { const on = b.dataset.spk === spkOn; b.classList.toggle('on', on); b.textContent = on ? '⏹ หยุดอ่าน' : '🔊 ฟังผลวิเคราะห์'; }); }
+  function stopSpeak() { spkOn = null; try { SS && SS.cancel(); } catch (e) {} spkUI(); }
+  function speak(k) {
+    if (!SS) return;
+    if (spkOn === k) { stopSpeak(); return; }
+    const r = k === 'side' ? sideRes : result; if (!r) return;
+    try { SS.cancel(); } catch (e) {}
+    const lines = (k === 'side' ? sideSpeech(r) : mainSpeech(r)).map(clean).filter(Boolean);
+    // แบ่งเป็นท่อนสั้นๆ (iPhone ตัดเสียงถ้ายาวเกิน)
+    const chunks = []; lines.forEach(t => { while (t.length > 180) { let c = t.lastIndexOf(' ', 180); if (c < 60) c = 180; chunks.push(t.slice(0, c)); t = t.slice(c).trim(); } if (t) chunks.push(t); });
+    const voice = thVoice(); spkOn = k; spkUI();
+    chunks.forEach((t, i) => {
+      const u = new SpeechSynthesisUtterance(t);
+      u.lang = 'th-TH'; if (voice) u.voice = voice; u.rate = RATES[rateI][1];
+      if (i === chunks.length - 1) u.onend = () => { if (spkOn === k) { spkOn = null; spkUI(); } };
+      u.onerror = () => { if (i === chunks.length - 1 && spkOn === k) { spkOn = null; spkUI(); } };
+      SS.speak(u);
+    });
+  }
+  if (SS) { try { SS.getVoices(); SS.onvoiceschanged = () => SS.getVoices(); } catch (e) {} }
+  tray.addEventListener('click', e => {
+    const b = e.target.closest('[data-spk]'); if (b) { speak(b.dataset.spk); return; }
+    const rt = e.target.closest('[data-rate]');
+    if (rt) { rateI = (rateI + 1) % 3; try { localStorage.setItem('oi_tts_rate', String(rateI)); } catch (er) {} bd().querySelectorAll('[data-rate]').forEach(x => { x.textContent = 'ความเร็ว: ' + RATES[rateI][0]; }); if (spkOn) { const k = spkOn; spkOn = null; speak(k); } }
+  });
+
   // ---------- ผู้ใช้เลือกฝั่ง → AI ประเมินต่อ (ใช้กราฟ ณ ตอนกด) ----------
   function sideBlock(first) {
     return `<div class="sideQ"><b>${first ? 'หรือเลือกฝั่งที่อยากเข้า ให้ AI วิเคราะห์ฝั่งนั้นเลย' : 'คุณอยากเข้าฝั่งไหนตอนนี้? ให้ AI ประเมินต่อ'}</b><div class="sides${sideBusy ? ' busy' : ''}" id="paSides"><button class="sb buy${sidePick === 'BUY' ? ' on' : ''}" data-side="BUY">▲ BUY<small>วิเคราะห์ฝั่งซื้อ</small></button><button class="sb sell${sidePick === 'SELL' ? ' on' : ''}" data-side="SELL">▼ SELL<small>วิเคราะห์ฝั่งขาย</small></button></div><div class="sres" id="paSide">${sideRes ? sideHTML(sideRes, true) : sideBusy ? sideWaitHTML(sidePick) : ''}</div></div>`;
@@ -359,6 +442,7 @@
     const pc = r.prob >= 60 ? '#2fe3a6' : r.prob >= 45 ? '#ffd97a' : '#ff6b82';
     const li = a => a && a.length ? `<ul>${a.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '<div style="color:#6f7896">–</div>';
     return `<div class="vd"><span class="v ${r.verdict}">${vt}</span><div class="prob"><small>โอกาสถึง TP1 ก่อน SL <b>${r.prob}%</b> · ${esc((r.time_th || '').slice(11))} น. · ราคา ${f2(r.price)}</small><div class="bar"><i data-w="${r.prob}" style="background:${pc};${old ? 'width:' + r.prob + '%' : ''}"></i></div></div></div>
+      ${spkHTML('side')}
       ${r.summary ? `<p style="margin-top:8px">${esc(r.summary)}</p>` : ''}
       ${r.entry || r.sl || r.tp1 ? `<div class="plan"><div><small>${r.verdict === 'GO' ? 'Entry ' + r.side : 'รอเข้า ' + r.side}</small>${f2(r.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(r.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(r.tp1)}</span></div><div><small>TP2${r.rr ? ' · R:R 1:' + r.rr : ''}</small><span style="color:#2fe3a6">${f2(r.tp2)}</span></div></div>` : ''}
       <div class="pc"><div><b style="color:#2fe3a6">👍 ที่หนุน</b>${li(r.pros)}</div><div><b style="color:#ff6b82">⚠️ ที่สวนทาง</b>${li(r.cons)}</div></div>
@@ -393,6 +477,7 @@
     if (sideBusy || busy) return;
     const s2 = snapshot();
     if (!s2) { O.showToast && O.showToast('ข้อมูลกราฟยังไม่พอ รอกราฟโหลดก่อน'); return; }
+    if (spkOn === 'side') stopSpeak();
     sideBusy = true; sidePick = side; sideRes = null;
     const box = $('paSide'), sides = $('paSides');
     if (sides) { sides.classList.add('busy'); sides.querySelectorAll('.sb').forEach(b => b.classList.toggle('on', b.dataset.side === side)); }
@@ -422,6 +507,7 @@
 
   async function run() {
     if (busy || sideBusy) return;
+    stopSpeak();
     if (!news.length) loadNews();
     snap = snapshot();
     if (!snap) { O.showToast && O.showToast('ข้อมูลกราฟยังไม่พอ รอกราฟโหลดก่อน'); return; }
@@ -480,7 +566,7 @@
 
   // ---------- เปิด/ปิดถาด ----------
   function open() { if (tray.classList.contains('open')) return; tray.classList.add('open'); tray.setAttribute('aria-hidden', 'false'); if (!busy) paintIdle(); loadNews(); try { navigator.vibrate && navigator.vibrate(10); } catch (e) {} }
-  function close() { tray.classList.remove('open'); tray.setAttribute('aria-hidden', 'true'); }
+  function close() { stopSpeak(); tray.classList.remove('open'); tray.setAttribute('aria-hidden', 'true'); }
   $('paX').onclick = close;
   // ปัดขวาบนถาด = ปิด
   let tx = null;

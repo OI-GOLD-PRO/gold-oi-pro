@@ -99,8 +99,11 @@
     if (!lv.length) return;
     const sig = d.root + '|' + d.oiT + '|' + lv.length + '|' + lv.reduce((a, l) => a + l.oi, 0);
     if (st.lvSig === sig && st.lvOi === O.oi) return;
-    const dt = d.oiT ? new Date(d.oiT * 1000).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' }) : '';
-    O.setLevels(lv, d.root, dt ? `OI ${dt}` : 'OI สด');
+    // ป้าย: วันหมดอายุของสัญญา (เวลาไทย) + OI เป็นของวันเทรดไหน (วันตามเวลาชิคาโกที่ CME ปิดตัวเลข)
+    const th = (t, o) => new Date(t * 1000).toLocaleString('th-TH', Object.assign({ timeZone: 'Asia/Bangkok' }, o));
+    const exp = d.expTs ? `หมด ${th(d.expTs, { weekday: 'short', day: 'numeric', month: 'short' })} ${th(d.expTs, { hour: '2-digit', minute: '2-digit', hour12: false })}` : '';
+    const oiD = d.oiT ? `OI ปิด ${new Date(d.oiT * 1000).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/Chicago' })}` : 'OI สด';
+    O.setLevels(lv, d.root, [exp, oiD].filter(Boolean).join(' · '));
     st.lvSig = sig; st.lvOi = O.oi; st.oiSrc = 'tv';
   }
   function tick() {

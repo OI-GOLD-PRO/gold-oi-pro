@@ -185,18 +185,21 @@
       const px = O.lastClose;
       const near = c.strikes.filter(s => s.vc + s.vp + s.c + s.p > 0).sort((a, b) => Math.abs(a.k - px) - Math.abs(b.k - px)).slice(0, 11);
       ctx.save(); ctx.font = `bold 10px ${mono}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-      const x0 = Math.min(plotW * 0.36, 150);
+      // วางชิดซ้ายของแท่ง OI ฝั่งขวา (ใต้เส้น strike ไม่ทับป้าย Cxx Pxx ที่อยู่เหนือเส้น)
+      const barMax = Math.min(plotW * 0.32, 150), rowOf = new Map((oi.rows || []).map(r => [r.strike, r]));
       const vMax = Math.max(1, ...near.map(s => s.vc + s.vp));
       near.forEach(s => {
-        const y = series.priceToCoordinate(s.k); if (y === null || y < 26 || y > plotH - 8) return;
+        const r = rowOf.get(s.k), y = series.priceToCoordinate(r ? r.price : s.k); if (y === null || y < 26 || y > plotH - 8) return;
         const parts = [];
         const sig = (b, sl, lab) => { const v = b + sl, n = b - sl; if (v >= 10 && Math.abs(n) >= Math.max(5, v * 0.2)) parts.push([lab + (n > 0 ? '▲' : '▼'), n > 0 ? C('--call') : C('--put')]); };
         sig(s.bc, s.sc, 'C'); sig(s.bp, s.sp, 'P');
         const v = s.vc + s.vp, o = s.c + s.p;
         if (hot(s, vMax)) parts.push(['🔥', '#fff']);
         if (!parts.length) return;
-        let x = x0;
-        parts.forEach(([t, col]) => { ctx.fillStyle = col; ctx.fillText(t, x, y - 6); x += ctx.measureText(t).width + 4; });
+        const L = r && oi.maxOI ? barMax * Math.max(r.c, r.p) / oi.maxOI : 0;
+        const wAll = parts.reduce((a, [t]) => a + ctx.measureText(t).width + 4, 0);
+        let x = plotW - L - 6 - wAll;
+        parts.forEach(([t, col]) => { ctx.fillStyle = col; ctx.fillText(t, x, y + 7); x += ctx.measureText(t).width + 4; });
       });
       ctx.restore();
     }

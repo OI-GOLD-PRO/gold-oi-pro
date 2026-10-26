@@ -349,7 +349,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '2.0.14';
+  const APP_VER = '2.0.15';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -700,9 +700,9 @@
         const yTop = series.priceToCoordinate(r.price + half), yBot = series.priceToCoordinate(r.price - half);
         if (yTop !== null && yBot !== null) {
           ctx.globalAlpha = 0.16; ctx.fillStyle = wallC;
-          ctx.fillRect(mid, Math.min(yTop, yBot), plotW - mid, Math.abs(yBot - yTop));
+          ctx.fillRect(0, Math.min(yTop, yBot), plotW, Math.abs(yBot - yTop)); // แถบโซนเต็มจอ
         }
-        if (rk <= 5) { ctx.globalAlpha = 0.95; ctx.lineWidth = 2; ctx.strokeStyle = wallC; hline(mid, plotW); }
+        if (rk <= 5) { ctx.globalAlpha = 0.95; ctx.lineWidth = 2; ctx.strokeStyle = wallC; hline(0, plotW); }
       }
       // Volume วันนี้ 5 อันดับ: เส้นทึบสีเหลืองจากขอบซ้ายถึงขอบขวาของกราฟ (เต็มจอ)
       if (oi.topV && oi.topV.includes(r.strike)) {
@@ -2139,7 +2139,7 @@
 <script src="goldscalp.js"></script>
 <script src="cotgroups.js?v=20009"></script>
 <script src="dash.js?v=20014"></script>
-<script src="live.js?v=11601"></script>
+<script src="live.js?v=20015"></script>
 <script src="intraday.js?v=20002"></script>
 <script src="aitray.js?v=20006"></script>
 </body>

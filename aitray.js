@@ -49,6 +49,29 @@
   #paTray .warn { font-size: 12px; color: #f0a35b; } #paTray .muted { font-size: 11px; color: #6f7896; margin-top: 8px; }
   #paTray .row2 { display: flex; gap: 8px; margin-top: 10px; } #paTray .row2 button { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #2a3358; background: #141b3a; color: #e8ecf6; font-size: 13px; }
   #paTray .err { color: #ff6b82; font-size: 13px; margin: 10px 0; }
+  #paTray .sideQ { margin: 12px 0 4px; padding: 10px; border: 1px solid #2a3358; border-radius: 12px; background: #0f1533; }
+  #paTray .sideQ > b { display: block; font-size: 13px; margin-bottom: 8px; text-align: center; color: #c9d1ea; }
+  #paTray .sides { display: flex; gap: 10px; }
+  #paTray .sb { flex: 1; padding: 12px 6px; border-radius: 12px; font: 800 19px var(--mono, monospace); letter-spacing: .05em; display: flex; flex-direction: column; align-items: center; gap: 1px; transition: transform .15s, box-shadow .2s; }
+  #paTray .sb small { font: 600 11px var(--sans, sans-serif); letter-spacing: 0; opacity: .85; }
+  #paTray .sb:active { transform: scale(.96); }
+  #paTray .sb.buy { background: rgba(47,191,143,.14); color: #2fe3a6; border: 1px solid #2fbf8f; }
+  #paTray .sb.sell { background: rgba(229,87,107,.14); color: #ff6b82; border: 1px solid #e5576b; }
+  #paTray .sb.buy.on { background: rgba(47,191,143,.3); box-shadow: 0 0 18px rgba(47,191,143,.45); }
+  #paTray .sb.sell.on { background: rgba(229,87,107,.3); box-shadow: 0 0 18px rgba(229,87,107,.45); }
+  #paTray .sides.busy .sb { opacity: .5; }
+  #paTray .sres { margin-top: 10px; }
+  #paTray .vd { display: flex; align-items: center; gap: 10px; }
+  #paTray .vd .v { font: 800 15px var(--sans, sans-serif); padding: 6px 12px; border-radius: 10px; white-space: nowrap; animation: paPop .5s cubic-bezier(.2,1.5,.4,1) both; }
+  #paTray .v.GO { background: rgba(47,191,143,.18); color: #2fe3a6; border: 1px solid #2fbf8f; }
+  #paTray .v.WAIT { background: rgba(240,163,91,.16); color: #f0b46b; border: 1px solid #c98a45; }
+  #paTray .v.NO { background: rgba(229,87,107,.18); color: #ff6b82; border: 1px solid #e5576b; }
+  #paTray .prob { flex: 1; } #paTray .prob small { font-size: 11px; color: #8a93ad; } #paTray .prob small b { font: 700 15px var(--mono, monospace); color: #ffd97a; }
+  #paTray .prob .bar { height: 7px; border-radius: 7px; background: #1b2240; overflow: hidden; margin-top: 4px; } #paTray .prob .bar i { display: block; height: 100%; width: 0; border-radius: 7px; transition: width .9s ease; }
+  #paTray .pc { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+  #paTray .pc > div { background: #11183a; border: 1px solid #1f2850; border-radius: 9px; padding: 6px 8px; font-size: 12px; line-height: 1.5; }
+  #paTray .pc ul { margin: 2px 0 0; padding-left: 15px; font-size: 12px; }
+  @media (max-width: 360px) { #paTray .pc { grid-template-columns: 1fr; } }
   #paTray .grab { position: absolute; left: 50%; bottom: 5px; width: 40px; height: 4px; margin-left: -20px; border-radius: 4px; background: #2a3358; }`;
   document.head.appendChild(css);
   const tray = document.createElement('div');
@@ -254,7 +277,7 @@
   }
 
   // ---------- สถานะถาด ----------
-  let snap = null, result = null, busy = false, anim = 0, showPlan = true;
+  let snap = null, result = null, busy = false, anim = 0, showPlan = true, sideRes = null, sideBusy = false, sidePick = null;
   const bd = () => $('paBd');
   function paintIdle() {
     $('paSub').textContent = `${(O.cfg && O.cfg.name) || ''} · ${TFN[O.tf] || O.tf}`;
@@ -298,6 +321,7 @@
       ${r.entry || r.sl || r.tp1 ? `<div class="plan"><div><small>${r.action === 'WAIT' ? 'รอเข้า' : 'Entry'}</small>${f2(r.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(r.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(r.tp1)}</span></div><div><small>TP2${r.rr ? ' · R:R 1:' + r.rr : ''}</small><span style="color:#2fe3a6">${f2(r.tp2)}</span></div></div>` : ''}
       ${r.reasons && r.reasons.length ? `<ul>${r.reasons.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
       ${r.wait_for && r.action === 'WAIT' ? `<p>⏳ ${esc(r.wait_for)}</p>` : ''}${r.invalid ? `<p class="warn">⚠️ ${esc(r.invalid)}</p>` : ''}${r.checked ? `<p class="warn">${esc(r.checked)}</p>` : ''}
+      <div class="sideQ"><b>คุณอยากเข้าฝั่งไหนตอนนี้? ให้ AI ประเมินต่อ</b><div class="sides${sideBusy ? ' busy' : ''}" id="paSides"><button class="sb buy${sidePick === 'BUY' ? ' on' : ''}" data-side="BUY">▲ BUY<small>ซื้อ</small></button><button class="sb sell${sidePick === 'SELL' ? ' on' : ''}" data-side="SELL">▼ SELL<small>ขาย</small></button></div><div class="sres" id="paSide">${sideRes ? sideHTML(sideRes, true) : sideBusy ? `<div class="think">AI กำลังประเมินฝั่ง ${sidePick} จากกราฟตอนนี้<i></i><i></i><i></i></div>` : ''}</div></div>
       <div class="row2"><button id="paPlan">${showPlan ? '🧹 ซ่อนแผนบนกราฟ' : '📍 แสดงแผนบนกราฟ'}</button><button id="paAgain">🔄 วิเคราะห์ใหม่</button></div>
       <div class="muted">วิเคราะห์โดย DeepSeek จากกราฟ ณ เวลาที่กด · ใช้ประกอบการตัดสินใจ ไม่ใช่คำแนะนำการลงทุน</div>`;
   }
@@ -305,10 +329,53 @@
     const p = $('paPlan'), a = $('paAgain');
     if (p) p.onclick = () => { showPlan = !showPlan; O.markDirty(); p.textContent = showPlan ? '🧹 ซ่อนแผนบนกราฟ' : '📍 แสดงแผนบนกราฟ'; };
     if (a) a.onclick = run;
+    bd().querySelectorAll('#paSides .sb').forEach(btn => { btn.onclick = () => askSide(btn.dataset.side); });
+  }
+
+  // ---------- ผู้ใช้เลือกฝั่ง → AI ประเมินต่อ (ใช้กราฟ ณ ตอนกด) ----------
+  function sideHTML(r, old) {
+    const vt = { GO: `✅ ควรเข้า ${r.side}`, WAIT: `⏳ รอก่อน`, NO: `⛔ ไม่ควร ${r.side}` }[r.verdict] || r.verdict;
+    const pc = r.prob >= 60 ? '#2fe3a6' : r.prob >= 45 ? '#ffd97a' : '#ff6b82';
+    const li = a => a && a.length ? `<ul>${a.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '<div style="color:#6f7896">–</div>';
+    return `<div class="vd"><span class="v ${r.verdict}">${vt}</span><div class="prob"><small>โอกาสถึง TP1 ก่อน SL <b>${r.prob}%</b> · ${esc((r.time_th || '').slice(11))} น. · ราคา ${f2(r.price)}</small><div class="bar"><i data-w="${r.prob}" style="background:${pc};${old ? 'width:' + r.prob + '%' : ''}"></i></div></div></div>
+      ${r.summary ? `<p style="margin-top:8px">${esc(r.summary)}</p>` : ''}
+      ${r.entry || r.sl || r.tp1 ? `<div class="plan"><div><small>${r.verdict === 'GO' ? 'Entry ' + r.side : 'รอเข้า ' + r.side}</small>${f2(r.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(r.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(r.tp1)}</span></div><div><small>TP2${r.rr ? ' · R:R 1:' + r.rr : ''}</small><span style="color:#2fe3a6">${f2(r.tp2)}</span></div></div>` : ''}
+      <div class="pc"><div><b style="color:#2fe3a6">👍 ที่หนุน</b>${li(r.pros)}</div><div><b style="color:#ff6b82">⚠️ ที่สวนทาง</b>${li(r.cons)}</div></div>
+      ${r.wait_for && r.verdict !== 'GO' ? `<p>⏳ ${esc(r.wait_for)}</p>` : ''}${r.invalid ? `<p class="warn">⚠️ ${esc(r.invalid)}</p>` : ''}${r.checked ? `<p class="warn">${esc(r.checked)}</p>` : ''}`;
+  }
+  async function askSide(side) {
+    if (sideBusy || busy) return;
+    const s2 = snapshot();
+    if (!s2) { O.showToast && O.showToast('ข้อมูลกราฟยังไม่พอ รอกราฟโหลดก่อน'); return; }
+    sideBusy = true; sidePick = side; sideRes = null;
+    const box = $('paSide'), sides = $('paSides');
+    if (sides) { sides.classList.add('busy'); sides.querySelectorAll('.sb').forEach(b => b.classList.toggle('on', b.dataset.side === side)); }
+    if (box) { box.innerHTML = `<div class="think">AI กำลังประเมินฝั่ง ${side} จากกราฟตอนนี้<i></i><i></i><i></i></div>`; box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    try { navigator.vibrate && navigator.vibrate(10); } catch (e) {}
+    const payload = Object.assign({}, s2); delete payload._draw;
+    try { payload.tfs = await multiTF(s2); } catch (e) { payload.tfs = {}; }
+    if (payload.tfs.M15) payload.atr_m15 = payload.tfs.M15.atr;
+    payload.side = side;
+    if (result) payload.prev = { action: result.action, confidence: result.confidence, pattern: result.pattern, entry: result.entry, sl: result.sl, tp1: result.tp1, tp2: result.tp2, reasons: result.reasons, price: result.price, time_th: result.time_th };
+    const res = await O.aiCall('ai_pa', payload, 90000);
+    sideBusy = false;
+    const box2 = $('paSide'), sides2 = $('paSides');
+    if (sides2) sides2.classList.remove('busy');
+    if (!res || !res.ok || !res.side) {
+      if (box2) box2.innerHTML = `<div class="err">ประเมินไม่สำเร็จ: ${esc(res && res.error === 'auth' ? 'รหัสเข้าแอปหมดอายุ' : (res && res.error) || 'ไม่ทราบสาเหตุ')}</div>`;
+      return;
+    }
+    sideRes = res.side;
+    if (!box2) return;
+    box2.innerHTML = sideHTML(sideRes, false);
+    window.OIColorize && OIColorize(box2);
+    requestAnimationFrame(() => requestAnimationFrame(() => { const i = box2.querySelector('.prob .bar i'); if (i) i.style.width = i.dataset.w + '%'; }));
+    box2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (O.beep && sideRes.verdict === 'GO') O.beep();
   }
 
   async function run() {
-    if (busy) return;
+    if (busy || sideBusy) return;
     if (!news.length) loadNews();
     snap = snapshot();
     if (!snap) { O.showToast && O.showToast('ข้อมูลกราฟยังไม่พอ รอกราฟโหลดก่อน'); return; }
@@ -343,7 +410,7 @@
       bd().innerHTML = `<div class="err">วิเคราะห์ไม่สำเร็จ: ${esc(res && res.error === 'auth' ? 'รหัสเข้าแอปหมดอายุ' : (res && res.error) || 'ไม่ทราบสาเหตุ')}</div><button class="go" id="paGo">ลองใหม่</button>`;
       $('paGo').onclick = run; return;
     }
-    result = res.pa; result.at = Date.now(); result.abs = snap.absorption;
+    result = res.pa; result.at = Date.now(); result.abs = snap.absorption; sideRes = null; sidePick = null;
     result.mtf = {}; Object.values(payload.tfs || {}).forEach(t => { result.mtf[t.tf] = { trend: t.trend }; }); showPlan = result.action !== 'WAIT' || !!result.entry;
     bd().innerHTML = `<canvas id="paCv"></canvas>` + resultHTML(result, false);
     drawMini($('paCv'), draw, draw.length, null, result, null);

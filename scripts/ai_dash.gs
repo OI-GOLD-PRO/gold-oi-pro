@@ -233,9 +233,11 @@ function aiWeb_(e) {
   if (p.api === 'ai_pa') {
     let snap = null; try { snap = JSON.parse((e.postData && e.postData.contents) || 'null'); } catch (err) {}
     if (!snap || !Array.isArray(snap.bars) || snap.bars.length < 10) return out({ error: 'ข้อมูลกราฟไม่พอ' });
-    const cache = CacheService.getScriptCache(), ck = 'pa_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(p.code))).slice(0, 16);
-    if (cache.get(ck)) return out({ error: 'กดถี่เกินไป รอ 20 วินาทีแล้วลองใหม่' });
-    cache.put(ck, '1', 20);
+    const side = snap.side === 'BUY' || snap.side === 'SELL' ? snap.side : null;
+    const cache = CacheService.getScriptCache(), ck = (side ? 'ps_' : 'pa_') + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(p.code))).slice(0, 16);
+    if (cache.get(ck)) return out({ error: side ? 'กดถี่เกินไป รอ 10 วินาทีแล้วลองใหม่' : 'กดถี่เกินไป รอ 20 วินาทีแล้วลองใหม่' });
+    cache.put(ck, '1', side ? 10 : 20);
+    if (side) { try { return out({ ok: true, side: aiSide_(snap) }); } catch (err) { return out({ error: String(err.message || err).slice(0, 300) }); } }
     try { return out({ ok: true, pa: aiPA_(snap) }); } catch (err) { return out({ error: String(err.message || err).slice(0, 300) }); }
   }
   const cache = CacheService.getScriptCache();
@@ -257,12 +259,7 @@ function aiWeb_(e) {
 
 // ---------- ถาดลับ: AI อ่าน Price Action ของกราฟสด ณ ตอนกด แล้วตัดสินว่าควรเข้าออเดอร์ไหม ----------
 // snap มาจากแอป: { sym, tf, time_th, price, atr, bars: [[t,o,h,l,c,v]...] (เก่า→ใหม่, แท่งสุดท้าย = กำลังวิ่ง), patterns, levels, vwap, swing }
-function aiPA_(snap) {
-  const key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY');
-  if (!key) throw new Error('ยังไม่ได้ใส่ DEEPSEEK_API_KEY');
-  const price = Number(snap.price), atr = Math.max(0.5, Number(snap.atr_m15) || Number(snap.atr) || 3);
-  const sys = [
-    'คุณคือเทรดเดอร์ Price Action ทองคำมืออาชีพสายเทรดในวัน (Intraday ไม่ถือข้ามคืน) วิเคราะห์จากกราฟสดที่ส่งมา ณ ตอนนี้ แล้วตัดสินว่าควรเข้าออเดอร์ตอนนี้ไหม',
+const PA_RULES_ = [
     'tfs คือข้อมูลหลายไทม์เฟรมที่ระบบสรุปแล้ว (trend จากโครงสร้างราคา, structure, ATR, patterns, absorption, bars): ใช้ H4 ดูทิศใหญ่, H1 ดูโครงสร้างและแนว, M15 หาจุดตั้งเทรด, M5 หาจังหวะเข้า · เทรดตามทิศ H1/H4 ได้น้ำหนักมากกว่า สวนทิศต้องมีเหตุผลแข็ง (แนวใหญ่ + Price Action + Absorption) และลดความมั่นใจ · bars/patterns ระดับบนสุดคือ TF ที่ผู้ใช้เปิดอยู่',
     'ใช้เฉพาะตัวเลขในข้อมูล ห้ามแต่งราคาใหม่ · patterns คือรูปแบบแท่งเทียนที่ระบบตรวจไว้แล้ว (เชื่อถือได้) ให้ใช้เป็นหลัก ห้ามอ้างรูปแบบที่ไม่มีใน patterns',
     'bars เรียงเก่า→ใหม่ แท่งสุดท้ายยังไม่ปิด (forming) อย่าตัดสินจากแท่งที่ยังไม่ปิดอย่างเดียว',
@@ -272,6 +269,14 @@ function aiPA_(snap) {
     'headlines = พาดหัวข่าวล่าสุดภาษาอังกฤษ (ago_min = กี่นาทีที่แล้ว) ใช้ประกอบ: ข่าวหนุนทอง = ดอลลาร์อ่อน/ยีลด์ลง/Fed ผ่อนคลาย/ความเสี่ยงภูมิรัฐศาสตร์ · ข่าวกดทอง = ดอลลาร์แข็ง/ยีลด์ขึ้น/Fed เข้มงวด/risk-on · ห้ามแต่งข่าวที่ไม่มีใน headlines · ข่าวแรงสวนทางกับแผน = ลดความมั่นใจ',
     'ไม่มีข้อมูล EMA และห้ามอ้างถึง EMA/เส้นค่าเฉลี่ย ใช้โครงสร้างราคา แนว OI/EM/gmf/VWAP และ Price Action เท่านั้น',
     'SL ต้องอยู่หลังไส้/โครงสร้าง ห่างจาก entry 0.5-2.5 เท่า ATR ของ M15 (atr_m15) · TP เป็นเป้าในวัน · TP1/TP2 ใช้แนวที่มีในข้อมูลหรือ VWAP',
+];
+function aiPA_(snap) {
+  const key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY');
+  if (!key) throw new Error('ยังไม่ได้ใส่ DEEPSEEK_API_KEY');
+  const price = Number(snap.price), atr = Math.max(0.5, Number(snap.atr_m15) || Number(snap.atr) || 3);
+  const sys = [
+    'คุณคือเทรดเดอร์ Price Action ทองคำมืออาชีพสายเทรดในวัน (Intraday ไม่ถือข้ามคืน) วิเคราะห์จากกราฟสดที่ส่งมา ณ ตอนนี้ แล้วตัดสินว่าควรเข้าออเดอร์ตอนนี้ไหม',
+    ...PA_RULES_,
     'ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: action ("BUY"|"SELL"|"WAIT"), confidence (0-100), pattern (ชื่อ Price Action ที่เห็นสั้นๆ หรือ "ไม่มีสัญญาณชัด"), pa (อธิบาย Price Action แท่งล่าสุด 1-2 ประโยค), context (ราคาอยู่ตรงไหนเทียบแนวสำคัญ 1 ประโยค), entry, sl, tp1, tp2 (ตัวเลข; ถ้า WAIT ให้ใส่ราคาที่ควรรอเข้าแทน หรือ null), reasons (array 2-4 ข้อ ข้อละ 1 ประโยค), invalid (ถ้า... แผนนี้ใช้ไม่ได้ 1 ประโยค), tf_view (object {H4, H1, M15, M5} แต่ละค่า 1 ประโยคสั้น: ทิศ + สิ่งที่เห็น), align (สรุปว่าไทม์เฟรมสอดคล้องหรือขัดกัน ไม่เกิน 40 ตัวอักษร), news_bias ("หนุนทอง"|"กดทอง"|"กลาง"), news_summary (สรุปข่าวล่าสุดที่มีผลกับทองเป็นภาษาไทย 1-2 ประโยค), news_items (array สูงสุด 4 ข้อ {i: ลำดับข่าวใน headlines เริ่ม 0, th: แปล/สรุปพาดหัวเป็นไทยสั้นๆ, impact: "+"|"-"|"0" ผลต่อทอง}), absorption (ตีความ Absorption จากข้อมูล 1-2 ประโยค: ถี่ไหม ฝั่งไหนรับ เกิดที่แนวไหน มีผลกับการเข้าออเดอร์อย่างไร), wait_for (ถ้า WAIT: ต้องเห็นอะไรก่อนเข้า 1 ประโยค)',
   ].join('\n');
   let heads = []; try { heads = aiNews_().slice(0, 10); } catch (e) {}
@@ -298,5 +303,44 @@ function aiPA_(snap) {
     if (bad.length) { out.action = 'WAIT'; out.checked = 'ระบบปรับเป็นรอ: ' + bad.join(', '); }
     else { const tp = out.tp2 || out.tp1; out.rr = Math.round(Math.abs(tp - e) / Math.max(0.01, Math.abs(e - out.sl)) * 10) / 10; }
   }
+  return out;
+}
+
+
+// ---------- ถาดลับ: ผู้ใช้เลือกฝั่ง BUY / SELL หลังวิเคราะห์ → ประเมินว่าควรเข้าฝั่งนั้นไหม โอกาสเท่าไหร่ ----------
+// snap มาจากแอป (กราฟ ณ ตอนกด) + side + prev (ผลวิเคราะห์รอบก่อน)
+function aiSide_(snap) {
+  const key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY');
+  if (!key) throw new Error('ยังไม่ได้ใส่ DEEPSEEK_API_KEY');
+  const side = snap.side, b = side === 'BUY', price = Number(snap.price), atr = Math.max(0.5, Number(snap.atr_m15) || Number(snap.atr) || 3);
+  const sys = [
+    `คุณคือเทรดเดอร์ Price Action ทองคำมืออาชีพสายเทรดในวัน ผู้ใช้ต้องการเข้า ${side} (${b ? 'ซื้อ' : 'ขาย'}) ตอนนี้ ให้ประเมินอย่างตรงไปตรงมาว่าควรเข้าฝั่งนี้ไหม และโอกาสสำเร็จเท่าไหร่ ห้ามเอนตามใจผู้ใช้ ถ้าฝั่งนี้สวนทางให้บอกตรงๆ`,
+    'prev คือผลวิเคราะห์รอบก่อนของคุณ (อาจหลายนาทีที่แล้ว) ใช้อ้างอิง แต่ตัดสินจากกราฟปัจจุบันเป็นหลัก',
+    ...PA_RULES_,
+    `prob = โอกาส (%) ที่ราคาจะถึง TP1 ก่อนโดน SL ถ้าเข้า ${side} ตามแผนที่คุณให้ ประเมินแบบระมัดระวัง (สวนทิศ H1/H4 ไม่ควรเกิน 45, ไม่มีสัญญาณชัดไม่ควรเกิน 55, เกิน 75 ต้องมีเหตุผลแข็งมากหลายข้อ)`,
+    `verdict: "GO" = เข้า ${side} ได้ตอนนี้, "WAIT" = ฝั่งนี้พอได้แต่ควรรอราคา/สัญญาณก่อน, "NO" = ไม่ควรเข้า ${side}`,
+    `ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: verdict, prob (0-100), summary (สรุปคำตอบ 1-2 ประโยค), entry, sl, tp1, tp2 (ตัวเลขแผน ${side}; ถ้า WAIT ใส่ราคาที่ควรรอเข้า; ถ้า NO ใส่ null ได้), pros (array 1-3 ข้อ เหตุผลที่หนุน ${side}), cons (array 1-3 ข้อ ความเสี่ยง/เหตุผลที่สวนทาง), wait_for (ถ้า WAIT หรือ NO: ต้องเห็นอะไรก่อนถึงจะเข้า ${side} ได้ 1 ประโยค), invalid (แผนนี้ใช้ไม่ได้ถ้า... 1 ประโยค)`,
+  ].join('\n');
+  let heads = []; try { heads = aiNews_().slice(0, 8); } catch (e) {}
+  snap.headlines = heads.map(h => ({ t: h.t, src: h.src, ago_min: h.ago_min }));
+  const body = { model: AI_MODEL, temperature: 0.2, response_format: { type: 'json_object' }, max_tokens: 1400,
+    messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(snap) }] };
+  const res = aiFetchJson_('https://api.deepseek.com/chat/completions', { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + key }, payload: JSON.stringify(body) });
+  const A = aiParseJson_(res.choices[0].message.content);
+  const num = v => { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
+  const arr = v => (Array.isArray(v) ? v : [v]).filter(Boolean).map(String).slice(0, 3);
+  const out = { side, verdict: ['GO', 'WAIT', 'NO'].indexOf(String(A.verdict).toUpperCase()) >= 0 ? String(A.verdict).toUpperCase() : 'WAIT',
+    prob: Math.max(0, Math.min(100, Math.round(Number(A.prob) || 0))), summary: String(A.summary || ''), entry: num(A.entry), sl: num(A.sl), tp1: num(A.tp1), tp2: num(A.tp2),
+    pros: arr(A.pros), cons: arr(A.cons), wait_for: String(A.wait_for || ''), invalid: String(A.invalid || ''), price, tf: snap.tf, time_th: snap.time_th, model: AI_MODEL };
+  // ตรวจแผน: ทิศ SL/TP ต้องถูกฝั่ง, entry ไม่ไกลราคา (ยกเว้นราคารอเข้า), SL ไม่กว้างเกิน
+  const e = out.entry, bad = [];
+  if (e) {
+    if (out.verdict === 'GO' && Math.abs(e - price) > 3 * atr) bad.push('entry ไกลราคาเกินไป');
+    if (out.sl && (b ? out.sl >= e : out.sl <= e)) bad.push('SL ผิดฝั่ง');
+    if (out.tp1 && (b ? out.tp1 <= e : out.tp1 >= e)) bad.push('TP ผิดฝั่ง');
+    if (out.sl && Math.abs(e - out.sl) > 4 * atr) bad.push('SL กว้างเกิน');
+  }
+  if (bad.length) { out.checked = 'ระบบตรวจแผนไม่ผ่าน: ' + bad.join(', '); if (out.verdict === 'GO') out.verdict = 'WAIT'; out.sl = out.tp1 = out.tp2 = null; }
+  else if (e && out.sl && (out.tp2 || out.tp1)) out.rr = Math.round(Math.abs((out.tp2 || out.tp1) - e) / Math.max(0.01, Math.abs(e - out.sl)) * 10) / 10;
   return out;
 }

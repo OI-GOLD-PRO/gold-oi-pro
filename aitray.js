@@ -65,7 +65,6 @@
       news = (j.events || []).filter(e => e.c === 'USD' && (e.i || 'H') === 'H').map(e => ({ t: e.title, ms: Date.parse(e.date), f: e.forecast })).filter(e => isFinite(e.ms));
     } catch (e) {}
   }
-  const ema = (arr, n) => { const k = 2 / (n + 1); let e = null; arr.forEach(v => { e = e === null ? v : v * k + e * (1 - k); }); return e; };
 
   function levelsNow(px) {
     const L = [], oi = O.oi, live = window.OILive && window.OILive.calc;
@@ -163,7 +162,6 @@
     return {
       sym: (O.cfg && O.cfg.name) || 'XAUUSD', tf: TFN[O.tf] || O.tf, time_th: new Date(nowMs + TZ * 1000).toISOString().slice(0, 16).replace('T', ' '),
       price: Math.round(px * 100) / 100, atr: Math.round(atr * 100) / 100,
-      ema20: Math.round(ema(closed.map(b => b.close), 20) * 100) / 100, ema50: Math.round(ema(closed.map(b => b.close), 50) * 100) / 100,
       vwap: vwap ? Math.round(vwap * 100) / 100 : null,
       swing_30: { high: hi.high, high_time: hhmm(hi.time), low: lo.low, low_time: hhmm(lo.time) },
       patterns: patterns(B, atr, levels),
@@ -193,13 +191,13 @@
   function tfSummary(name, B, levels, nBars) {
     if (!B || B.length < 60) return null;
     const cl = B.slice(0, -1), last = cl[cl.length - 1], atr = atrOf(cl, 14), c = cl.map(b => b.close);
-    const e20 = ema(c, 20), e50 = ema(c, 50), e20p = ema(c.slice(0, -5), 20);
-    const trend = last.close > e20 && e20 > e50 && e20 > e20p ? 'ขึ้น' : last.close < e20 && e20 < e50 && e20 < e20p ? 'ลง' : 'ไซด์เวย์';
+    // ทิศจากโครงสร้างราคาล้วน (ไม่ใช้ EMA): HH-HL = ขึ้น, LH-LL = ลง · โครงสร้างไม่ชัด → ดูราคาเทียบ 20 แท่งก่อน (เกิน 1.5 ATR)
+    const struct = structure(cl.slice(-60)), mv = last.close - c[c.length - 21];
+    const trend = /ขาขึ้น/.test(struct) ? 'ขึ้น' : /ขาลง/.test(struct) ? 'ลง' : mv > 1.5 * atr ? 'ขึ้น' : mv < -1.5 * atr ? 'ลง' : 'ไซด์เวย์';
     const sw = cl.slice(-30), hi = Math.max(...sw.map(b => b.high)), lo = Math.min(...sw.map(b => b.low));
     const vol = new Map(B.map(b => [b.time, b.volume || 0]));
     return {
-      tf: name, trend, structure: structure(cl.slice(-60)), atr: Math.round(atr * 100) / 100,
-      ema20: Math.round(e20 * 100) / 100, ema50: Math.round(e50 * 100) / 100,
+      tf: name, trend, structure: struct, atr: Math.round(atr * 100) / 100,
       range_30: { high: Math.round(hi * 100) / 100, low: Math.round(lo * 100) / 100, price_pos_pct: Math.round((B[B.length - 1].close - lo) / Math.max(0.01, hi - lo) * 100) },
       patterns: patterns(B, atr, levels).filter(p => p.bar === 'แท่งล่าสุดที่ปิด' || p.bar === 'ย้อนหลัง 2 แท่ง'),
       absorption: (({ rate_40_pct, count_40, count_last10, bias }) => ({ rate_40_pct, count_40, count_last10, bias }))(absorption(B, vol, atr, levels)),

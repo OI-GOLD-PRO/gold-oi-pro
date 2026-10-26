@@ -193,7 +193,9 @@
   #reloadOv .sp { width: 46px; height: 46px; border-radius: 50%; border: 3px solid rgba(224,180,76,.18); border-top-color: var(--gold); border-right-color: var(--gold); animation: rlSpin .8s linear infinite; box-shadow: 0 0 18px rgba(224,180,76,.25); }
   #reloadOv small { font: 600 12px var(--sans); color: var(--fg); letter-spacing: .02em; }
   @keyframes rlSpin { to { transform: rotate(360deg); } }
-  button.icon.busy { animation: rlSpin .8s linear infinite; color: var(--gold); border-color: var(--gold); }
+  #reload .ri { display: inline-block; line-height: 1; }
+  button.icon.busy { color: var(--gold); border-color: var(--gold); }
+  button.icon.busy .ri { animation: rlSpin .8s linear infinite; }
   #chart, #ov { position: absolute; inset: 0; }
   #chart { z-index: 1; }
   #ov { pointer-events: none; z-index: 2; }
@@ -295,7 +297,7 @@
     <div class="px"><div id="price">–</div><div id="chg">กำลังโหลด</div></div>
     <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือนโซน OI">🔕</button>
     <button class="icon" id="layBtn" aria-label="เลย์เอาต์กราฟ: 1 กราฟ / บนล่าง / ซ้ายขวา">▭</button>
-    <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่">⟳</button>
+    <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่"><span class="ri">⟳</span></button>
     <button class="icon" id="logout" aria-label="ออกจากระบบ">⏻</button>
   </header>
   <div class="chips" id="chips"><span class="chip">กำลัง Sync Data…</span></div>
@@ -356,7 +358,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '2.0.26';
+  const APP_VER = '2.0.27';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 

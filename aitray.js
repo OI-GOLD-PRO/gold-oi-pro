@@ -291,6 +291,45 @@
       eq_highs: eq(hs, 'H'), eq_lows: eq(ls, 'L'),
     };
   }
+  // ---------- ข้อมูล Options ของเรา: GEX / gamma regime / gmf / Skew / ซื้อขายราย strike ----------
+  function optionsNow(px) {
+    const c = window.OILive && window.OILive.calc, oi = O.oi; if (!c || !c.strikes) return null;
+    const rowOf = new Map(((oi && oi.rows) || []).map(r => [r.strike, r])), kp = k => { const r = rowOf.get(k); return Math.round((r ? r.price : k) * 100) / 100; };
+    const near = c.strikes.filter(s => Math.abs(kp(s.k) - px) <= px * 0.03);
+    const gx = near.filter(s => s.gex).sort((a, b) => Math.abs(b.gex) - Math.abs(a.gex)).slice(0, 6)
+      .map(s => ({ strike: s.k, price: kp(s.k), gex_musd: Math.round(s.gex / 1e6 * 10) / 10, type: s.gex > 0 ? 'Call GEX บวก (แม่เหล็ก/แนวต้าน ราคามักถูกดึงเข้าหาแล้วชะลอ)' : 'Put GEX ลบ (ทะลุแล้วเร่ง)' }));
+    const flows = near.map(s => ({ strike: s.k, price: kp(s.k), call_net_buy: Math.round((s.bc || 0) - (s.sc || 0)), put_net_buy: Math.round((s.bp || 0) - (s.sp || 0)), vol: (s.vc || 0) + (s.vp || 0) }))
+      .filter(f => Math.abs(f.call_net_buy) >= 10 || Math.abs(f.put_net_buy) >= 10).sort((a, b) => b.vol - a.vol).slice(0, 6);
+    const gm = oi && oi.gmf ? oi.gmf.find(g => g.lab === 'gmf M') : null;
+    const g = c.gexAtF;
+    return {
+      gamma_regime: g === null || g === undefined ? null : g > 0 ? 'บวก (Positive gamma: MM ซื้อตอนลง ขายตอนขึ้น → ราคามักแกว่งกรอบ ถูกดึงกลับ เหมาะเล่นกลับตัวที่แนว)' : 'ลบ (Negative gamma: MM ไล่ตามราคา → วิ่งแรงตามทาง เบรกแล้วไปต่อ ระวังสวน)',
+      net_gex_at_price_musd: g === null || g === undefined ? null : Math.round(g / 1e6 * 10) / 10,
+      gmf_itd: c.gmf, gmf_itd_adj_by_flow: c.gmfAdj, gmf_M: gm ? gm.p : null,
+      price_vs_gmf_M: gm ? (px >= gm.p ? 'เหนือ gmf M (gamma บวก แกว่งกรอบ)' : 'ใต้ gmf M (gamma ลบ วิ่งแรง)') : null,
+      skew_put_minus_call: c.skew === null ? null : Math.round(c.skew * 10) / 10,
+      top_gex_strikes: gx, flows_today: flows,
+    };
+  }
+  // จุดซ้อน: โซน SMC (OB / FVG / EQH-EQL / Swing) ที่ตรงกับแนว OI / Wall / EM / gmf / Max Pain / Volume / GEX
+  function confluence(tfs, levels, opt, tol) {
+    const lv = levels.slice(); (opt && opt.top_gex_strikes || []).forEach(g => lv.push({ name: `GEX ${g.gex_musd > 0 ? '+' : ''}${g.gex_musd}M @${g.strike}`, p: g.price }));
+    const out = [], hit = (lo, hi) => lv.filter(l => l.p >= lo - tol && l.p <= hi + tol).map(l => l.name);
+    ['H1', 'M15', 'M5'].forEach(tf => {
+      const S = tfs[tf] && tfs[tf].smc; if (!S) return;
+      const z = [];
+      if (S.bull_ob) z.push(['OB ซื้อ', S.bull_ob.bottom, S.bull_ob.top]);
+      if (S.bear_ob) z.push(['OB ขาย', S.bear_ob.bottom, S.bear_ob.top]);
+      (S.bull_fvg || []).forEach(f => z.push(['FVG ขึ้น', f.bottom, f.top]));
+      (S.bear_fvg || []).forEach(f => z.push(['FVG ลง', f.bottom, f.top]));
+      if (S.eq_highs) z.push(['EQH (สภาพคล่องบน)', S.eq_highs, S.eq_highs]);
+      if (S.eq_lows) z.push(['EQL (สภาพคล่องล่าง)', S.eq_lows, S.eq_lows]);
+      if (S.swing_high) z.push(['Swing High', S.swing_high, S.swing_high]);
+      if (S.swing_low) z.push(['Swing Low', S.swing_low, S.swing_low]);
+      z.forEach(([nm, lo, hi]) => { const h = [...new Set(hit(lo, hi))]; if (h.length) out.push({ tf, smc: nm, zone: lo === hi ? f2(lo) : `${f2(lo)}–${f2(hi)}`, mid: (lo + hi) / 2, with: h.slice(0, 3) }); });
+    });
+    return out.sort((a, b) => (a.tf === 'H1' ? 0 : a.tf === 'M15' ? 1 : 2) - (b.tf === 'H1' ? 0 : b.tf === 'M15' ? 1 : 2)).slice(0, 8);
+  }
   function tfSummary(name, B, levels, nBars) {
     if (!B || B.length < 60) return null;
     const cl = B.slice(0, -1), last = cl[cl.length - 1], atr = atrOf(cl, 14), c = cl.map(b => b.close);
@@ -383,7 +422,9 @@
     const fv = a => a && a.length ? a.map(f => `${f2(f.bottom)}–${f2(f.top)}`).join(', ') : '–';
     const ev = S && S.last_event ? `<b style="color:${S.last_event.dir === 'ขึ้น' ? '#2fe3a6' : '#ff6b82'}">${S.last_event.type} ${S.last_event.dir}</b> @${f2(S.last_event.level)} · ${S.last_event.bars_ago} แท่งก่อน` : 'ยังไม่มี BOS/CHoCH';
     const facts = S ? `<div style="font:11px var(--mono,monospace);color:#a9b4d6;line-height:1.6;margin-top:3px">โครงสร้าง: ${esc(S.bias)} · ${ev}<br>Swing H/L: ${f2(S.swing_high)} / ${f2(S.swing_low)} · ${esc(S.zone || '–')}<br>OB ซื้อ ${z(S.bull_ob, '#2fe3a6')} · OB ขาย ${z(S.bear_ob, '#ff6b82')}<br>FVG ขึ้น ${fv(S.bull_fvg)} · FVG ลง ${fv(S.bear_fvg)}${S.eq_highs || S.eq_lows ? `<br>Liquidity: ${S.eq_highs ? 'EQH ' + f2(S.eq_highs) : ''}${S.eq_highs && S.eq_lows ? ' · ' : ''}${S.eq_lows ? 'EQL ' + f2(S.eq_lows) : ''}` : ''}</div>` : '';
-    return `<div style="margin:8px 0;padding:6px 10px;border:1px solid #1f2850;border-radius:10px;background:#0f1533"><b style="font-size:13px">🏗️ โครงสร้างตลาด SMC (H1)</b>${facts}${r.smc ? `<p style="margin-top:5px">${esc(r.smc)}</p>` : ''}</div>`;
+    const gm = r.opt && r.opt.gamma_regime ? `<div style="font-size:11px;margin-top:4px;color:${/^บวก/.test(r.opt.gamma_regime) ? '#2fe3a6' : '#ff6b82'}">γ ${esc(r.opt.gamma_regime.split(' (')[0])}${r.opt.net_gex_at_price_musd !== null ? ' · Net GEX ' + r.opt.net_gex_at_price_musd + 'M' : ''}${r.opt.price_vs_gmf_M ? ' · ' + esc(r.opt.price_vs_gmf_M.split(' (')[0]) : ''}</div>` : '';
+    const cf = (r.conf || []).slice(0, 5).map(c => `<div style="font-size:11px;line-height:1.5;padding-top:2px">🎯 <b>${c.tf}</b> ${esc(c.smc)} ${esc(c.zone)} ↔ ${esc(c.with.join(', '))}</div>`).join('');
+    return `<div style="margin:8px 0;padding:6px 10px;border:1px solid #1f2850;border-radius:10px;background:#0f1533"><b style="font-size:13px">🏗️ โครงสร้างตลาด SMC (H1) × OI / GEX</b>${facts}${gm}${cf ? `<div style="margin-top:5px;border-top:1px solid #1a2246;padding-top:3px"><b style="font-size:12px;color:#ffd97a">จุดซ้อน SMC × OI/GEX</b>${cf}</div>` : ''}${r.smc ? `<p style="margin-top:5px">${esc(r.smc)}</p>` : ''}</div>`;
   }
   function mtfHTML(r) {
     const v = r.tf_view; if (!v || typeof v !== 'object') return '';
@@ -557,6 +598,8 @@
     if (payload.tfs.M15) payload.atr_m15 = payload.tfs.M15.atr;
     if (payload.tfs.M5) payload.atr_m5 = payload.tfs.M5.atr;
     payload.style = STYLE;
+    try { payload.options = optionsNow(payload.price); } catch (e) { payload.options = null; }
+    try { payload.confluence = confluence(payload.tfs || {}, payload.levels || [], payload.options, Math.max(2, (payload.atr_m5 || 2) * 0.5)).map(({ mid, ...x }) => x); } catch (e) { payload.confluence = []; }
     payload.side = side;
     if (result) payload.prev = { action: result.action, confidence: result.confidence, pattern: result.pattern, entry: result.entry, sl: result.sl, tp1: result.tp1, tp2: result.tp2, reasons: result.reasons, price: result.price, time_th: result.time_th };
     const [res] = await Promise.all([O.aiCall('ai_pa', payload, 90000), new Promise(r => setTimeout(r, 2500))]);
@@ -606,6 +649,8 @@
     if (payload.tfs.M15) payload.atr_m15 = payload.tfs.M15.atr;
     if (payload.tfs.M5) payload.atr_m5 = payload.tfs.M5.atr;
     payload.style = STYLE;
+    try { payload.options = optionsNow(payload.price); } catch (e) { payload.options = null; }
+    try { payload.confluence = confluence(payload.tfs || {}, payload.levels || [], payload.options, Math.max(2, (payload.atr_m5 || 2) * 0.5)).map(({ mid, ...x }) => x); } catch (e) { payload.confluence = []; }
     const mtfTxt = Object.values(payload.tfs).map(t => `${t.tf} ${t.trend}`).join(' · ');
     const stEl = bd().querySelectorAll('.steps div')[1]; if (stEl && mtfTxt) stEl.textContent = '▸ หลาย TF: ' + mtfTxt;
     const [res] = await Promise.all([O.aiCall('ai_pa', payload, 90000), new Promise(r => setTimeout(r, 2000))]);
@@ -615,7 +660,7 @@
       $('paGo').onclick = run; return;
     }
     result = res.pa; result.at = Date.now(); result.abs = snap.absorption; sideRes = null; sidePick = null;
-    result.mtf = {}; Object.values(payload.tfs || {}).forEach(t => { result.mtf[t.tf] = { trend: t.trend }; }); result.smcH1 = payload.tfs && payload.tfs.H1 ? payload.tfs.H1.smc : null; showPlan = result.action !== 'WAIT' || !!result.entry;
+    result.mtf = {}; Object.values(payload.tfs || {}).forEach(t => { result.mtf[t.tf] = { trend: t.trend }; }); result.smcH1 = payload.tfs && payload.tfs.H1 ? payload.tfs.H1.smc : null; result.conf = payload.confluence || []; result.opt = payload.options; showPlan = result.action !== 'WAIT' || !!result.entry;
     bd().innerHTML = `<canvas id="paCv"></canvas>` + resultHTML(result, false);
     drawMini($('paCv'), draw, draw.length, null, result, null);
     requestAnimationFrame(() => { const i = bd().querySelector('.conf .bar i'); if (i) i.style.width = (result.confidence || 0) + '%'; });

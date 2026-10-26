@@ -1,5 +1,5 @@
 // ถาดลับ AI Price Action: ปัดซ้ายที่ข้อความ "OI · Powered by … · V…" บนหัวแอป → ถาดสไลด์ออกมาครึ่งจอบน
-// กดปุ่ม → แอนิเมชัน AI + กราฟวิ่ง → DeepSeek อ่านกราฟสด ณ ตอนนั้น (แท่งเทียน + Price Action ที่ระบบตรวจไว้ + แนว OI/EM/gmf/VWAP) → ควรเข้าออเดอร์ไหม
+// กดปุ่ม → แอนิเมชัน AI + กราฟวิ่ง → DeepSeek อ่านกราฟสด ณ ตอนนั้น (แท่งเทียน + Price Action ที่ระบบตรวจไว้ + แนว OI/EM/gmf/GEX) → ควรเข้าออเดอร์ไหม
 (() => {
   'use strict';
   const O = window.OI;
@@ -196,10 +196,7 @@
     const px = B[B.length - 1].close;
     const closed = B.slice(0, -1);
     let atr = 0; { const s = closed.slice(-15); for (let i = 1; i < s.length; i++) atr += Math.max(s[i].high - s[i].low, Math.abs(s[i].high - s[i - 1].close), Math.abs(s[i].low - s[i - 1].close)); atr = atr / Math.max(1, s.length - 1); }
-    // VWAP วันเทรด (เริ่ม 05:00 ไทย)
-    let vwap = null; { const day = Math.floor((B[B.length - 1].time - SESS) / 86400); let pv = 0, vv = 0; B.forEach(b => { if (Math.floor((b.time - SESS) / 86400) !== day) return; const v = vol.get(b.time) || 0; pv += (b.high + b.low + b.close) / 3 * v; vv += v; }); if (vv > 0) vwap = pv / vv; }
-    const iv = window.OI_intraday && window.OI_intraday.result; if (iv && iv.vwapNow) vwap = iv.vwapNow;
-    const levels = levelsNow(px); if (vwap) levels.push({ name: 'VWAP วันนี้', p: Math.round(vwap * 100) / 100, dist: Math.round((vwap - px) * 100) / 100 });
+    const levels = levelsNow(px); // ไม่ใช้ VWAP
     levels.sort((a, b) => b.p - a.p);
     const last = B.slice(-40);
     const sw = closed.slice(-30), hi = sw.reduce((a, b) => b.high > a.high ? b : a), lo = sw.reduce((a, b) => b.low < a.low ? b : a);
@@ -208,7 +205,6 @@
     return {
       sym: (O.cfg && O.cfg.name) || 'XAUUSD', tf: TFN[O.tf] || O.tf, time_th: new Date(nowMs + TZ * 1000).toISOString().slice(0, 16).replace('T', ' '),
       price: Math.round(px * 100) / 100, atr: Math.round(atr * 100) / 100,
-      vwap: vwap ? Math.round(vwap * 100) / 100 : null,
       swing_30: { high: hi.high, high_time: hhmm(hi.time), low: lo.low, low_time: hhmm(lo.time) },
       patterns: patterns(B, atr, levels),
       absorption: absorption(B, vol, atr, levels),
@@ -404,7 +400,7 @@
   function paintIdle() {
     $('paSub').textContent = `${(O.cfg && O.cfg.name) || ''} · ${TFN[O.tf] || O.tf}`;
     bd().innerHTML = `<button class="go" id="paGo">⚡ วิเคราะห์จังหวะเข้าตอนนี้</button>
-      <div class="info">AI จะอ่านแท่งเทียน ${TFN[O.tf] || O.tf} ล่าสุด 40 แท่ง + Price Action ที่ระบบตรวจเจอ + แนว OI / EM / gmf / VWAP ณ ตอนกด แล้วบอกว่าควร BUY / SELL หรือรอ<br>เปลี่ยน TF ที่กราฟก่อนกด เพื่อให้วิเคราะห์ TF นั้น</div>` + sideBlock(true) + (result ? resultHTML(result, true) : '');
+      <div class="info">AI จะอ่านแท่งเทียน ${TFN[O.tf] || O.tf} ล่าสุด 40 แท่ง + Price Action ที่ระบบตรวจเจอ + โมเดล Quant จากข้อมูล OI / GEX / Flow / EM / gmf ณ ตอนกด แล้วบอกว่าควร BUY / SELL หรือรอ<br>เปลี่ยน TF ที่กราฟก่อนกด เพื่อให้วิเคราะห์ TF นั้น</div>` + sideBlock(true) + (result ? resultHTML(result, true) : '');
     $('paGo').onclick = run; bindSides();
     window.OIColorize && OIColorize(bd());
     if (result) bindResult();
@@ -415,6 +411,21 @@
     const ago = m => m < 60 ? m + ' นาที' : Math.round(m / 60) + ' ชม.';
     const items = (r.news || []).map(n => `<div style="display:flex;gap:6px;padding:4px 0;border-top:1px solid #1a2246;font-size:12px;line-height:1.45"><span style="width:16px;text-align:center;font-weight:700;color:${n.impact === '+' ? '#2fe3a6' : n.impact === '-' ? '#ff6b82' : '#8a93ad'}">${n.impact === '+' ? '▲' : n.impact === '-' ? '▼' : '•'}</span><span>${esc(n.th)}<br><small style="color:#6f7896">${esc(n.src)} · ${ago(n.ago_min)}ที่แล้ว</small></span></div>`).join('');
     return `<div style="margin:8px 0;padding:6px 10px;border:1px solid #1f2850;border-radius:10px;background:#0f1533"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:13px">📰 ข่าวล่าสุด</b>${r.news_bias ? `<span style="font-size:12px;font-weight:700;color:${bc}">${esc(r.news_bias)}</span>` : ''}</div>${r.news_summary ? `<p style="margin:4px 0 2px;font-size:12px;color:#c9d1ea">${esc(r.news_summary)}</p>` : ''}${items}</div>`;
+  }
+  function quantHTML(r) {
+    const Q = r.quant; if (!Q) return '';
+    const sc = Q.score, scol = sc > 15 ? '#2fe3a6' : sc < -15 ? '#ff6b82' : '#c9d1ea';
+    const bar = f => { const w = Math.min(50, Math.abs(f.contrib) * 1.6); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;line-height:1.7"><span style="width:118px;color:#a9b4d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.name)}</span><span style="position:relative;flex:1;height:8px;background:#141b3a;border-radius:4px"><i style="position:absolute;top:0;bottom:0;${f.contrib >= 0 ? 'left:50%' : 'right:50%'};width:${w}%;border-radius:4px;background:${f.contrib >= 0 ? '#2fbf8f' : '#e5576b'}"></i><i style="position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:#3a4570"></i></span><span style="width:34px;text-align:right;font-family:var(--mono,monospace);color:${f.contrib >= 0 ? '#2fe3a6' : '#ff6b82'}">${f.contrib > 0 ? '+' : ''}${f.contrib}</span></div>`; };
+    const pl = (p, nm) => p ? `<div style="flex:1;background:#11183a;border:1px solid #1f2850;border-radius:9px;padding:5px 7px;font:11px var(--mono,monospace);line-height:1.6"><b style="color:${nm === 'BUY' ? '#2fe3a6' : '#ff6b82'}">${nm}</b> ชนะ <b>${p.p_win}%</b> · EV <b style="color:${p.ev_r >= 0.15 ? '#2fe3a6' : p.ev_r < 0 ? '#ff6b82' : '#c9d1ea'}">${p.ev_r > 0 ? '+' : ''}${p.ev_r}R</b><br>SL ${f2(p.sl)} · TP1 ${f2(p.tp1)}<br><small style="color:#6f7896">R:R 1:${p.rr} · TP1 ${esc(p.tp1_at)}</small></div>` : `<div style="flex:1;font-size:11px;color:#6f7896;padding:5px">${nm}: ไม่มีเป้าใกล้พอ</div>`;
+    const tc = (Q.touch || []).slice(0, 6).map(t => `<span style="display:inline-block;margin:2px 4px 0 0;padding:1px 6px;border-radius:6px;background:#141b3a;font:10px var(--mono,monospace);color:${t.dist > 0 ? '#9fe8c9' : '#ffb3bf'}">${esc(t.name.split(' (')[0])} ${f2(t.p)} · ${t.prob}%</span>`).join('');
+    return `<div style="margin:8px 0;padding:8px 10px;border:1px solid #2a3358;border-radius:10px;background:linear-gradient(180deg,#121a40,#0f1533)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:13px">📐 Quant Model</b><span style="font:800 18px var(--mono,monospace);color:${scol}">${sc > 0 ? '+' : ''}${sc}</span></div>
+      <div style="font-size:11px;color:#a9b4d6;margin:2px 0 6px">${esc(Q.regime)}<br>IV ${Q.iv_pct ?? '–'}% · RV ${Q.rv_pct ?? '–'}%${Q.rv_iv ? ' · RV/IV ' + Q.rv_iv : ''} · 1σ (2 ชม.) ±${f2(Q.sigma_2h)}${Q.hours_to_expiry !== null ? ' · หมดอายุอีก ' + Q.hours_to_expiry + ' ชม.' : ''}</div>
+      ${Q.factors.map(bar).join('')}
+      <div style="display:flex;gap:6px;margin-top:7px">${pl(Q.plans.long, 'BUY')}${pl(Q.plans.short, 'SELL')}</div>
+      <div style="font-size:11px;margin-top:6px;color:#ffd97a">โมเดลตัดสิน: <b>${Q.decision.action === 'WAIT' ? 'รอ' : Q.decision.action}</b> · ${esc(Q.decision.why)}</div>
+      ${tc ? `<div style="margin-top:5px;font-size:11px;color:#8a93ad">โอกาสแตะแนวใน ~2 ชม.<br>${tc}</div>` : ''}
+      ${r.veto ? `<p class="warn" style="margin-top:6px">⛔ ds สั่งรอ: ${esc(r.veto)}</p>` : ''}${r.quant_view ? `<p style="margin-top:6px">${esc(r.quant_view)}</p>` : ''}</div>`;
   }
   function smcHTML(r) {
     const S = r.smcH1; if (!S && !r.smc) return '';
@@ -449,6 +460,7 @@
       ${spkHTML('main')}
       <div class="pat">${esc(r.pattern)}</div><p>${esc(r.pa)}</p><p style="color:#a9b4d6">${esc(r.context)}</p>
       ${newsHTML(r)}
+      ${quantHTML(r)}
       ${smcHTML(r)}
       ${mtfHTML(r)}
       ${absHTML(r)}
@@ -600,6 +612,7 @@
     payload.style = STYLE;
     try { payload.options = optionsNow(payload.price); } catch (e) { payload.options = null; }
     try { payload.confluence = confluence(payload.tfs || {}, payload.levels || [], payload.options, Math.max(2, (payload.atr_m5 || 2) * 0.5)).map(({ mid, ...x }) => x); } catch (e) { payload.confluence = []; }
+    try { payload.quant = window.OIQuant ? window.OIQuant.model(payload) : null; } catch (e) { payload.quant = null; }
     payload.side = side;
     if (result) payload.prev = { action: result.action, confidence: result.confidence, pattern: result.pattern, entry: result.entry, sl: result.sl, tp1: result.tp1, tp2: result.tp2, reasons: result.reasons, price: result.price, time_th: result.time_th };
     const [res] = await Promise.all([O.aiCall('ai_pa', payload, 90000), new Promise(r => setTimeout(r, 2500))]);
@@ -628,7 +641,7 @@
     busy = true;
     const draw = snap._draw, pats = snap.patterns;
     const patTxt = pats.length ? pats.slice(0, 2).map(p => p.name.split(' (')[0]).join(' + ') : 'ไม่พบรูปแบบชัด';
-    const steps = [`▸ อ่านแท่งเทียน ${snap.tf} 40 แท่ง · ATR ${f2(snap.atr)}`, '▸ อ่านหลาย TF: H1 / M15 / M5 / M1…', '▸ อ่านข่าวล่าสุด…', `▸ Price Action ${snap.tf}: ${patTxt}`, `▸ Absorption ${snap.absorption.count_40 !== undefined ? snap.absorption.rate_40_pct + '% · ' + snap.absorption.bias : '–'}`, `▸ เทียบแนว ${snap.levels.length} ระดับ (OI / EM / gmf / VWAP)`, '▸ DeepSeek กำลังตัดสินใจ…'];
+    const steps = [`▸ อ่านแท่งเทียน ${snap.tf} 40 แท่ง · ATR ${f2(snap.atr)}`, '▸ อ่านหลาย TF: H1 / M15 / M5 / M1…', '▸ อ่านข่าวล่าสุด…', `▸ Price Action ${snap.tf}: ${patTxt}`, `▸ Absorption ${snap.absorption.count_40 !== undefined ? snap.absorption.rate_40_pct + '% · ' + snap.absorption.bias : '–'}`, `▸ โมเดล Quant: OI / GEX / Flow / EM / gmf · ${snap.levels.length} แนว`, '▸ DeepSeek กำลังตัดสินใจ…'];
     bd().innerHTML = `<canvas id="paCv"></canvas><div class="think">AI กำลังวิเคราะห์<i></i><i></i><i></i></div><div class="steps">${steps.map(s => `<div>${esc(s)}</div>`).join('')}</div>`;
     const cv = $('paCv'), st = [...bd().querySelectorAll('.steps div')];
     // กราฟวิ่งไวๆ: เลื่อนจากแท่งเก่าไปล่าสุด แล้วสแกนซ้ำ จนกว่าผลจะมา
@@ -651,6 +664,7 @@
     payload.style = STYLE;
     try { payload.options = optionsNow(payload.price); } catch (e) { payload.options = null; }
     try { payload.confluence = confluence(payload.tfs || {}, payload.levels || [], payload.options, Math.max(2, (payload.atr_m5 || 2) * 0.5)).map(({ mid, ...x }) => x); } catch (e) { payload.confluence = []; }
+    try { payload.quant = window.OIQuant ? window.OIQuant.model(payload) : null; } catch (e) { payload.quant = null; }
     const mtfTxt = Object.values(payload.tfs).map(t => `${t.tf} ${t.trend}`).join(' · ');
     const stEl = bd().querySelectorAll('.steps div')[1]; if (stEl && mtfTxt) stEl.textContent = '▸ หลาย TF: ' + mtfTxt;
     const [res] = await Promise.all([O.aiCall('ai_pa', payload, 90000), new Promise(r => setTimeout(r, 2000))]);
@@ -660,7 +674,7 @@
       $('paGo').onclick = run; return;
     }
     result = res.pa; result.at = Date.now(); result.abs = snap.absorption; sideRes = null; sidePick = null;
-    result.mtf = {}; Object.values(payload.tfs || {}).forEach(t => { result.mtf[t.tf] = { trend: t.trend }; }); result.smcH1 = payload.tfs && payload.tfs.H1 ? payload.tfs.H1.smc : null; result.conf = payload.confluence || []; result.opt = payload.options; showPlan = result.action !== 'WAIT' || !!result.entry;
+    result.mtf = {}; Object.values(payload.tfs || {}).forEach(t => { result.mtf[t.tf] = { trend: t.trend }; }); result.smcH1 = payload.tfs && payload.tfs.H1 ? payload.tfs.H1.smc : null; result.conf = payload.confluence || []; result.opt = payload.options; result.quant = payload.quant; showPlan = result.action !== 'WAIT' || !!result.entry;
     bd().innerHTML = `<canvas id="paCv"></canvas>` + resultHTML(result, false);
     drawMini($('paCv'), draw, draw.length, null, result, null);
     requestAnimationFrame(() => { const i = bd().querySelector('.conf .bar i'); if (i) i.style.width = (result.confidence || 0) + '%'; });

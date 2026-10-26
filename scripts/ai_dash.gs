@@ -280,9 +280,12 @@ function aiPA_(snap) {
   if (!key) throw new Error('ยังไม่ได้ใส่ DEEPSEEK_API_KEY');
   const price = Number(snap.price), atr = Math.max(0.5, Number(snap.atr_m5) * 2 || Number(snap.atr_m15) || Number(snap.atr) || 3);
   const sys = [
-    'คุณคือเทรดเดอร์ Price Action ทองคำมืออาชีพสายเทรดสั้น (Scalp/Short-term ในวัน ถือไม่กี่นาทีถึง 1-2 ชม.) วิเคราะห์จากกราฟสดที่ส่งมา ณ ตอนนี้ แล้วตัดสินว่าควรเข้าออเดอร์ตอนนี้ไหม',
-    ...PA_RULES_,
-    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: action ("BUY"|"SELL"|"WAIT"), confidence (0-100), pattern (ชื่อ Price Action ที่เห็นสั้นๆ หรือ "ไม่มีสัญญาณชัด"), pa (อธิบาย Price Action แท่งล่าสุด 1-2 ประโยค), context (ราคาอยู่ตรงไหนเทียบแนวสำคัญ 1 ประโยค), entry, sl, tp1, tp2 (ตัวเลข; ถ้า WAIT ให้ใส่ราคาที่ควรรอเข้าแทน หรือ null), reasons (array 2-4 ข้อ ข้อละ 1 ประโยค), invalid (ถ้า... แผนนี้ใช้ไม่ได้ 1 ประโยค), tf_view (object {H1, M15, M5, M1} แต่ละค่า 1 ประโยคสั้น: ทิศ + สิ่งที่เห็น), align (สรุปว่าไทม์เฟรมสอดคล้องหรือขัดกัน ไม่เกิน 40 ตัวอักษร), news_bias ("หนุนทอง"|"กดทอง"|"กลาง"), news_summary (สรุปข่าวล่าสุดที่มีผลกับทองเป็นภาษาไทย 1-2 ประโยค), news_items (array สูงสุด 4 ข้อ {i: ลำดับข่าวใน headlines เริ่ม 0, th: แปล/สรุปพาดหัวเป็นไทยสั้นๆ, impact: "+"|"-"|"0" ผลต่อทอง}), smc (อ่านโครงสร้างตลาด SMC ของ H1 ประกอบกับแนว OI/GEX ของเรา: M15/M5 สอดคล้องไหม, gamma บวกหรือลบ, จุดซ้อน (confluence) ไหนดีที่สุดที่ควรรอเข้า 2-3 ประโยค), absorption (ตีความ Absorption จากข้อมูล 1-2 ประโยค: ถี่ไหม ฝั่งไหนรับ เกิดที่แนวไหน มีผลกับการเข้าออเดอร์อย่างไร), wait_for (ถ้า WAIT: ต้องเห็นอะไรก่อนเข้า 1 ประโยค)',
+    'คุณคือนักวิเคราะห์ Quant ทองคำ (GC) สายเทรดสั้น ถือไม่กี่นาทีถึง 1-2 ชม. วิเคราะห์ด้วยตัวเลขจากข้อมูล Options/OI ของเราเป็นหลัก',
+    'quant คือผลโมเดลที่ระบบคำนวณแล้ว (เชื่อถือได้ ห้ามแก้ตัวเลข): score (−100..+100 ทิศรวม), regime (gamma บวก = แกว่งกรอบ, gamma ลบ = วิ่งตามทาง), iv/rv, sigma_2h (ระยะ 1σ ใน 2 ชม.), factors (แต่ละปัจจัย s = −1..+1, contrib = คะแนนที่ให้), plans.long/short (entry, sl, tp1, p_win %, ev_r, rr), decision (action ที่โมเดลเลือก + why), touch (โอกาสแตะแนวใน ~2 ชม.)',
+    'หน้าที่คุณ: อธิบายผลโมเดลให้เทรดเดอร์เข้าใจ ปัจจัยไหนขับเคลื่อนหลัก ปัจจัยไหนขัด และความเสี่ยงที่โมเดลไม่เห็น · ห้ามเปลี่ยนแผนหรือตัวเลขของโมเดล · สั่ง veto (ให้รอ) ได้เฉพาะเมื่อมีเหตุผลนอกโมเดลที่ชัดเจน เช่น ข่าวแรงใน headlines สวนทาง หรือข้อมูลขัดกันรุนแรง',
+    'ไม่มี VWAP และไม่มี EMA ห้ามอ้างถึง · ใช้ตัวเลขในข้อมูลเท่านั้น',
+    ...PA_RULES_.filter(r => !/VWAP|EMA/.test(r)),
+    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: quant_view (อธิบายผลโมเดล 2-3 ประโยค: คะแนน ระบอบ ปัจจัยหลักที่ขับ ปัจจัยที่ขัด), veto (true/false), veto_reason (ถ้า veto), action ("BUY"|"SELL"|"WAIT" ให้ตรงกับ quant.decision ยกเว้น veto), confidence (0-100), pattern (ชื่อ Price Action ที่เห็นสั้นๆ หรือ "ไม่มีสัญญาณชัด"), pa (อธิบาย Price Action แท่งล่าสุด 1-2 ประโยค), context (ราคาอยู่ตรงไหนเทียบแนวสำคัญ 1 ประโยค), entry, sl, tp1, tp2 (ตัวเลข; ถ้า WAIT ให้ใส่ราคาที่ควรรอเข้าแทน หรือ null), reasons (array 2-4 ข้อ ข้อละ 1 ประโยค), invalid (ถ้า... แผนนี้ใช้ไม่ได้ 1 ประโยค), tf_view (object {H1, M15, M5, M1} แต่ละค่า 1 ประโยคสั้น: ทิศ + สิ่งที่เห็น), align (สรุปว่าไทม์เฟรมสอดคล้องหรือขัดกัน ไม่เกิน 40 ตัวอักษร), news_bias ("หนุนทอง"|"กดทอง"|"กลาง"), news_summary (สรุปข่าวล่าสุดที่มีผลกับทองเป็นภาษาไทย 1-2 ประโยค), news_items (array สูงสุด 4 ข้อ {i: ลำดับข่าวใน headlines เริ่ม 0, th: แปล/สรุปพาดหัวเป็นไทยสั้นๆ, impact: "+"|"-"|"0" ผลต่อทอง}), smc (อ่านโครงสร้างตลาด SMC ของ H1 ประกอบกับแนว OI/GEX ของเรา: M15/M5 สอดคล้องไหม, gamma บวกหรือลบ, จุดซ้อน (confluence) ไหนดีที่สุดที่ควรรอเข้า 2-3 ประโยค), absorption (ตีความ Absorption จากข้อมูล 1-2 ประโยค: ถี่ไหม ฝั่งไหนรับ เกิดที่แนวไหน มีผลกับการเข้าออเดอร์อย่างไร), wait_for (ถ้า WAIT: ต้องเห็นอะไรก่อนเข้า 1 ประโยค)',
   ].join('\n');
   let heads = []; try { heads = aiNews_().slice(0, 10); } catch (e) {}
   snap.headlines = heads.map(h => ({ t: h.t, src: h.src, ago_min: h.ago_min }));
@@ -298,6 +301,18 @@ function aiPA_(snap) {
     headlines_n: heads.length, tf_view: (() => { const v = A.tf_view && typeof A.tf_view === 'object' ? A.tf_view : {}; const o = {}; ['H1', 'M15', 'M5', 'M1'].forEach(k => { if (v[k]) o[k] = String(typeof v[k] === 'object' ? Object.values(v[k]).join(' ') : v[k]); }); return o; })(), wait_for: String(A.wait_for || ''),
     price, tf: snap.tf, time_th: snap.time_th, model: AI_MODEL };
   if (['BUY', 'SELL', 'WAIT'].indexOf(out.action) < 0) out.action = 'WAIT';
+  // โหมด Quant: ทิศและแผนมาจากโมเดล (ds อธิบาย และ veto ได้เท่านั้น)
+  const Q = snap.quant;
+  if (Q && Q.decision) {
+    out.quant_view = String(A.quant_view || '');
+    const pl = Q.decision.plan, veto = A.veto === true || String(A.veto) === 'true';
+    out.action = veto ? 'WAIT' : Q.decision.action;
+    if (veto) out.veto = String(A.veto_reason || 'ds ให้รอ');
+    const use = pl || (Q.plans && (Q.score >= 0 ? Q.plans.long : Q.plans.short));
+    if (use) { out.entry = use.entry; out.sl = use.sl; out.tp1 = use.tp1; out.tp2 = use.tp2; out.rr = use.rr; }
+    out.confidence = pl ? pl.p_win : Math.min(60, Math.abs(Q.score));
+    return out;
+  }
   // ตรวจความสมเหตุสมผลของแผน: ทิศ SL/TP ถูก, entry ใกล้ราคา, ระยะ SL สมจริง → ไม่ผ่าน = WAIT
   if (out.action !== 'WAIT') {
     const b = out.action === 'BUY', e = out.entry, bad = [];
@@ -321,7 +336,8 @@ function aiSide_(snap) {
   const sys = [
     `คุณคือเทรดเดอร์ Price Action ทองคำมืออาชีพสายเทรดสั้น (ถือไม่กี่นาทีถึง 1-2 ชม.) ผู้ใช้ต้องการเข้า ${side} (${b ? 'ซื้อ' : 'ขาย'}) ตอนนี้ ให้ประเมินอย่างตรงไปตรงมาว่าควรเข้าฝั่งนี้ไหม และโอกาสสำเร็จเท่าไหร่ ห้ามเอนตามใจผู้ใช้ ถ้าฝั่งนี้สวนทางให้บอกตรงๆ`,
     'prev คือผลวิเคราะห์รอบก่อนของคุณ (อาจหลายนาทีที่แล้ว) ใช้อ้างอิง แต่ตัดสินจากกราฟปัจจุบันเป็นหลัก',
-    ...PA_RULES_,
+    `quant คือผลโมเดลตัวเลข (เชื่อถือได้): plans.${b ? 'long' : 'short'} คือแผนฝั่งที่ผู้ใช้เลือก (p_win, ev_r, sl, tp1) · score คือทิศรวม · ใช้อธิบายใน summary/pros/cons ห้ามขัดตัวเลขโมเดล · ไม่มี VWAP/EMA`,
+    ...PA_RULES_.filter(r => !/VWAP|EMA/.test(r)),
     `prob = โอกาส (%) ที่ราคาจะถึง TP1 ก่อนโดน SL ถ้าเข้า ${side} ตามแผนที่คุณให้ ประเมินแบบระมัดระวัง (สวนทิศ H1/M15 ไม่ควรเกิน 45, ไม่มีสัญญาณชัดไม่ควรเกิน 55, เกิน 75 ต้องมีเหตุผลแข็งมากหลายข้อ)`,
     `verdict: "GO" = เข้า ${side} ได้ตอนนี้, "WAIT" = ฝั่งนี้พอได้แต่ควรรอราคา/สัญญาณก่อน, "NO" = ไม่ควรเข้า ${side}`,
     `ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: verdict, prob (0-100), summary (สรุปคำตอบ 1-2 ประโยค), entry, sl, tp1, tp2 (ตัวเลขแผน ${side}; ถ้า WAIT ใส่ราคาที่ควรรอเข้า; ถ้า NO ใส่ null ได้), pros (array 1-3 ข้อ เหตุผลที่หนุน ${side}), cons (array 1-3 ข้อ ความเสี่ยง/เหตุผลที่สวนทาง), wait_for (ถ้า WAIT หรือ NO: ต้องเห็นอะไรก่อนถึงจะเข้า ${side} ได้ 1 ประโยค), invalid (แผนนี้ใช้ไม่ได้ถ้า... 1 ประโยค)`,
@@ -334,9 +350,16 @@ function aiSide_(snap) {
   const A = aiParseJson_(res.choices[0].message.content);
   const num = v => { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
   const arr = v => (Array.isArray(v) ? v : [v]).filter(Boolean).map(String).slice(0, 3);
+  const Q = snap.quant, qp = Q && Q.plans ? (b ? Q.plans.long : Q.plans.short) : null;
   const out = { side, verdict: ['GO', 'WAIT', 'NO'].indexOf(String(A.verdict).toUpperCase()) >= 0 ? String(A.verdict).toUpperCase() : 'WAIT',
     prob: Math.max(0, Math.min(100, Math.round(Number(A.prob) || 0))), summary: String(A.summary || ''), entry: num(A.entry), sl: num(A.sl), tp1: num(A.tp1), tp2: num(A.tp2),
     pros: arr(A.pros), cons: arr(A.cons), wait_for: String(A.wait_for || ''), invalid: String(A.invalid || ''), price, tf: snap.tf, time_th: snap.time_th, model: AI_MODEL };
+  // โหมด Quant: โอกาสชนะและแผนมาจากโมเดล · GO เมื่อ EV ≥ 0.15R และชนะ ≥ 45% · NO เมื่อ EV < 0
+  if (qp) {
+    out.prob = qp.p_win; out.entry = qp.entry; out.sl = qp.sl; out.tp1 = qp.tp1; out.tp2 = qp.tp2; out.rr = qp.rr; out.ev_r = qp.ev_r;
+    out.verdict = qp.ev_r >= 0.15 && qp.p_win >= 45 && !/ตลาดปิด|ใกล้ข่าว/.test(Q.decision.why) ? (out.verdict === 'NO' || out.verdict === 'WAIT' ? 'WAIT' : 'GO') : qp.ev_r < 0 ? 'NO' : 'WAIT';
+    return out;
+  } else if (Q) { out.verdict = 'NO'; out.summary = (out.summary ? out.summary + ' · ' : '') + 'โมเดลไม่พบเป้าหมายใกล้พอสำหรับฝั่งนี้'; return out; }
   // ตรวจแผน: ทิศ SL/TP ต้องถูกฝั่ง, entry ไม่ไกลราคา (ยกเว้นราคารอเข้า), SL ไม่กว้างเกิน
   const e = out.entry, bad = [];
   if (e) {

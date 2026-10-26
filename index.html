@@ -349,7 +349,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '2.0.21';
+  const APP_VER = '2.0.22';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -734,11 +734,30 @@
       }
       // OI ฝั่งขวา: แสดงเมื่อ Call หรือ Put ตั้งแต่ 30
       if (Math.max(r.c, r.p) >= 30) {
-        ctx.fillStyle = big ? C('--fg') : C('--muted');
-        const lab = `${r.c ? 'C' + r.c : ''}${r.c && r.p ? ' ' : ''}${r.p ? 'P' + r.p : ''}`;
-        const L = barMax * Math.max(r.p, r.c) / oi.maxOI;
-        ctx.textAlign = 'right';
-        ctx.fillText(lab, plotW - L - 4, y - 7); // ขยับขึ้นให้พ้นเส้นกำแพง
+        // OI ฝั่งไหนเกิน 100 = ตัวหนา มีกรอบพื้นสีของฝั่งนั้น (Call เขียว · Put แดง)
+        const base = big ? C('--fg') : C('--muted'), mono = C('--mono');
+        const segs = [];
+        if (r.c) segs.push(['C' + r.c, r.c > 100 ? C('--call') : base, r.c > 100]);
+        if (r.c && r.p) segs.push([' ', base, false]);
+        if (r.p) segs.push(['P' + r.p, r.p > 100 ? C('--put') : base, r.p > 100]);
+        const fnt = h => h ? `bold 11px ${mono}` : `10px ${mono}`;
+        const wid = segs.reduce((a, g) => { ctx.font = fnt(g[2]); return a + ctx.measureText(g[0]).width + (g[2] ? 6 : 0); }, 0);
+        const L = barMax * Math.max(r.p, r.c) / oi.maxOI, yo = y - 7; // ขยับขึ้นให้พ้นเส้นกำแพง
+        let x = plotW - L - 4 - wid;
+        ctx.textAlign = 'left';
+        segs.forEach(([t, col, hot]) => {
+          ctx.font = fnt(hot);
+          const tw = ctx.measureText(t).width;
+          if (hot) {
+            x += 3;
+            ctx.globalAlpha = 0.22; ctx.fillStyle = col; ctx.fillRect(x - 2, yo - 7, tw + 4, 14);
+            ctx.globalAlpha = 0.9; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(x - 2 + .5, yo - 7 + .5, tw + 3, 13);
+            ctx.globalAlpha = 1;
+          }
+          ctx.fillStyle = col; ctx.fillText(t, x, yo);
+          x += tw + (hot ? 3 : 0);
+        });
+        ctx.font = `10px ${mono}`;
       }
       // Volume: ใต้เลข strike ฝั่งซ้าย (ต้องมีที่ว่างระหว่างเส้นพอ)
       if (gap >= 24) {

@@ -94,15 +94,19 @@
   function syncLevels() {
     const d = st.d;
     if (!d || !d.rows || !O.setLevels || !O.cfgData || !O.oi) return;
-    const lv = [];
+    let lv = [], fb = null;
     d.rows.forEach(r => { if (r[11] > 0) lv.push({ strike: r[0], oi: r[11], type: r[1] }); });
+    // สัญญาวันนี้ยังไม่มี OI (เพิ่งเปิด) → ใช้ OI ของสัญญาถัดไปที่ Worker ยืมมาให้
+    if (!lv.length && d.oiFb && d.oiFb.rows && d.oiFb.rows.length) { fb = d.oiFb; lv = fb.rows.map(([k, t, oi]) => ({ strike: k, oi, type: t })); }
     if (!lv.length) return;
-    const sig = d.root + '|' + d.oiT + '|' + lv.length + '|' + lv.reduce((a, l) => a + l.oi, 0);
+    const sig = d.root + '|' + d.oiT + '|' + (fb ? fb.root + fb.exp : '') + '|' + lv.length + '|' + lv.reduce((a, l) => a + l.oi, 0);
     if (st.lvSig === sig && st.lvOi === O.oi) return;
     // ป้าย: วันหมดอายุของสัญญา (เวลาไทย) + OI เป็นของวันเทรดไหน (วันตามเวลาชิคาโกที่ CME ปิดตัวเลข)
     const th = (t, o) => new Date(t * 1000).toLocaleString('th-TH', Object.assign({ timeZone: 'Asia/Bangkok' }, o));
     const exp = d.expTs ? `หมด ${th(d.expTs, { weekday: 'short', day: 'numeric', month: 'short' })} ${th(d.expTs, { hour: '2-digit', minute: '2-digit', hour12: false })}` : '';
-    const oiD = d.oiT ? `OI ปิด ${new Date(d.oiT * 1000).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/Chicago' })}` : 'OI สด';
+    const oiT = fb ? fb.oiT : d.oiT;
+    let oiD = oiT ? `OI ปิด ${new Date(oiT * 1000).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/Chicago' })}` : 'OI สด';
+    if (fb) oiD = `⚠️ ยืม OI จาก ${fb.root} (หมด ${th(fb.expTs, { weekday: 'short', day: 'numeric', month: 'short' })}) · ${oiD}`;
     O.setLevels(lv, d.root, [exp, oiD].filter(Boolean).join(' · '));
     st.lvSig = sig; st.lvOi = O.oi; st.oiSrc = 'tv';
   }

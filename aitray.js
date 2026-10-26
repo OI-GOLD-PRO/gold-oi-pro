@@ -250,7 +250,9 @@
       bars: B.slice(-nBars).map(b => [hhmm(b.time), +b.open.toFixed(2), +b.high.toFixed(2), +b.low.toFixed(2), +b.close.toFixed(2), b.volume || 0]),
     };
   }
-  const MTF = [['H4', '4h', 160, 12], ['H1', '1h', 200, 20], ['M15', '15m', 200, 24], ['M5', '5m', 200, 24]];
+  // เทรดสั้น: H1 = ทิศ/แนวใหญ่, M15 = โครงสร้าง, M5 = จุดตั้งเทรด, M1 = จังหวะเข้า
+  const STYLE = 'เทรดสั้น (Short-term / Scalp ในวัน) ถือไม่กี่นาทีถึงราว 1-2 ชม. ไม่ถือข้ามคืน: H1 ดูทิศ/แนวใหญ่, M15 ดูโครงสร้าง, M5 หาจุดตั้งเทรด, M1 หาจังหวะเข้า · SL แคบหลังไส้ TP เป็นแนวใกล้ที่ไปถึงได้เร็ว';
+  const MTF = [['H1', '1h', 200, 16], ['M15', '15m', 200, 20], ['M5', '5m', 200, 24], ['M1', '1m', 300, 30]];
   async function multiTF(snap) {
     const cur = O.tf, vol = new Map((O.rawBars || []).map(k => [Math.floor(k[0] / 1000) + TZ, k[5] || 0]));
     const res = await Promise.all(MTF.map(async ([nm, t, n, nb]) => {
@@ -319,7 +321,7 @@
   }
   function mtfHTML(r) {
     const v = r.tf_view; if (!v || typeof v !== 'object') return '';
-    const rows = ['H4', 'H1', 'M15', 'M5'].filter(k => v[k]).map(k => { const t = r.mtf && r.mtf[k]; const tr = t ? t.trend : ''; const ic = tr === 'ขึ้น' ? '🟢' : tr === 'ลง' ? '🔴' : '⚪';
+    const rows = ['H4', 'H1', 'M15', 'M5', 'M1'].filter(k => v[k]).map(k => { const t = r.mtf && r.mtf[k]; const tr = t ? t.trend : ''; const ic = tr === 'ขึ้น' ? '🟢' : tr === 'ลง' ? '🔴' : '⚪';
       return `<div style="display:flex;gap:8px;padding:3px 0;border-top:1px solid #1a2246"><b style="width:34px;font:700 12px var(--mono,monospace);color:#e0b44c">${k}</b><span style="font-size:12px;line-height:1.45">${ic} ${esc(v[k])}</span></div>`; }).join('');
     return `<div style="margin:8px 0;padding:6px 10px;border:1px solid #1f2850;border-radius:10px;background:#0f1533"><b style="font-size:13px">🧭 หลายไทม์เฟรม</b>${r.align ? ` <span style="font-size:12px;color:${/สอดคล้อง/.test(r.align) ? '#2fe3a6' : '#f0a35b'}">· ${esc(r.align)}</span>` : ''}${rows}</div>`;
   }
@@ -381,7 +383,7 @@
       (r.news || []).forEach((n, i) => L.push(`ข่าวที่ ${i + 1} ${n.impact === '+' ? 'หนุนทอง' : n.impact === '-' ? 'กดทอง' : 'ผลกลาง'} ${n.th}`));
     }
     const v = r.tf_view || {};
-    if (Object.keys(v).length) { L.push('มุมมองหลายไทม์เฟรม'); ['H4', 'H1', 'M15', 'M5'].forEach(k => { if (v[k]) L.push(`${k} ${v[k]}`); }); if (r.align) L.push(`สรุป ${r.align}`); }
+    if (Object.keys(v).length) { L.push('มุมมองหลายไทม์เฟรม'); ['H4', 'H1', 'M15', 'M5', 'M1'].forEach(k => { if (v[k]) L.push(`${k} ${v[k]}`); }); if (r.align) L.push(`สรุป ${r.align}`); }
     const a = r.abs;
     if (a && a.count_40 !== undefined) L.push(`แอบซอร์ปชัน ${a.rate_40_pct} เปอร์เซ็นต์ เกิด ${a.count_40} จาก 40 แท่ง เอนไป ${a.bias} ซื้อรับ ${a.buy_side} ขายรับ ${a.sell_side}`);
     if (r.absorption) L.push(r.absorption);
@@ -486,6 +488,8 @@
     const payload = Object.assign({}, s2); delete payload._draw;
     try { payload.tfs = await multiTF(s2); } catch (e) { payload.tfs = {}; }
     if (payload.tfs.M15) payload.atr_m15 = payload.tfs.M15.atr;
+    if (payload.tfs.M5) payload.atr_m5 = payload.tfs.M5.atr;
+    payload.style = STYLE;
     payload.side = side;
     if (result) payload.prev = { action: result.action, confidence: result.confidence, pattern: result.pattern, entry: result.entry, sl: result.sl, tp1: result.tp1, tp2: result.tp2, reasons: result.reasons, price: result.price, time_th: result.time_th };
     const [res] = await Promise.all([O.aiCall('ai_pa', payload, 90000), new Promise(r => setTimeout(r, 2500))]);
@@ -514,7 +518,7 @@
     busy = true;
     const draw = snap._draw, pats = snap.patterns;
     const patTxt = pats.length ? pats.slice(0, 2).map(p => p.name.split(' (')[0]).join(' + ') : 'ไม่พบรูปแบบชัด';
-    const steps = [`▸ อ่านแท่งเทียน ${snap.tf} 40 แท่ง · ATR ${f2(snap.atr)}`, '▸ อ่านหลาย TF: H4 / H1 / M15 / M5…', '▸ อ่านข่าวล่าสุด…', `▸ Price Action ${snap.tf}: ${patTxt}`, `▸ Absorption ${snap.absorption.count_40 !== undefined ? snap.absorption.rate_40_pct + '% · ' + snap.absorption.bias : '–'}`, `▸ เทียบแนว ${snap.levels.length} ระดับ (OI / EM / gmf / VWAP)`, '▸ DeepSeek กำลังตัดสินใจ…'];
+    const steps = [`▸ อ่านแท่งเทียน ${snap.tf} 40 แท่ง · ATR ${f2(snap.atr)}`, '▸ อ่านหลาย TF: H1 / M15 / M5 / M1…', '▸ อ่านข่าวล่าสุด…', `▸ Price Action ${snap.tf}: ${patTxt}`, `▸ Absorption ${snap.absorption.count_40 !== undefined ? snap.absorption.rate_40_pct + '% · ' + snap.absorption.bias : '–'}`, `▸ เทียบแนว ${snap.levels.length} ระดับ (OI / EM / gmf / VWAP)`, '▸ DeepSeek กำลังตัดสินใจ…'];
     bd().innerHTML = `<canvas id="paCv"></canvas><div class="think">AI กำลังวิเคราะห์<i></i><i></i><i></i></div><div class="steps">${steps.map(s => `<div>${esc(s)}</div>`).join('')}</div>`;
     const cv = $('paCv'), st = [...bd().querySelectorAll('.steps div')];
     // กราฟวิ่งไวๆ: เลื่อนจากแท่งเก่าไปล่าสุด แล้วสแกนซ้ำ จนกว่าผลจะมา
@@ -533,7 +537,8 @@
     const payload = Object.assign({}, snap); delete payload._draw;
     try { payload.tfs = await multiTF(snap); } catch (e) { payload.tfs = {}; }
     if (payload.tfs.M15) payload.atr_m15 = payload.tfs.M15.atr;
-    payload.style = 'เทรดในวัน (Intraday) ถือไม่ข้ามคืน: H4 ดูทิศใหญ่, H1 ดูโครงสร้าง/แนว, M15 หาจุดตั้งเทรด, M5 หาจังหวะเข้า';
+    if (payload.tfs.M5) payload.atr_m5 = payload.tfs.M5.atr;
+    payload.style = STYLE;
     const mtfTxt = Object.values(payload.tfs).map(t => `${t.tf} ${t.trend}`).join(' · ');
     const stEl = bd().querySelectorAll('.steps div')[1]; if (stEl && mtfTxt) stEl.textContent = '▸ หลาย TF: ' + mtfTxt;
     const [res] = await Promise.all([O.aiCall('ai_pa', payload, 90000), new Promise(r => setTimeout(r, 2000))]);

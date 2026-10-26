@@ -260,7 +260,7 @@ function aiWeb_(e) {
 // ---------- ถาดลับ: AI อ่าน Price Action ของกราฟสด ณ ตอนกด แล้วตัดสินว่าควรเข้าออเดอร์ไหม ----------
 // snap มาจากแอป: { sym, tf, time_th, price, atr, bars: [[t,o,h,l,c,v]...] (เก่า→ใหม่, แท่งสุดท้าย = กำลังวิ่ง), patterns, levels, vwap, swing }
 const PA_RULES_ = [
-    'tfs คือข้อมูลหลายไทม์เฟรมที่ระบบสรุปแล้ว (trend จากโครงสร้างราคา, structure, ATR, patterns, absorption, bars): ใช้ H4 ดูทิศใหญ่, H1 ดูโครงสร้างและแนว, M15 หาจุดตั้งเทรด, M5 หาจังหวะเข้า · เทรดตามทิศ H1/H4 ได้น้ำหนักมากกว่า สวนทิศต้องมีเหตุผลแข็ง (แนวใหญ่ + Price Action + Absorption) และลดความมั่นใจ · bars/patterns ระดับบนสุดคือ TF ที่ผู้ใช้เปิดอยู่',
+    'tfs คือข้อมูลหลายไทม์เฟรมที่ระบบสรุปแล้ว (trend จากโครงสร้างราคา, structure, ATR, patterns, absorption, bars): ผู้ใช้เทรดสั้น (style): H1 ดูทิศและแนวใหญ่, M15 ดูโครงสร้าง, M5 หาจุดตั้งเทรด, M1 หาจังหวะเข้า · เทรดตามทิศ H1/M15 ได้น้ำหนักมากกว่า สวนทิศต้องมีเหตุผลแข็ง (แนวใหญ่ + Price Action + Absorption) และลดความมั่นใจ · bars/patterns ระดับบนสุดคือ TF ที่ผู้ใช้เปิดอยู่',
     'ใช้เฉพาะตัวเลขในข้อมูล ห้ามแต่งราคาใหม่ · patterns คือรูปแบบแท่งเทียนที่ระบบตรวจไว้แล้ว (เชื่อถือได้) ให้ใช้เป็นหลัก ห้ามอ้างรูปแบบที่ไม่มีใน patterns',
     'bars เรียงเก่า→ใหม่ แท่งสุดท้ายยังไม่ปิด (forming) อย่าตัดสินจากแท่งที่ยังไม่ปิดอย่างเดียว',
     'levels คือแนวจาก Options (Call Wall = แนวต้าน, Put Wall = แนวรับ, กรอบ EM, gmf, Max Pain, โซน OI, เส้น Volume) ราคาเหนือ gmf M มักแกว่งกรอบ ใต้ gmf M มักวิ่งแรงตามทาง',
@@ -268,16 +268,17 @@ const PA_RULES_ = [
     'absorption คือแท่งที่ Volume สูงแต่ราคาไปไม่ไกล (มีออเดอร์ใหญ่รอรับ) ระบบคำนวณไว้แล้ว: rate_40_pct = อัตราการเกิดใน 40 แท่ง, side buy = ซื้อรับแรงขาย (หนุนขึ้น), sell = ขายรับแรงซื้อ (กดลง) · Absorption ที่แนวสำคัญ + Pin Bar/ปฏิเสธราคา = สัญญาณกลับตัวที่แข็งแรงขึ้น · Absorption ถี่แต่ราคาไม่ไปไหน = สะสม/แจกจ่ายของ รอเบรก',
     'headlines = พาดหัวข่าวล่าสุดภาษาอังกฤษ (ago_min = กี่นาทีที่แล้ว) ใช้ประกอบ: ข่าวหนุนทอง = ดอลลาร์อ่อน/ยีลด์ลง/Fed ผ่อนคลาย/ความเสี่ยงภูมิรัฐศาสตร์ · ข่าวกดทอง = ดอลลาร์แข็ง/ยีลด์ขึ้น/Fed เข้มงวด/risk-on · ห้ามแต่งข่าวที่ไม่มีใน headlines · ข่าวแรงสวนทางกับแผน = ลดความมั่นใจ',
     'ไม่มีข้อมูล EMA และห้ามอ้างถึง EMA/เส้นค่าเฉลี่ย ใช้โครงสร้างราคา แนว OI/EM/gmf/VWAP และ Price Action เท่านั้น',
-    'SL ต้องอยู่หลังไส้/โครงสร้าง ห่างจาก entry 0.5-2.5 เท่า ATR ของ M15 (atr_m15) · TP เป็นเป้าในวัน · TP1/TP2 ใช้แนวที่มีในข้อมูลหรือ VWAP',
+    'เทรดสั้น: SL แคบอยู่หลังไส้/โครงสร้าง M5 ห่างจาก entry 0.8-2.5 เท่า ATR ของ M5 (atr_m5) · TP1 = แนวใกล้สุดที่ไปถึงได้เร็ว (ราว 1R), TP2 = แนวถัดไป · ไม่ตั้งเป้าไกลแบบถือทั้งวัน · Entry ต้องใกล้ราคาปัจจุบัน ถ้าต้องรอราคาไกลเกิน 2 ATR ของ M5 ให้ WAIT',
+    'TF ที่ใช้คือ H1, M15, M5, M1 (ไม่มี H4)',
 ];
 function aiPA_(snap) {
   const key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY');
   if (!key) throw new Error('ยังไม่ได้ใส่ DEEPSEEK_API_KEY');
-  const price = Number(snap.price), atr = Math.max(0.5, Number(snap.atr_m15) || Number(snap.atr) || 3);
+  const price = Number(snap.price), atr = Math.max(0.5, Number(snap.atr_m5) * 2 || Number(snap.atr_m15) || Number(snap.atr) || 3);
   const sys = [
-    'คุณคือเทรดเดอร์ Price Action ทองคำมืออาชีพสายเทรดในวัน (Intraday ไม่ถือข้ามคืน) วิเคราะห์จากกราฟสดที่ส่งมา ณ ตอนนี้ แล้วตัดสินว่าควรเข้าออเดอร์ตอนนี้ไหม',
+    'คุณคือเทรดเดอร์ Price Action ทองคำมืออาชีพสายเทรดสั้น (Scalp/Short-term ในวัน ถือไม่กี่นาทีถึง 1-2 ชม.) วิเคราะห์จากกราฟสดที่ส่งมา ณ ตอนนี้ แล้วตัดสินว่าควรเข้าออเดอร์ตอนนี้ไหม',
     ...PA_RULES_,
-    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: action ("BUY"|"SELL"|"WAIT"), confidence (0-100), pattern (ชื่อ Price Action ที่เห็นสั้นๆ หรือ "ไม่มีสัญญาณชัด"), pa (อธิบาย Price Action แท่งล่าสุด 1-2 ประโยค), context (ราคาอยู่ตรงไหนเทียบแนวสำคัญ 1 ประโยค), entry, sl, tp1, tp2 (ตัวเลข; ถ้า WAIT ให้ใส่ราคาที่ควรรอเข้าแทน หรือ null), reasons (array 2-4 ข้อ ข้อละ 1 ประโยค), invalid (ถ้า... แผนนี้ใช้ไม่ได้ 1 ประโยค), tf_view (object {H4, H1, M15, M5} แต่ละค่า 1 ประโยคสั้น: ทิศ + สิ่งที่เห็น), align (สรุปว่าไทม์เฟรมสอดคล้องหรือขัดกัน ไม่เกิน 40 ตัวอักษร), news_bias ("หนุนทอง"|"กดทอง"|"กลาง"), news_summary (สรุปข่าวล่าสุดที่มีผลกับทองเป็นภาษาไทย 1-2 ประโยค), news_items (array สูงสุด 4 ข้อ {i: ลำดับข่าวใน headlines เริ่ม 0, th: แปล/สรุปพาดหัวเป็นไทยสั้นๆ, impact: "+"|"-"|"0" ผลต่อทอง}), absorption (ตีความ Absorption จากข้อมูล 1-2 ประโยค: ถี่ไหม ฝั่งไหนรับ เกิดที่แนวไหน มีผลกับการเข้าออเดอร์อย่างไร), wait_for (ถ้า WAIT: ต้องเห็นอะไรก่อนเข้า 1 ประโยค)',
+    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: action ("BUY"|"SELL"|"WAIT"), confidence (0-100), pattern (ชื่อ Price Action ที่เห็นสั้นๆ หรือ "ไม่มีสัญญาณชัด"), pa (อธิบาย Price Action แท่งล่าสุด 1-2 ประโยค), context (ราคาอยู่ตรงไหนเทียบแนวสำคัญ 1 ประโยค), entry, sl, tp1, tp2 (ตัวเลข; ถ้า WAIT ให้ใส่ราคาที่ควรรอเข้าแทน หรือ null), reasons (array 2-4 ข้อ ข้อละ 1 ประโยค), invalid (ถ้า... แผนนี้ใช้ไม่ได้ 1 ประโยค), tf_view (object {H1, M15, M5, M1} แต่ละค่า 1 ประโยคสั้น: ทิศ + สิ่งที่เห็น), align (สรุปว่าไทม์เฟรมสอดคล้องหรือขัดกัน ไม่เกิน 40 ตัวอักษร), news_bias ("หนุนทอง"|"กดทอง"|"กลาง"), news_summary (สรุปข่าวล่าสุดที่มีผลกับทองเป็นภาษาไทย 1-2 ประโยค), news_items (array สูงสุด 4 ข้อ {i: ลำดับข่าวใน headlines เริ่ม 0, th: แปล/สรุปพาดหัวเป็นไทยสั้นๆ, impact: "+"|"-"|"0" ผลต่อทอง}), absorption (ตีความ Absorption จากข้อมูล 1-2 ประโยค: ถี่ไหม ฝั่งไหนรับ เกิดที่แนวไหน มีผลกับการเข้าออเดอร์อย่างไร), wait_for (ถ้า WAIT: ต้องเห็นอะไรก่อนเข้า 1 ประโยค)',
   ].join('\n');
   let heads = []; try { heads = aiNews_().slice(0, 10); } catch (e) {}
   snap.headlines = heads.map(h => ({ t: h.t, src: h.src, ago_min: h.ago_min }));
@@ -290,7 +291,7 @@ function aiPA_(snap) {
     pattern: String(A.pattern || ''), pa: String(A.pa || ''), context: String(A.context || ''), entry: num(A.entry), sl: num(A.sl), tp1: num(A.tp1), tp2: num(A.tp2),
     reasons: (Array.isArray(A.reasons) ? A.reasons : [A.reasons]).filter(Boolean).map(String).slice(0, 4), invalid: String(A.invalid || ''), absorption: String(A.absorption || ''), align: String(A.align || ''), news_bias: String(A.news_bias || ''), news_summary: String(A.news_summary || ''),
     news: (Array.isArray(A.news_items) ? A.news_items : []).map(n => { const h = heads[Number(n && n.i)]; return h ? { th: String(n.th || h.t), en: h.t, src: h.src, time_th: h.time_th, ago_min: h.ago_min, impact: ['+', '-', '0'].indexOf(String(n.impact)) >= 0 ? String(n.impact) : '0' } : null; }).filter(Boolean).slice(0, 4),
-    headlines_n: heads.length, tf_view: (() => { const v = A.tf_view && typeof A.tf_view === 'object' ? A.tf_view : {}; const o = {}; ['H4', 'H1', 'M15', 'M5'].forEach(k => { if (v[k]) o[k] = String(typeof v[k] === 'object' ? Object.values(v[k]).join(' ') : v[k]); }); return o; })(), wait_for: String(A.wait_for || ''),
+    headlines_n: heads.length, tf_view: (() => { const v = A.tf_view && typeof A.tf_view === 'object' ? A.tf_view : {}; const o = {}; ['H1', 'M15', 'M5', 'M1'].forEach(k => { if (v[k]) o[k] = String(typeof v[k] === 'object' ? Object.values(v[k]).join(' ') : v[k]); }); return o; })(), wait_for: String(A.wait_for || ''),
     price, tf: snap.tf, time_th: snap.time_th, model: AI_MODEL };
   if (['BUY', 'SELL', 'WAIT'].indexOf(out.action) < 0) out.action = 'WAIT';
   // ตรวจความสมเหตุสมผลของแผน: ทิศ SL/TP ถูก, entry ใกล้ราคา, ระยะ SL สมจริง → ไม่ผ่าน = WAIT
@@ -312,12 +313,12 @@ function aiPA_(snap) {
 function aiSide_(snap) {
   const key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY');
   if (!key) throw new Error('ยังไม่ได้ใส่ DEEPSEEK_API_KEY');
-  const side = snap.side, b = side === 'BUY', price = Number(snap.price), atr = Math.max(0.5, Number(snap.atr_m15) || Number(snap.atr) || 3);
+  const side = snap.side, b = side === 'BUY', price = Number(snap.price), atr = Math.max(0.5, Number(snap.atr_m5) * 2 || Number(snap.atr_m15) || Number(snap.atr) || 3);
   const sys = [
-    `คุณคือเทรดเดอร์ Price Action ทองคำมืออาชีพสายเทรดในวัน ผู้ใช้ต้องการเข้า ${side} (${b ? 'ซื้อ' : 'ขาย'}) ตอนนี้ ให้ประเมินอย่างตรงไปตรงมาว่าควรเข้าฝั่งนี้ไหม และโอกาสสำเร็จเท่าไหร่ ห้ามเอนตามใจผู้ใช้ ถ้าฝั่งนี้สวนทางให้บอกตรงๆ`,
+    `คุณคือเทรดเดอร์ Price Action ทองคำมืออาชีพสายเทรดสั้น (ถือไม่กี่นาทีถึง 1-2 ชม.) ผู้ใช้ต้องการเข้า ${side} (${b ? 'ซื้อ' : 'ขาย'}) ตอนนี้ ให้ประเมินอย่างตรงไปตรงมาว่าควรเข้าฝั่งนี้ไหม และโอกาสสำเร็จเท่าไหร่ ห้ามเอนตามใจผู้ใช้ ถ้าฝั่งนี้สวนทางให้บอกตรงๆ`,
     'prev คือผลวิเคราะห์รอบก่อนของคุณ (อาจหลายนาทีที่แล้ว) ใช้อ้างอิง แต่ตัดสินจากกราฟปัจจุบันเป็นหลัก',
     ...PA_RULES_,
-    `prob = โอกาส (%) ที่ราคาจะถึง TP1 ก่อนโดน SL ถ้าเข้า ${side} ตามแผนที่คุณให้ ประเมินแบบระมัดระวัง (สวนทิศ H1/H4 ไม่ควรเกิน 45, ไม่มีสัญญาณชัดไม่ควรเกิน 55, เกิน 75 ต้องมีเหตุผลแข็งมากหลายข้อ)`,
+    `prob = โอกาส (%) ที่ราคาจะถึง TP1 ก่อนโดน SL ถ้าเข้า ${side} ตามแผนที่คุณให้ ประเมินแบบระมัดระวัง (สวนทิศ H1/M15 ไม่ควรเกิน 45, ไม่มีสัญญาณชัดไม่ควรเกิน 55, เกิน 75 ต้องมีเหตุผลแข็งมากหลายข้อ)`,
     `verdict: "GO" = เข้า ${side} ได้ตอนนี้, "WAIT" = ฝั่งนี้พอได้แต่ควรรอราคา/สัญญาณก่อน, "NO" = ไม่ควรเข้า ${side}`,
     `ตอบ JSON เท่านั้น ภาษาไทย กระชับ ฟิลด์: verdict, prob (0-100), summary (สรุปคำตอบ 1-2 ประโยค), entry, sl, tp1, tp2 (ตัวเลขแผน ${side}; ถ้า WAIT ใส่ราคาที่ควรรอเข้า; ถ้า NO ใส่ null ได้), pros (array 1-3 ข้อ เหตุผลที่หนุน ${side}), cons (array 1-3 ข้อ ความเสี่ยง/เหตุผลที่สวนทาง), wait_for (ถ้า WAIT หรือ NO: ต้องเห็นอะไรก่อนถึงจะเข้า ${side} ได้ 1 ประโยค), invalid (แผนนี้ใช้ไม่ได้ถ้า... 1 ประโยค)`,
   ].join('\n');

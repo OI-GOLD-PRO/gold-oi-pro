@@ -1355,7 +1355,35 @@
   let prov = null, pingTimer = null, lastBarTime = null, pollTimer = null;
   try { const id = localStorage.getItem('oi_src'); const i = PROVIDERS.findIndex(p => p.id === id); if (i > 0) PROVIDERS.unshift(PROVIDERS.splice(i, 1)[0]); } catch (e) {}
 
-  const toBar = k => ({ time: Math.floor(k[0] / 1000) + TZ_SHIFT, open: k[1] - adj, high: k[2] - adj, low: k[3] - adj, close: k[4] - adj });
+  // ส่วนต่าง perp − GC เปลี่ยนไปทุกวัน (ค่าถือครอง/funding) ถ้าใช้ offset ปัจจุบันค่าเดียวกับทั้งกราฟ แท่งย้อนหลังหลายวันจะเพี้ยน
+  // จึงเก็บ offset รายชั่วโมงย้อนหลังจาก Yahoo GC=F (H1, 60 วัน) เทียบ perp ชั่วโมงเดียวกัน แล้วใช้ค่าของช่วงเวลานั้นกับแท่งเก่า
+  // ช่วงหลังจุดล่าสุดของ Yahoo ไล่ค่าต่อเนื่องไปหา offset สด (Gold.F) ของตอนนี้ ไม่ให้กราฟกระตุก
+  let histAdj = []; // [[วินาที, adj]] เรียงเวลา
+  function adjFor(ms) {
+    const n = histAdj.length; if (!n) return adj;
+    const t = ms / 1000;
+    if (t <= histAdj[0][0]) return histAdj[0][1];
+    const [tl, al] = histAdj[n - 1];
+    if (t >= tl) { const nowS = Date.now() / 1000; if (nowS <= tl) return adj; const w = Math.min(1, (t - tl) / (nowS - tl)); return al + (adj - al) * w; }
+    let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (histAdj[m][0] <= t) lo = m; else hi = m; }
+    const [t0, a0] = histAdj[lo], [t1, a1] = histAdj[hi];
+    return a0 + (a1 - a0) * (t - t0) / Math.max(1, t1 - t0);
+  }
+  async function loadHistBasis() {
+    if (SYM !== 'gold' || SC.yahoo || !prov) return;
+    try {
+      const [yr, pr] = await Promise.all([fetch(`${GC_WORKER}/?tf=1h&t=${Math.floor(Date.now() / 600000)}`).then(r => r.json()), fetchBars(prov, '1h', 1000)]);
+      const ys = ((yr.bars || {})['1h'] || []), pm = new Map(pr.map(k => [Math.floor(k[0] / 1000), k[4]]));
+      const raw = [];
+      ys.forEach(b => { const t = Math.floor(b[0] / 3600) * 3600; if (pm.has(t) && isFinite(b[4])) { const d = pm.get(t) - b[4]; if (Math.abs(d) <= 40) raw.push([t + 3600, d]); } }); // ใช้ราคาปิดของชั่วโมง = เวลาปลายแท่ง
+      if (raw.length < 10) return;
+      // กรองสัญญาณรบกวน: ค่ากลางของ 5 ชั่วโมงรอบข้าง
+      histAdj = raw.map((x, i) => { const w = raw.slice(Math.max(0, i - 2), i + 3).map(y => y[1]).sort((a, b) => a - b); return [x[0], Math.round(w[w.length >> 1] * 100) / 100]; });
+      if (rawBars.length) { try { series.setData(rawBars.map(toBar)); } catch (e) {} indRefresh(); dirty = true; }
+    } catch (e) {}
+  }
+  setInterval(() => { if (document.visibilityState === 'visible') loadHistBasis(); }, 30 * 60e3);
+  const toBar = k => { const a = adjFor(k[0]); return { time: Math.floor(k[0] / 1000) + TZ_SHIFT, open: k[1] - a, high: k[2] - a, low: k[3] - a, close: k[4] - a }; };
 
   // ราคาทอง spot จาก gold-api.com ใช้วัดส่วนต่าง perp − spot แล้วเลื่อนกราฟลงให้ตรงกับราคา forex
   function paintOff() {
@@ -1514,6 +1542,7 @@
         chart.timeScale().scrollToRealTime();
         $('msg').hidden = true;
         window.OISplash && OISplash.done(lastClose, SC.name);
+        if (!histAdj.length) setTimeout(loadHistBasis, 1500);
         dirty = true;
         openWS();
         return;

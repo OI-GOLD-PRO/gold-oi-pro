@@ -416,7 +416,7 @@
     const Q = r.quant; if (!Q) return '';
     const sc = Q.score, scol = sc > 15 ? '#2fe3a6' : sc < -15 ? '#ff6b82' : '#c9d1ea';
     const bar = f => { const w = Math.min(50, Math.abs(f.contrib) * 1.6); return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;line-height:1.7"><span style="width:118px;color:#a9b4d6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.name)}</span><span style="position:relative;flex:1;height:8px;background:#141b3a;border-radius:4px"><i style="position:absolute;top:0;bottom:0;${f.contrib >= 0 ? 'left:50%' : 'right:50%'};width:${w}%;border-radius:4px;background:${f.contrib >= 0 ? '#2fbf8f' : '#e5576b'}"></i><i style="position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:#3a4570"></i></span><span style="width:34px;text-align:right;font-family:var(--mono,monospace);color:${f.contrib >= 0 ? '#2fe3a6' : '#ff6b82'}">${f.contrib > 0 ? '+' : ''}${f.contrib}</span></div>`; };
-    const pl = (p, nm) => p ? `<div style="flex:1;background:#11183a;border:1px solid #1f2850;border-radius:9px;padding:5px 7px;font:11px var(--mono,monospace);line-height:1.6"><b style="color:${nm === 'BUY' ? '#2fe3a6' : '#ff6b82'}">${nm}</b> ชนะ <b>${p.p_win}%</b> · EV <b style="color:${p.ev_r >= 0.15 ? '#2fe3a6' : p.ev_r < 0 ? '#ff6b82' : '#c9d1ea'}">${p.ev_r > 0 ? '+' : ''}${p.ev_r}R</b><br>SL ${f2(p.sl)} · TP1 ${f2(p.tp1)}<br><small style="color:#6f7896">R:R 1:${p.rr} · TP1 ${esc(p.tp1_at)}</small></div>` : `<div style="flex:1;font-size:11px;color:#6f7896;padding:5px">${nm}: ไม่มีเป้าใกล้พอ</div>`;
+    const pl = (p, nm) => p ? `<div style="flex:1;background:#11183a;border:1px solid ${r.focus === nm ? (nm === 'BUY' ? '#2fbf8f' : '#e5576b') : '#1f2850'};border-radius:9px;padding:5px 7px;font:11px var(--mono,monospace);line-height:1.6"><b style="color:${nm === 'BUY' ? '#2fe3a6' : '#ff6b82'}">${nm}</b> ชนะ <b>${p.p_win}%</b> · EV <b style="color:${p.ev_r >= 0.15 ? '#2fe3a6' : p.ev_r < 0 ? '#ff6b82' : '#c9d1ea'}">${p.ev_r > 0 ? '+' : ''}${p.ev_r}R</b><br>SL ${f2(p.sl)} · TP1 ${f2(p.tp1)}<br><small style="color:#6f7896">R:R 1:${p.rr} · TP1 ${esc(p.tp1_at)}</small></div>` : `<div style="flex:1;font-size:11px;color:#6f7896;padding:5px">${nm}: ไม่มีเป้าใกล้พอ</div>`;
     const tc = (Q.touch || []).slice(0, 6).map(t => `<span style="display:inline-block;margin:2px 4px 0 0;padding:1px 6px;border-radius:6px;background:#141b3a;font:10px var(--mono,monospace);color:${t.dist > 0 ? '#9fe8c9' : '#ffb3bf'}">${esc(t.name.split(' (')[0])} ${f2(t.p)} · ${t.prob}%</span>`).join('');
     return `<div style="margin:8px 0;padding:8px 10px;border:1px solid #2a3358;border-radius:10px;background:linear-gradient(180deg,#121a40,#0f1533)">
       <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:13px">📐 Quant Model</b><span style="font:800 18px var(--mono,monospace);color:${scol}">${sc > 0 ? '+' : ''}${sc}</span></div>
@@ -496,6 +496,9 @@
     const act = r.action === 'WAIT' ? 'รอก่อน ยังไม่เข้า' : r.action === 'BUY' ? 'ซื้อ BUY' : 'ขาย SELL';
     L.push(`ผลวิเคราะห์ไทม์เฟรม ${r.tf || ''} เวลา ${(r.time_th || '').slice(11)} ราคา ${n2(r.price)}`);
     L.push(`คำแนะนำ ${act} ความมั่นใจ ${r.confidence || 0} เปอร์เซ็นต์`);
+    quantSpeech(r.quant).forEach(t => L.push(t));
+    if (r.quant_view) L.push(r.quant_view);
+    if (r.veto) L.push(`ดีเอสสั่งรอ ${r.veto}`);
     if (r.pattern) L.push(`รูปแบบราคา ${r.pattern}`);
     if (r.pa) L.push(r.pa); if (r.context) L.push(r.context);
     if (r.news_summary || (r.news && r.news.length)) {
@@ -514,11 +517,23 @@
     if (r.checked) L.push(r.checked);
     return L;
   }
+  function quantSpeech(Q, focus) {
+    if (!Q) return [];
+    const L = [`โมเดลควอนต์ คะแนนรวม ${Q.score > 0 ? 'บวก ' : Q.score < 0 ? 'ลบ ' : ''}${Math.abs(Q.score)} เอนไปทาง${Q.bias}`, `ระบอบตลาด ${String(Q.regime || '').split(' (')[0]}`];
+    const top = (Q.factors || []).slice(0, 4).map(f => `${f.name} ${f.contrib >= 0 ? 'หนุนขึ้น' : 'กดลง'} ${Math.abs(f.contrib)}`);
+    if (top.length) L.push('ปัจจัยหลัก ' + top.join(' '));
+    const pl = (p, nm) => p ? `ฝั่ง ${nm} โอกาสชนะ ${p.p_win} เปอร์เซ็นต์ ค่าคาดหวัง ${p.ev_r} อาร์ สต็อปลอส ${n2(p.sl)} เป้าแรก ${n2(p.tp1)}` : `ฝั่ง ${nm} ไม่มีเป้าใกล้พอ`;
+    if (!focus || focus === 'BUY') L.push(pl(Q.plans.long, 'ซื้อ'));
+    if (!focus || focus === 'SELL') L.push(pl(Q.plans.short, 'ขาย'));
+    if (!focus) L.push(`โมเดลตัดสิน ${Q.decision.action === 'WAIT' ? 'รอ' : Q.decision.action} เพราะ ${Q.decision.why}`);
+    return L;
+  }
   function sideSpeech(r) {
     const L = [], vt = { GO: `ควรเข้า ${r.side}`, WAIT: `รอก่อน ยังไม่ควรเข้า ${r.side} ตอนนี้`, NO: `ไม่ควรเข้า ${r.side}` }[r.verdict] || '';
     L.push(`ผลวิเคราะห์ฝั่ง ${r.side === 'BUY' ? 'ซื้อ BUY' : 'ขาย SELL'} เวลา ${(r.time_th || '').slice(11)} ราคา ${n2(r.price)}`);
     L.push(`${vt} โอกาสถึงเป้าแรกก่อนโดนสต็อปลอส ${r.prob} เปอร์เซ็นต์`);
     if (r.summary) L.push(r.summary);
+    quantSpeech(r.quant, r.side).forEach(t => L.push(t));
     if (r.entry || r.sl || r.tp1) L.push(`แผน ${r.verdict === 'GO' ? 'จุดเข้า' : 'ราคาที่รอเข้า'} ${n2(r.entry)}${r.sl ? ' สต็อปลอส ' + n2(r.sl) : ''}${r.tp1 ? ' เป้าแรก ' + n2(r.tp1) : ''}${r.tp2 ? ' เป้าสอง ' + n2(r.tp2) : ''}${r.rr ? ' กำไรต่อความเสี่ยง 1 ต่อ ' + r.rr : ''}`);
     if (r.pros && r.pros.length) { L.push('ที่หนุน'); r.pros.forEach((t, i) => L.push(`ข้อ ${i + 1} ${t}`)); }
     if (r.cons && r.cons.length) { L.push('ที่สวนทาง'); r.cons.forEach((t, i) => L.push(`ข้อ ${i + 1} ${t}`)); }
@@ -529,23 +544,41 @@
   }
   function thVoice() { const vs = SS.getVoices() || []; return vs.find(v => /^th/i.test(v.lang) && /premium|enhanced/i.test(v.name)) || vs.find(v => /^th/i.test(v.lang)) || null; }
   function spkUI() { bd().querySelectorAll('[data-spk]').forEach(b => { const on = b.dataset.spk === spkOn; b.classList.toggle('on', on); b.textContent = on ? '⏹ หยุดอ่าน' : '🔊 ฟังผลวิเคราะห์'; }); }
-  function stopSpeak() { spkOn = null; try { SS && SS.cancel(); } catch (e) {} spkUI(); }
+  function stopSpeak() { spkOn = null; spkGen++; try { SS && SS.cancel(); } catch (e) {} spkUI(); }
+  // iPhone: ถ้าเปิดโหมดเงียบ (สวิตช์ข้างเครื่อง) เสียงอ่านจะเงียบ → เล่นไฟล์เสียงเงียบสั้นๆ ผ่าน <audio> ก่อน ให้ระบบเปิดช่องเสียงแบบเล่นสื่อ
+  let unlockAu = null;
+  function unlockAudio() {
+    try {
+      if (!unlockAu) { unlockAu = new Audio('data:audio/wav;base64,UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YUAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'); unlockAu.setAttribute('playsinline', ''); }
+      unlockAu.muted = false; unlockAu.volume = 0.01; const p = unlockAu.play(); if (p && p.catch) p.catch(() => {});
+    } catch (e) {}
+  }
+  let spkGen = 0;
   function speak(k) {
-    if (!SS) return;
+    if (!SS) { O.showToast && O.showToast('เครื่องนี้ไม่รองรับการอ่านออกเสียง'); return; }
     if (spkOn === k) { stopSpeak(); return; }
     const r = k === 'side' ? sideRes : result; if (!r) return;
-    try { SS.cancel(); } catch (e) {}
+    unlockAudio();
+    try { if (SS.speaking || SS.pending) SS.cancel(); SS.resume(); } catch (e) {}
     const lines = (k === 'side' ? sideSpeech(r) : mainSpeech(r)).map(clean).filter(Boolean);
-    // แบ่งเป็นท่อนสั้นๆ (iPhone ตัดเสียงถ้ายาวเกิน)
-    const chunks = []; lines.forEach(t => { while (t.length > 180) { let c = t.lastIndexOf(' ', 180); if (c < 60) c = 180; chunks.push(t.slice(0, c)); t = t.slice(c).trim(); } if (t) chunks.push(t); });
-    const voice = thVoice(); spkOn = k; spkUI();
-    chunks.forEach((t, i) => {
-      const u = new SpeechSynthesisUtterance(t);
-      u.lang = 'th-TH'; if (voice) u.voice = voice; u.rate = RATES[rateI][1];
-      if (i === chunks.length - 1) u.onend = () => { if (spkOn === k) { spkOn = null; spkUI(); } };
-      u.onerror = () => { if (i === chunks.length - 1 && spkOn === k) { spkOn = null; spkUI(); } };
+    // แบ่งเป็นท่อนสั้นๆ แล้วอ่านต่อกันทีละท่อน (คิวยาวๆ บน iPhone/Android มักหยุดกลางทาง)
+    const chunks = []; lines.forEach(t => { while (t.length > 160) { let c = t.lastIndexOf(' ', 160); if (c < 60) c = 160; chunks.push(t.slice(0, c)); t = t.slice(c).trim(); } if (t) chunks.push(t); });
+    const voice = thVoice(), gen = ++spkGen; spkOn = k; spkUI();
+    if (!voice && !(SS.getVoices() || []).length) { /* iPhone โหลดรายชื่อเสียงช้า ใช้ภาษาไทยตาม lang ไปก่อน */ }
+    else if (!voice) O.showToast && O.showToast('ไม่พบเสียงภาษาไทยในเครื่อง · iPhone: ตั้งค่า → การช่วยการเข้าถึง → เนื้อหาที่พูด → เสียง → ไทย (ดาวน์โหลด)', 9000);
+    let i = 0, started = false;
+    const next = () => {
+      if (gen !== spkGen || spkOn !== k) return;
+      if (i >= chunks.length) { spkOn = null; spkUI(); return; }
+      const u = new SpeechSynthesisUtterance(chunks[i++]);
+      u.lang = 'th-TH'; if (voice) u.voice = voice; u.rate = RATES[rateI][1]; u.volume = 1;
+      u.onstart = () => { started = true; };
+      u.onend = next; u.onerror = e => { if (e && (e.error === 'interrupted' || e.error === 'canceled')) return; next(); };
       SS.speak(u);
-    });
+    };
+    next();
+    // ถ้าผ่านไป 2.5 วินาทีแล้วยังไม่เริ่มพูด (เครื่องค้าง/ถูกบล็อก) ลองปลุกอีกครั้ง แล้วแจ้งผู้ใช้
+    setTimeout(() => { if (gen === spkGen && spkOn === k && !started) { try { SS.cancel(); SS.resume(); } catch (e) {} i = Math.max(0, i - 1); next(); setTimeout(() => { if (gen === spkGen && spkOn === k && !started) { stopSpeak(); O.showToast && O.showToast('อ่านออกเสียงไม่ได้ · ปิดโหมดเงียบ/เพิ่มเสียง แล้วลองใหม่ (iPhone ต้องมีเสียงไทยในเครื่อง)', 8000); } }, 2500); } }, 2500);
   }
   if (SS) { try { SS.getVoices(); SS.onvoiceschanged = () => SS.getVoices(); } catch (e) {} }
   tray.addEventListener('click', e => {
@@ -566,13 +599,14 @@
     return `<div class="vd"><span class="v ${r.verdict}">${vt}</span><div class="prob"><small>โอกาสถึง TP1 ก่อน SL <b>${r.prob}%</b> · ${esc((r.time_th || '').slice(11))} น. · ราคา ${f2(r.price)}</small><div class="bar"><i data-w="${r.prob}" style="background:${pc};${old ? 'width:' + r.prob + '%' : ''}"></i></div></div></div>
       ${spkHTML('side')}
       ${r.summary ? `<p style="margin-top:8px">${esc(r.summary)}</p>` : ''}
+      ${r.quant ? quantHTML({ quant: r.quant, focus: r.side }) : ''}
       ${r.entry || r.sl || r.tp1 ? `<div class="plan"><div><small>${r.verdict === 'GO' ? 'Entry ' + r.side : 'รอเข้า ' + r.side}</small>${f2(r.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(r.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(r.tp1)}</span></div><div><small>TP2${r.rr ? ' · R:R 1:' + r.rr : ''}</small><span style="color:#2fe3a6">${f2(r.tp2)}</span></div></div>` : ''}
       <div class="pc"><div><b style="color:#2fe3a6">👍 ที่หนุน</b>${li(r.pros)}</div><div><b style="color:#ff6b82">⚠️ ที่สวนทาง</b>${li(r.cons)}</div></div>
       ${r.wait_for && r.verdict !== 'GO' ? `<p>⏳ ${esc(r.wait_for)}</p>` : ''}${r.invalid ? `<p class="warn">⚠️ ${esc(r.invalid)}</p>` : ''}${r.checked ? `<p class="warn">${esc(r.checked)}</p>` : ''}`;
   }
   function sideWaitHTML(side) {
     const b = side === 'BUY';
-    const steps = ['▸ อ่านกราฟสด ณ ตอนนี้', '▸ อ่านหลาย TF: H4 / H1 / M15 / M5', `▸ เช็คแนว OI / gmf / EM ฝั่ง ${b ? 'ซื้อ' : 'ขาย'}`, '▸ หาจุด Entry / SL / TP', '▸ ชั่งน้ำหนัก ที่หนุน vs ที่สวนทาง', '▸ คำนวณโอกาสสำเร็จ %'];
+    const steps = ['▸ อ่านกราฟสด ณ ตอนนี้', '▸ อ่านหลาย TF: H1 / M15 / M5 / M1', `▸ โมเดล Quant: OI / GEX / Flow / EM / gmf`, `▸ หาจุด Entry / SL / TP ฝั่ง ${b ? 'ซื้อ' : 'ขาย'}`, '▸ คำนวณโอกาสชนะ + EV', '▸ ds อธิบายผล'];
     return `<div class="sw ${b ? 'b' : 's'}"><div class="swv"><canvas id="paSCv"></canvas><div class="arw"><span>${b ? '▲' : '▼'}</span><span>${b ? '▲' : '▼'}</span><span>${b ? '▲' : '▼'}</span></div><div class="ring"></div></div>
       <div class="think">AI กำลังวิเคราะห์ฝั่ง ${side}<i></i><i></i><i></i></div><div class="steps" id="paSSt">${steps.map(t => `<div>${t}</div>`).join('')}</div>
       <div class="ctr">โอกาส <b id="paSPct">--</b>%</div></div>`;
@@ -623,7 +657,7 @@
       if (box2) box2.innerHTML = `<div class="err">ประเมินไม่สำเร็จ: ${esc(res && res.error === 'auth' ? 'รหัสเข้าแอปหมดอายุ' : (res && res.error) || 'ไม่ทราบสาเหตุ')}</div>`;
       return;
     }
-    sideRes = res.side;
+    sideRes = res.side; sideRes.quant = payload.quant;
     if (!box2) return;
     box2.innerHTML = sideHTML(sideRes, false);
     window.OIColorize && OIColorize(box2);

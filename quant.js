@@ -24,7 +24,8 @@
     { const nr = strikes.filter(s => s.ivC || s.ivP).sort((a, b) => Math.abs(kp(a.k) - px) - Math.abs(kp(b.k) - px)).slice(0, 2); const v = []; nr.forEach(s => { if (s.ivC) v.push(s.ivC); if (s.ivP) v.push(s.ivP); }); if (v.length) iv = v.reduce((a, b) => a + b, 0) / v.length; }
     let rv = null;
     { const b = tfs.M5 && tfs.M5.bars; if (b && b.length > 12) { const r = []; for (let i = 1; i < b.length; i++) r.push(Math.log(b[i][4] / b[i - 1][4])); const m = r.reduce((a, x) => a + x, 0) / r.length, sd = Math.sqrt(r.reduce((a, x) => a + (x - m) ** 2, 0) / (r.length - 1)); rv = sd * Math.sqrt(276 * 252); } }
-    const volA = iv || rv || 0.18;
+    // ระยะสั้นใช้ค่ากลางของ IV (ตลาดคาด) กับ RV (ที่วิ่งจริง) กันประเมินระยะวิ่งเกินจริงตอนตลาดเงียบ
+    const volA = iv && rv ? (iv + rv) / 2 : iv || rv || 0.18;
     const sigH = px * volA * Math.sqrt(HORIZON_H / (252 * 23)); // ระยะ 1σ ภายใน ~2 ชม. (หน่วยดอลลาร์)
     const hoursLeft = c && c.expTs ? Math.max(0, (c.expTs * 1000 - Date.now()) / 36e5) : null;
 
@@ -66,10 +67,15 @@
     const regime = gpos === null ? 'ไม่ทราบ gamma' : gpos ? (rvIv !== null && rvIv > 1.2 ? 'gamma บวก แต่ RV สูงกว่า IV (เริ่มแกว่งแรง)' : 'Mean-revert (gamma บวก: แกว่งกรอบ เล่นกลับตัวที่แนว)') : 'Trend / Breakout (gamma ลบ: วิ่งแรงตามทาง)';
 
     // ---- แนวสำหรับวางแผน (ไม่มี VWAP) ----
+    // ความแข็งของแนว (0..1): ใช้ปรับโอกาส — SL อยู่หลังแนวแข็ง = โดนยากขึ้น, TP อยู่ที่แม่เหล็ก (GEX บวก/Max Pain) = ถึงง่ายขึ้น
+    const strengthOf = nm => /Wall/.test(nm) ? 0.8 : /โซน OI/.test(nm) ? 0.65 : /GEX \+/.test(nm) ? 0.6 : /OB/.test(nm) ? 0.55 : /EM/.test(nm) ? 0.5 : /Volume/.test(nm) ? 0.4 : /EQ[HL]/.test(nm) ? 0.15 : /gmf/.test(nm) ? 0.3 : 0.3;
+    const magnetOf = nm => /GEX \+/.test(nm) || /Max Pain/.test(nm) ? 0.6 : /EQ[HL]/.test(nm) ? 0.4 : /Wall|โซน OI/.test(nm) ? 0.3 : 0.15;
     const L = [];
     (P.levels || []).forEach(l => { if (!/VWAP/i.test(l.name)) L.push({ name: l.name, p: l.p }); });
     (opt.top_gex_strikes || []).forEach(g => L.push({ name: `GEX ${g.gex_musd > 0 ? '+' : ''}${g.gex_musd}M`, p: g.price }));
     ['H1', 'M15'].forEach(k => { const s = tfs[k] && tfs[k].smc; if (!s) return; if (s.bull_ob) L.push({ name: `${k} OB ซื้อ`, p: s.bull_ob.top, side: 'S' }); if (s.bear_ob) L.push({ name: `${k} OB ขาย`, p: s.bear_ob.bottom, side: 'R' }); if (s.eq_highs) L.push({ name: `${k} EQH`, p: s.eq_highs }); if (s.eq_lows) L.push({ name: `${k} EQL`, p: s.eq_lows }); });
+    L.forEach(l => { l.str = strengthOf(l.name); l.mag = magnetOf(l.name); });
+    const revert = gpos === true ? 1 : gpos === false ? 0.4 : 0.7; // แนวยันได้ดีในระบอบ gamma บวก
     const minD = 0.8 * atr5, buf = 0.3 * atr5;
     const above = L.filter(l => l.p > px + minD).sort((a, b) => a.p - b.p), below = L.filter(l => l.p < px - minD).sort((a, b) => b.p - a.p);
     const mu = S * 0.35 * sigH; // ทิศคาดหวังภายในกรอบเวลา จากคะแนนรวม
@@ -79,14 +85,19 @@
     };
     function plan(dir) {
       const tpL = dir > 0 ? above : below, slL = dir > 0 ? below : above;
-      const t1 = tpL[0], t2 = tpL.find(l => Math.abs(l.p - (t1 ? t1.p : px)) >= 0.8 * atr5) || null;
-      const slRef = slL.find(l => Math.abs(l.p - px) <= 3 * atr5);
+      // SL: หลังแนวแข็งที่ใกล้ที่สุด (ภายใน 3 ATR M5) ไม่งั้น 1.5 ATR M5
+      const slRef = slL.filter(l => Math.abs(l.p - px) <= 3 * atr5).sort((x, y) => Math.abs(x.p - px) - Math.abs(y.p - px)).find(l => l.str >= 0.4) || null;
       let sl = slRef ? slRef.p - dir * buf : px - dir * 1.5 * atr5;
       if (Math.abs(px - sl) < 0.8 * atr5) sl = px - dir * 0.8 * atr5;
-      if (!t1) return null;
+      const b = Math.abs(px - sl);
+      // TP1: แนวแรกที่ระยะไม่น้อยกว่า 0.8 เท่าของ SL (กัน R:R เล็กเกิน) · TP2 = แนวถัดไป
+      const t1 = tpL.find(l => Math.abs(l.p - px) >= Math.max(minD, 0.8 * b)); if (!t1) return null;
+      const t2 = tpL.find(l => (l.p - t1.p) * dir >= 0.8 * atr5) || null;
       let tp1 = t1.p; if (Math.abs(tp1 - px) > 2.5 * sigH) tp1 = px + dir * 2.5 * sigH;
-      const a = Math.abs(tp1 - px), b = Math.abs(px - sl);
-      const p = clamp(pWin(a, b, dir * mu), 0.02, 0.98);
+      const a = Math.abs(tp1 - px);
+      // ระยะ "ที่ใช้คิดโอกาส": SL หลังแนวแข็ง = เหมือนไกลขึ้น, TP ที่แม่เหล็ก = เหมือนใกล้ขึ้น
+      const bEff = b * (1 + 0.6 * (slRef ? slRef.str : 0) * revert), aEff = a * (1 - 0.3 * t1.mag * revert);
+      const p = clamp(pWin(aEff, bEff, dir * mu), 0.02, 0.98);
       const rr = a / b, ev = p * rr - (1 - p);
       const touch = 2 * (1 - Phi(a / sigH));
       return { side: dir > 0 ? 'BUY' : 'SELL', entry: r2(px), sl: r2(sl), tp1: r2(tp1), tp2: t2 ? r2(t2.p) : null, tp1_at: t1.name, sl_at: slRef ? slRef.name : '1.5 ATR M5', rr: r2(rr), p_win: Math.round(p * 100), ev_r: r2(ev), p_touch_tp1_2h: Math.round(clamp(touch, 0, 1) * 100) };

@@ -310,7 +310,7 @@ function aiPA_(snap) {
     if (veto) out.veto = String(A.veto_reason || 'ds ให้รอ');
     const use = pl || (Q.plans && (Q.score >= 0 ? Q.plans.long : Q.plans.short));
     if (use) { out.entry = use.entry; out.sl = use.sl; out.tp1 = use.tp1; out.tp2 = use.tp2; out.rr = use.rr; }
-    out.confidence = pl ? pl.p_win : Math.min(60, Math.abs(Q.score));
+    out.confidence = pl ? pl.p_win : Math.max(Q.plans && Q.plans.long ? Q.plans.long.p_win : 0, Q.plans && Q.plans.short ? Q.plans.short.p_win : 0);
     return out;
   }
   // ตรวจความสมเหตุสมผลของแผน: ทิศ SL/TP ถูก, entry ใกล้ราคา, ระยะ SL สมจริง → ไม่ผ่าน = WAIT

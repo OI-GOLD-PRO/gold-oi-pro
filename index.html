@@ -349,7 +349,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '2.0.18';
+  const APP_VER = '2.0.19';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -742,13 +742,30 @@
       }
       // Volume: ใต้เลข strike ฝั่งซ้าย (ต้องมีที่ว่างระหว่างเส้นพอ)
       if (gap >= 24) {
-        const vl = (r.vc || r.vp) ? `V ${r.vc || 0}/${r.vp || 0}` : '';
-        const txt = vl;
-        if (txt) {
-          ctx.font = `9px ${C('--mono')}`;
-          ctx.textAlign = 'left'; ctx.fillStyle = C('--muted');
-          ctx.fillText(txt, 4, y + thick + 7);
-          ctx.font = `10px ${C('--mono')}`;
+        if (r.vc || r.vp) {
+          // V Call/Put: Call ฟ้า · Put ส้ม (สีเดียวกับแท่ง Volume) · ฝั่งไหนเกิน 100 = ตัวหนา ใหญ่ขึ้น มีกรอบพื้นรองหลัง
+          const yv = y + thick + 7, mono = C('--mono');
+          let x = 4;
+          const seg = (t, col, hot) => {
+            ctx.font = hot ? `bold 10px ${mono}` : `9px ${mono}`;
+            const tw = ctx.measureText(t).width;
+            if (hot) {
+              ctx.globalAlpha = 0.22; ctx.fillStyle = col; ctx.fillRect(x - 2, yv - 6.5, tw + 4, 13);
+              ctx.globalAlpha = 0.9; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(x - 2 + .5, yv - 6.5 + .5, tw + 3, 12);
+              ctx.globalAlpha = 1;
+            }
+            ctx.fillStyle = col; ctx.fillText(t, x, yv);
+            x += tw + (hot ? 3 : 0);
+          };
+          ctx.textAlign = 'left';
+          const vc = r.vc || 0, vp = r.vp || 0;
+          seg('V ', C('--muted'), false);
+          if (vc > 100) x += 2;
+          seg(String(vc), C('--volc'), vc > 100);
+          seg('/', C('--muted'), false);
+          if (vp > 100) x += 2;
+          seg(String(vp), C('--volp'), vp > 100);
+          ctx.font = `10px ${mono}`;
         }
       }
     });

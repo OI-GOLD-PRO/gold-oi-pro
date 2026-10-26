@@ -188,6 +188,12 @@
   body.half .px #chg { font-size: 9px; }
   body.half .chips, body.half .tfs, body.half #gsTbl { padding-left: 8px; padding-right: 8px; }
   #wrap { position: relative; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
+  #reloadOv { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(11,16,32,.55); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  #reloadOv.on { opacity: 1; pointer-events: auto; }
+  #reloadOv .sp { width: 46px; height: 46px; border-radius: 50%; border: 3px solid rgba(224,180,76,.18); border-top-color: var(--gold); border-right-color: var(--gold); animation: rlSpin .8s linear infinite; box-shadow: 0 0 18px rgba(224,180,76,.25); }
+  #reloadOv small { font: 600 12px var(--sans); color: var(--fg); letter-spacing: .02em; }
+  @keyframes rlSpin { to { transform: rotate(360deg); } }
+  button.icon.busy { animation: rlSpin .8s linear infinite; color: var(--gold); border-color: var(--gold); }
   #chart, #ov { position: absolute; inset: 0; }
   #chart { z-index: 1; }
   #ov { pointer-events: none; z-index: 2; }
@@ -308,6 +314,7 @@
   <div id="gsTbl"></div>
   <div id="wrap">
     <div id="chart"></div>
+    <div id="reloadOv" aria-hidden="true"><div class="sp"></div><small>กำลังโหลดกราฟใหม่…</small></div>
     <canvas id="ov"></canvas>
     <div id="tip" hidden></div>
     <div id="toast" hidden></div>
@@ -349,7 +356,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '2.0.25';
+  const APP_VER = '2.0.26';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -2015,7 +2022,22 @@
   }, 1000);
 
   $('tfs').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.tf) loadTF(b.dataset.tf); });
-  $('reload').addEventListener('click', loadSheet);
+  // ปุ่ม ⟳: ขึ้นสัญลักษณ์โหลดบนกราฟ จนกว่าข้อมูลชีต + ข้อมูลสดโหลดเสร็จและกราฟวาดใหม่แล้ว
+  let reloading = false;
+  $('reload').addEventListener('click', async () => {
+    if (reloading) return; reloading = true;
+    const ov = $('reloadOv'), btn = $('reload');
+    ov.classList.add('on'); btn.classList.add('busy');
+    const t0 = Date.now();
+    try {
+      while (syncing) await new Promise(r => setTimeout(r, 150));
+      const L = window.OILive;
+      await Promise.all([loadSheet(), L && L.poll ? Promise.resolve(L.poll()).catch(() => {}) : null]);
+      dirty = true;
+      await new Promise(r => setTimeout(r, Math.max(0, 600 - (Date.now() - t0))));
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    } finally { ov.classList.remove('on'); btn.classList.remove('busy'); reloading = false; }
+  });
 
   // ---------- เข้าสู่ระบบด้วยรหัสผ่าน (ตรวจกับแท็บ users ในชีตผ่าน Apps Script) ----------
   let authCode = null, authExpire = null, started = false;
@@ -2208,7 +2230,7 @@
 <script src="cotgroups.js?v=20009"></script>
 <script src="colorize.js?v=20017"></script>
 <script src="dash.js?v=20017"></script>
-<script src="live.js?v=20025"></script>
+<script src="live.js?v=20026"></script>
 <script src="intraday.js?v=20023"></script>
 <script src="aitray.js?v=20024"></script>
 </body>

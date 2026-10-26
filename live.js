@@ -117,6 +117,7 @@
     document.dispatchEvent(new CustomEvent('oilive'));
   }
   setTimeout(poll, 2500);
+  st.poll = poll; // ให้ปุ่ม ⟳ เรียกดึงข้อมูลสดทันที
   setInterval(poll, 60000);
   // ชีตโหลดเสร็จหลังข้อมูลสด หรือโหลดชีตใหม่ (oi ถูกสร้างใหม่): คำนวณซ้ำ
   setInterval(() => {

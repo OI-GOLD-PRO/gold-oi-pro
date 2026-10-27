@@ -390,7 +390,7 @@
         <span>ปรับ DXY</span><span></span><span class="${cl(k.dxyAdj)}">${k.dxyAdj > 0 ? '+' : ''}${k.dxyAdj}</span>
         <span>คะแนนสุดท้าย</span><span></span><span class="${cl(k.score)}">${k.score > 0 ? '+' : ''}${k.score}</span></div>
         <div class="note" style="margin-top:6px">ปัจจัย 1–4 หารด้วยค่าเปลี่ยนแปลงสูงสุดในอดีต (COT 3 ปี, ราคา 1 ปี) · ปัจจัย 6–7 เทียบช่วงต่ำสุด–สูงสุด 3 ปี · DXY: นักเก็งกำไรดอลลาร์ (Legacy, ICE DXY) เปลี่ยนเกิน 2% ของ OI → ซื้อดอลลาร์ −5 / ขายดอลลาร์ +5 · คะแนน ≥ +20 = ขาขึ้น, ≤ −20 = ขาลง</div></details>
-      <div class="note" style="margin-top:6px">COT ช้า 3 วัน (ข้อมูลวันอังคาร ประกาศคืนวันศุกร์) ใช้ดูภาพใหญ่ ส่วน gmf ใช้ดูจังหวะ · ที่มา CFTC Disaggregated COMEX Gold</div></div>`;
+      <div class="note" style="margin-top:6px">COT (ข้อมูลวันอังคาร ประกาศคืนวันศุกร์) ใช้ดูภาพใหญ่ ส่วน gmf ใช้ดูจังหวะ · ที่มา CFTC Disaggregated COMEX Gold</div></div>`;
   }
 
   // COT แยกรายกลุ่ม: กองทุน / Commercial / Non-commercial / รายย่อย (cotgroups.js)
@@ -467,9 +467,9 @@
       const dP = p0 !== null && p1 !== null ? pct(p0, p1) : null, dO = pct(R[0].oi, R[1].oi);
       const pd = dir(dP, 0.15), od = dir(dO, 0.3);
       const hit = pd && od ? FUT_T.find(r => r.p === pd && r.o === od) : null;
-      fut = `<h3 style="margin-top:4px">① Futures: ราคา × Open Interest <span style="font-weight:400;color:var(--muted)">(สัปดาห์ถึง ${esc(R[0].d)})</span></h3>
+      fut = `<h3 style="margin-top:4px">① Futures: ราคา × Open Interest</h3>
         <div class="oc-now">ราคา <b class="${pd > 0 ? 'up' : pd < 0 ? 'dn' : ''}">${arrow(pd)} ${sgp(dP)}</b> · OI ทั้งตลาด <b class="${od > 0 ? 'up' : od < 0 ? 'dn' : ''}">${arrow(od)} ${sgp(dO)}</b> (${Math.round(R[0].oi).toLocaleString('en-US')} สัญญา)${hit ? ` → <b>${hit.m}</b><br><span class="oc-t">${esc(hit.t)}</span>` : '<br><span class="oc-t">ราคาหรือ OI แทบไม่เปลี่ยน ยังไม่เข้าเงื่อนไขในตาราง</span>'}</div>
-        <div class="oc-tb">${FUT_T.map(r => `<div class="oc-r${r === hit ? ' on' : ''}"><span>${r.p > 0 ? 'ราคาพุ่ง ▲' : 'ราคาดิ่ง ▼'}</span><span>OI ${r.o > 0 ? 'เพิ่ม ▲' : 'ลด ▼'}</span><span>${esc(r.t)}</span></div>`).join('')}</div>
+        <div class="oc-tb">${FUT_T.map(r => `<div class="oc-r${r === hit ? ' on' : ''}"><span>${r.p > 0 ? 'ราคาขึ้น ▲' : 'ราคาลง ▼'}</span><span>OI ${r.o > 0 ? 'เพิ่ม ▲' : 'ลด ▼'}</span><span>${esc(r.t)}</span></div>`).join('')}</div>
         <div class="note">ตารางต้นฉบับกำหนด Volume "สูง" ทุกแถว (OI Futures ใช้รายงาน CFTC รายสัปดาห์ จึงเป็นภาพรวมสัปดาห์ ไม่ใช่รายวัน)</div>`;
     }
     // ---- Options: ราคา × OI ของ Call / Put เทียบการอัพเดทครั้งก่อน ----
@@ -493,8 +493,8 @@
         <div class="oc-now">ราคา <b class="${pd > 0 ? 'up' : pd < 0 ? 'dn' : ''}">${arrow(pd)} ${sgp(dP)}</b><br>
           Call OI <b class="${cd > 0 ? 'up' : cd < 0 ? 'dn' : ''}">${arrow(cd)} ${sgp(dC)}</b>${hc ? ` → ${hc.m} ${esc(hc.t)}` : ' → ยังไม่เข้าเงื่อนไข'}<br>
           Put OI <b class="${ud > 0 ? 'dn' : ud < 0 ? 'up' : ''}">${arrow(ud)} ${sgp(dPu)}</b>${hp ? ` → ${hp.m} ${esc(hp.t)}` : ' → ยังไม่เข้าเงื่อนไข'}</div>
-        <div class="oc-tb">${OPT_T.map(r => `<div class="oc-r oc3${r === hc || r === hp ? ' on' : ''}"><span>${r.p > 0 ? 'ราคาพุ่ง ▲' : 'ราคาดิ่ง ▼'}</span><span>${r.y === 'C' ? 'Call' : 'Put'} OI ${r.o > 0 ? '▲' : '▼'}</span><span>${esc(r.t)}</span></div>`).join('')}</div>
-        <div class="note">เทียบ OI รวมทุก strike ของสัญญา ${esc(cfg.contract || '–')} กับบันทึกครั้งก่อนที่ OI เปลี่ยน (ประวัติจากผลวิเคราะห์ AI) · สัญญารายวันหมดอายุทุกวัน จึงเทียบข้ามสัญญาไม่ได้ ต้องเป็นสัญญาเดียวกัน (OI เปลี่ยนตอนเปิดวันกับหลังตลาดปิด)</div>`;
+        <div class="oc-tb">${OPT_T.map(r => `<div class="oc-r oc3${r === hc || r === hp ? ' on' : ''}"><span>${r.p > 0 ? 'ราคาขึ้น ▲' : 'ราคาลง ▼'}</span><span>${r.y === 'C' ? 'Call' : 'Put'} OI ${r.o > 0 ? '▲' : '▼'}</span><span>${esc(r.t)}</span></div>`).join('')}</div>
+        <div class="note">เทียบ OI รวมทุก strike ของสัญญา ${esc(cfg.contract || '–')} กับบันทึกครั้งก่อนที่ OI เปลี่ยน</div>`;
     } else {
       opt = `<h3 style="margin-top:12px">② Options: ราคา × OI Call/Put</h3><div class="note">ยังไม่มีบันทึกก่อนหน้าของสัญญา ${esc(cfg.contract || '–')} ที่ OI ต่างจากตอนนี้ (OI เปลี่ยนแค่ตอนเปิดวันกับหลังตลาดปิด) จะเทียบได้เมื่อ OI สัญญานี้ถูกอัพเดทรอบถัดไป</div>`;
     }
@@ -528,7 +528,7 @@
   function liveCard(price) {
     const L = window.OILive, c = L && L.calc;
     if (!L) return '';
-    if (!c) return `<div class="card"><h3>⚡ ออปชันวันนี้ (สด · ช้า 10 นาที)</h3><div class="note">${L.err ? 'ดึงข้อมูลสดไม่ได้: ' + esc(L.err) : 'กำลังโหลด…'}</div></div>`;
+    if (!c) return `<div class="card"><h3>⚡ ออปชันวันนี้ (สด)</h3><div class="note">${L.err ? 'ดึงข้อมูลสดไม่ได้: ' + esc(L.err) : 'กำลังโหลด…'}</div></div>`;
     const px = price !== null ? price : c.S0;
     const f1 = v => v === null || v === undefined || !isFinite(v) ? '–' : Number(v).toFixed(1);
     const rel = v => v === null || px === null ? '' : ` <span class="${px >= v ? 'up' : 'dn'}">(${px >= v ? 'ราคาเหนือ' : 'ราคาใต้'} ${Math.abs(px - v).toFixed(1)})</span>`;
@@ -590,7 +590,7 @@
       parts.push(`<h3 style="margin-top:12px">ซื้อ/ขายสุทธิวันนี้ (8 strike ที่เทรดมากสุด · ประมาณจากราคาเทียบ bid/ask)</h3><table><thead><tr><th>Strike</th><th>Call</th><th>Put</th><th>Vol/OI</th></tr></thead><tbody>
         ${act.map(s => `<tr><td>${s.k}</td><td class="tag">${nt(s.bc, s.sc)}</td><td class="tag">${nt(s.bp, s.sp)}</td><td>${(s.c + s.p) ? ((s.vc + s.vp) / (s.c + s.p)).toFixed(1) : '∞'}</td></tr>${mean(s) ? `<tr><td></td><td colspan="3" style="font-family:var(--sans);font-size:10.5px;color:var(--muted);padding-top:0">${mean(s)}</td></tr>` : ''}`).join('')}</tbody></table>`);
     }
-    return `<div class="card"><h3>⚡ ออปชันวันนี้ ${esc(c.root)} (สด · ช้า 10 นาที · อัปเดต ${upd} · เหลือ ${hh} ชม. ${mm} นาที)</h3>${parts.join('')}
+    return `<div class="card"><h3>⚡ ออปชันวันนี้ ${esc(c.root)} (สด · เหลือ ${hh} ชม. ${mm} นาที)</h3>${parts.join('')}
       <div class="note" style="margin-top:8px">gmf itd สด = OI ของวัน + IV สด + เวลาที่เหลือ คำนวณทุก 1 นาที · แบบ "ปรับตามซื้อ/ขาย" ใช้ยอดซื้อ/ขายวันนี้แทนสมมติฐาน Call+/Put− (เป็นค่าประมาณ) · ป้ายบนกราฟ C▲ = Call ถูกซื้อ, C▼ = Call ถูกขาย, P▲/P▼ เช่นกัน, 🔥 = เงินใหม่ (volume ≥ OI และเทรดหนา)</div></div>`;
   }
 
@@ -626,7 +626,7 @@
         return `<div class="ev${past ? ' past' : ''}"><span class="t">${t}</span><span class="d" style="background:${e.i === 'H' ? '#ef4444' : '#f59e0b'}"></span><div>${esc(e.title)}<small>${res}</small></div></div>`;
       }).join('')}</div>`;
     }).join('');
-    return `<div class="card"><h3>📅 ปฏิทินข่าว USD สัปดาห์นี้ (เวลาไทย · 🔴 แรง 🟠 กลาง)</h3><div class="cal">${html}</div><div class="note" style="margin-top:6px">ที่มา Forex Factory + FXStreet · อัปเดตอัตโนมัติ · ผลจริงขึ้นหลังข่าวออกไม่กี่นาที</div></div>`;
+    return `<div class="card"><h3>📅 ปฏิทินข่าว USD สัปดาห์นี้ (เวลาไทย · 🔴 แรง 🟠 กลาง)</h3><div class="cal">${html}</div><div class="note" style="margin-top:6px">ที่มา Forex Factory + FXStreet</div></div>`;
   }
 
   // ---------- คำนวณจากข้อมูล OI + Volume ----------

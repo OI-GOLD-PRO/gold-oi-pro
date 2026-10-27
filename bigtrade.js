@@ -29,7 +29,10 @@
 
   // ---------- Delta + ราคาอ้างอิงต่อแท่ง (Binance klines: k[9] = taker buy volume) ----------
   async function loadKlines() {
-    const B = O.series.data() || []; if (!B.length) return;
+    const B = O.series.data() || []; if (B.length < 3) return;
+    // กราฟยังเป็นแท่งของ TF เดิม (เพิ่งกดเปลี่ยน) → รอแล้วลองใหม่ ไม่งั้นจับคู่ราคาผิดแท่ง
+    const step = TFS[O.tf] || 60;
+    if (O.tf !== '1d' && B[B.length - 1].time - B[B.length - 2].time !== step && B[B.length - 2].time - B[B.length - 3].time !== step) { setTimeout(() => loadKlines().then(() => O.markDirty()), 1500); return; }
     const disp = new Map(B.map(b => [b.time, b.close]));
     const n = Math.min(1500, Math.max(100, B.length));
     if (src !== 'bitget') {
@@ -37,7 +40,7 @@
         const k = await fetchJ(`https://fapi.binance.com/fapi/v1/klines?symbol=${SYM}&interval=${O.tf}&limit=${n}`);
         const dm = new Map(), om = new Map();
         k.forEach(x => { const t = Math.floor(x[0] / 1000) + TZ, v = +x[5], tb = +x[9]; dm.set(t, { b: tb, s: v - tb }); if (disp.has(t)) om.set(t, +x[4] - disp.get(t)); });
-        delta = dm; pxOff = om; src = 'binance'; return;
+        delta = dm; if (om.size >= 5) pxOff = om; src = 'binance'; return;
       } catch (e) { src = 'bitget'; }
     }
     // สำรอง: Bitget klines (ไม่มีฝั่ง taker) → ใช้แค่ราคาอ้างอิง ส่วน Delta คิดจากไม้ที่ดึงได้
@@ -45,7 +48,7 @@
       const G = { '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m', '1h': '1H', '4h': '4H', '1d': '1D' };
       const j = await fetchJ(`https://api.bitget.com/api/v2/mix/market/candles?symbol=${SYM}&productType=usdt-futures&granularity=${G[O.tf]}&limit=${Math.min(1000, n)}`);
       const om = new Map(); (j.data || []).forEach(x => { const t = Math.floor(+x[0] / 1000) + TZ; if (disp.has(t)) om.set(t, +x[4] - disp.get(t)); });
-      pxOff = om;
+      if (om.size >= 5) pxOff = om;
     } catch (e) {}
   }
   // ราคาไม้ → ราคาบนกราฟ (ใช้ส่วนต่างของแท่งนั้น ถ้าไม่มีใช้ของแท่งใกล้สุด)

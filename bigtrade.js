@@ -18,12 +18,13 @@
   // ---------- สถานะ ----------
   let src = null;             // 'binance' | 'bitget'
   let trades = [];            // ไม้ใหญ่ {t ms, p, q, s: 1 ซื้อ / -1 ขาย}
-  let sizes = [];             // ขนาดไม้ล่าสุด (คำนวณเกณฑ์อัตโนมัติ)
+  // ขนาดไม้ล่าสุด (วงแหวน 20,000 ค่า) ใช้คำนวณเกณฑ์อัตโนมัติ · คำนวณเกณฑ์ใหม่ทุก 20 วินาที ไม่ใช่ทุกไม้ (กันกราฟหน่วง)
+  const RING = 20000; let sizes = new Float32Array(RING), sN = 0, thrCache = 5, thrAt = 0;
   let delta = new Map();      // เวลาแท่ง (วินาทีแกนกราฟ) → { b, s } ปริมาณไล่ซื้อ/ไล่ขาย
   let pxOff = new Map();      // เวลาแท่ง → ราคา perp − ราคาบนกราฟ (แปลงราคาไม้ให้ตรงแกน)
   let curTf = null, busy = false, ws = null, wsTimer = null, status = '';
-  const thr = () => cfg.auto ? autoThr() : Math.max(0.01, +cfg.thr || 5);
-  function autoThr() { if (sizes.length < 200) return 5; const a = sizes.slice().sort((x, y) => x - y); return Math.max(1, Math.round(a[Math.floor(a.length * 0.995)] * 10) / 10); }
+  const thr = () => { if (!cfg.auto) return Math.max(0.01, +cfg.thr || 5); if (Date.now() - thrAt > 20000) { thrAt = Date.now(); thrCache = autoThr(); } return thrCache; };
+  function autoThr() { const n = Math.min(sN, RING); if (n < 200) return 5; const a = sizes.slice(0, n).sort(); return Math.max(1, Math.round(a[Math.floor(n * 0.995)] * 10) / 10); }
   const barOf = ms => { const sec = TFS[O.tf] || 60; return Math.floor(ms / 1000 / sec) * sec + TZ; };
   const fetchJ = async (u, ms) => { const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms || 8000); try { const r = await fetch(u, { signal: ac.signal, cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); } finally { clearTimeout(t); } };
 
@@ -64,12 +65,12 @@
 
   // ---------- ย้อนหลังไม้ใหญ่ ----------
   function addTrade(t, p, q, s, keepAll) {
-    sizes.push(q); if (sizes.length > 20000) sizes.splice(0, sizes.length - 20000);
+    sizes[sN % RING] = q; sN++;
     if (src === 'bitget') { const bt = barOf(t), d = delta.get(bt) || { b: 0, s: 0 }; if (s > 0) d.b += q; else d.s += q; delta.set(bt, d); }
-    if (keepAll || q >= Math.min(thr(), 1)) trades.push({ t, p, q, s });
+    if (keepAll || q >= Math.min(thrCache, 1)) trades.push({ t, p, q, s });
   }
   async function backfill() {
-    trades = []; sizes = [];
+    trades = []; sN = 0; thrAt = 0;
     const since = Date.now() - cfg.hours * 3600e3;
     if (src !== 'bitget') {
       try {
@@ -123,8 +124,8 @@
   function live(t) {
     // ไม้ใหม่ใหญ่มาก (≥ 3 เท่าเกณฑ์) → แจ้งในแอป
     const x = trades[trades.length - 1];
-    if (x && x.t === t && x.q >= thr() * 3 && Date.now() - lastAlert > 20000) { lastAlert = Date.now(); O.showToast && O.showToast(`🐋 ไม้ใหญ่ ${x.s > 0 ? '<b style="color:#2fe3a6">ไล่ซื้อ</b>' : '<b style="color:#ff6b82">ไล่ขาย</b>'} ${x.q.toFixed(2)} oz @ ${(x.p - offAt(barOf(x.t))).toFixed(2)}`, 6000); }
-    if (Date.now() - lastLive > 500) { lastLive = Date.now(); O.markDirty(); }
+    if (x && x.t === t && x.q >= thrCache * 3 && Date.now() - lastAlert > 20000) { lastAlert = Date.now(); O.showToast && O.showToast(`🐋 ไม้ใหญ่ ${x.s > 0 ? '<b style="color:#2fe3a6">ไล่ซื้อ</b>' : '<b style="color:#ff6b82">ไล่ขาย</b>'} ${x.q.toFixed(2)} oz @ ${(x.p - offAt(barOf(x.t))).toFixed(2)}`, 6000); }
+    if (x && x.t === t && x.q >= thrCache && Date.now() - lastLive > 500) { lastLive = Date.now(); O.markDirty(); }
   }
   // ตัดไม้เล็ก/เก่าทิ้งเป็นระยะ ไม่ให้หน่วยความจำโต
   setInterval(() => { if (!cfg.on) return; const T = thr() * 0.5, since = Date.now() - (cfg.hours + 6) * 3600e3; trades = trades.filter(x => x.q >= T && x.t >= since); }, 60000);
@@ -132,7 +133,7 @@
   async function reload() {
     if (busy || !cfg.on) return; busy = true; curTf = O.tf;
     status = 'กำลังโหลด…'; paintInfo();
-    try { await loadKlines(); await backfill(); openWS(); status = ''; } catch (e) { status = 'โหลดไม่ได้: ' + (e.message || e); }
+    try { await loadKlines(); await backfill(); thrAt = 0; thr(); openWS(); status = ''; } catch (e) { status = 'โหลดไม่ได้: ' + (e.message || e); }
     busy = false; paintInfo(); O.markDirty();
   }
   // Delta/ราคาอ้างอิงอัปเดตทุก 30 วินาที · เปลี่ยน TF → โหลด klines ใหม่ (ไม้ใหญ่ใช้ชุดเดิม)

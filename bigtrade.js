@@ -224,5 +224,5 @@
     });
   }
   if (cfg.on) setTimeout(reload, 3500);
-  window.OI_bigtr = { get cfg() { return cfg; }, get trades() { return trades; }, get delta() { return delta; }, get src() { return src; }, thr, reload };
+  window.OI_bigtr = { get pxOff() { return pxOff; }, offAt, get cfg() { return cfg; }, get trades() { return trades; }, get delta() { return delta; }, get src() { return src; }, thr, reload };
 })();

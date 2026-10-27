@@ -206,7 +206,11 @@
   .legend i { display: inline-block; width: 10px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
   .legend .rt { margin-left: auto; font-family: var(--mono); }
   button.icon.on { border-color: var(--gold); color: var(--gold); }
-  #toast { position: absolute; left: 10px; right: 10px; top: 10px; z-index: 5; background: #2a2208; border: 1px solid var(--gold); color: var(--fg); border-radius: 10px; padding: 9px 12px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
+  /* ป้ายแจ้งเตือน: เลื่อนลงจากขอบบนกลางจอ อยู่ในพื้นที่หัวแอป (ไม่บังกราฟ) ข้อความยาวเลื่อนอ่านในป้าย */
+  #toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 4px); width: min(560px, calc(100vw - 20px)); max-height: var(--toastMax, 140px); overflow-y: auto; -webkit-overflow-scrolling: touch;
+    z-index: 46; background: rgba(42,34,8,.97); border: 1px solid var(--gold); color: var(--fg); border-radius: 14px; padding: 9px 12px; font-size: 13px; line-height: 1.45; box-shadow: 0 10px 30px rgba(0,0,0,.55);
+    transform: translate(-50%, -140%); opacity: 0; transition: transform .34s cubic-bezier(.2,.9,.25,1), opacity .22s ease; }
+  #toast.show { transform: translate(-50%, 0); opacity: 1; }
   #toast b { color: var(--gold); font-family: var(--mono); }
 </style>
 </head>
@@ -358,7 +362,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '2.0.39';
+  const APP_VER = '2.0.40';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1085,10 +1089,17 @@
   // กล่องข้อความ: แตะที่กล่องหรือที่กราฟเพื่อปิด, ปิดเองหลัง ms (ค่าเริ่ม 8 วินาที)
   function showToast(html, ms) {
     boardOpen = false;
-    const el = $('toast'); el.innerHTML = html + '<div style="margin-top:6px;font-size:11px;opacity:.6">แตะเพื่อปิด</div>'; el.hidden = false;
+    const el = $('toast'); el.innerHTML = html + '<div style="margin-top:6px;font-size:11px;opacity:.6">แตะเพื่อปิด</div>';
+    // สูงได้ไม่เกินขอบบนของกราฟ (ไม่บังกราฟ) · ข้อความยาวเลื่อนอ่านในป้าย
+    try { const top = parseFloat(getComputedStyle(el).top) || 4, ct = chartEl.getBoundingClientRect().top; el.style.setProperty('--toastMax', Math.max(64, ct - top - 6) + 'px'); } catch (e) {}
+    clearTimeout(hideToast.t); el.hidden = false; el.scrollTop = 0;
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
     clearTimeout(showToast.t); showToast.t = setTimeout(hideToast, ms || 8000);
   }
-  function hideToast() { clearTimeout(showToast.t); $('toast').hidden = true; }
+  function hideToast() {
+    clearTimeout(showToast.t); const el = $('toast'); el.classList.remove('show');
+    clearTimeout(hideToast.t); hideToast.t = setTimeout(() => { if (!el.classList.contains('show')) el.hidden = true; }, 360);
+  }
   $('toast').addEventListener('click', hideToast);
   chartEl.addEventListener('pointerdown', () => { if (!$('toast').hidden) hideToast(); });
 

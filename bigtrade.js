@@ -39,7 +39,7 @@
       try {
         const k = await fetchJ(`https://fapi.binance.com/fapi/v1/klines?symbol=${SYM}&interval=${O.tf}&limit=${n}`);
         const dm = new Map(), om = new Map();
-        k.forEach(x => { const t = Math.floor(x[0] / 1000) + TZ, v = +x[5], tb = +x[9]; dm.set(t, { b: tb, s: v - tb }); if (disp.has(t)) om.set(t, +x[4] - disp.get(t)); });
+        k.forEach(x => { const t = Math.floor(x[0] / 1000) + TZ, v = +x[5], tb = +x[9]; dm.set(t, { b: tb, s: v - tb }); om.set(t, +x[4]); });
         delta = dm; if (om.size >= 5) pxOff = om; src = 'binance'; return;
       } catch (e) { src = 'bitget'; }
     }
@@ -47,14 +47,18 @@
     try {
       const G = { '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m', '1h': '1H', '4h': '4H', '1d': '1D' };
       const j = await fetchJ(`https://api.bitget.com/api/v2/mix/market/candles?symbol=${SYM}&productType=usdt-futures&granularity=${G[O.tf]}&limit=${Math.min(1000, n)}`);
-      const om = new Map(); (j.data || []).forEach(x => { const t = Math.floor(+x[0] / 1000) + TZ; if (disp.has(t)) om.set(t, +x[4] - disp.get(t)); });
+      const om = new Map(); (j.data || []).forEach(x => { const t = Math.floor(+x[0] / 1000) + TZ; om.set(t, +x[4]); });
       if (om.size >= 5) pxOff = om;
     } catch (e) {}
   }
   // ราคาไม้ → ราคาบนกราฟ (ใช้ส่วนต่างของแท่งนั้น ถ้าไม่มีใช้ของแท่งใกล้สุด)
+  // pxOff เก็บราคาปิด perp ต่อแท่ง → ส่วนต่าง = ราคาปิด perp − ราคาปิดบนกราฟ "ตอนนี้" (offset ของแอปเปลี่ยนได้หลังโหลด)
+  let dispKey = '', dispMap = new Map();
+  function dispNow() { const B = O.series.data() || []; const k = B.length + '|' + (B.length ? B[B.length - 1].close + '|' + B[0].close : ''); if (k !== dispKey) { dispKey = k; dispMap = new Map(B.map(b => [b.time, b.close])); } return dispMap; }
   function offAt(t) {
-    if (pxOff.has(t)) return pxOff.get(t);
-    let best = null, bd = Infinity; pxOff.forEach((v, k) => { const d = Math.abs(k - t); if (d < bd) { bd = d; best = v; } });
+    const D = dispNow();
+    if (pxOff.has(t) && D.has(t)) return pxOff.get(t) - D.get(t);
+    let best = null, bd = Infinity; pxOff.forEach((v, k) => { if (!D.has(k)) return; const d = Math.abs(k - t); if (d < bd) { bd = d; best = v - D.get(k); } });
     return best === null ? 0 : best;
   }
 

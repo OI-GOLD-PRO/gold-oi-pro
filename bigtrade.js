@@ -143,18 +143,26 @@
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
     const sp = ts.options().barSpacing || 6, T = thr();
     ctx.save();
-    // 1) ไม้ใหญ่: รวมไม้ในแท่งเดียวกัน ฝั่งเดียวกัน ราคาใกล้กัน (±0.3)
-    const agg = new Map();
-    trades.forEach(x => { if (x.q < T) return; const bt = barOf(x.t), p = x.p - offAt(bt), k = bt + '|' + x.s + '|' + Math.round(p / 0.3); const a = agg.get(k); if (a) { a.pq += p * x.q; a.q += x.q; a.n++; } else agg.set(k, { bt, s: x.s, q: x.q, pq: p * x.q, n: 1 }); });
-    const list = [...agg.values()].sort((a, b) => a.q - b.q);
-    list.forEach(a => {
-      const x = ts.timeToCoordinate(a.bt); if (x === null || x < 0 || x > plotW) return;
-      const p = a.pq / a.q, y = sr.priceToCoordinate(p); if (y === null || y < 0 || y > plotH) return;
-      const r = Math.max(3, Math.min(Math.max(10, sp * 1.4), 3 + 5 * Math.sqrt(a.q / T)));
-      ctx.globalAlpha = 0.32; ctx.fillStyle = a.s > 0 ? '#22e39a' : '#ff4d6a'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 0.95; ctx.lineWidth = 1.5; ctx.strokeStyle = a.s > 0 ? '#22e39a' : '#ff4d6a'; ctx.stroke();
-      if (a.q >= T * 3 && sp >= 5) { ctx.font = `bold 9px ${mono}`; ctx.fillStyle = a.s > 0 ? '#9ff5cf' : '#ffb3bf'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(`${a.s > 0 ? 'B' : 'S'}${a.q >= 100 ? Math.round(a.q) : a.q.toFixed(1)}`, x + r + 2, y); }
+    // 1) ไม้ใหญ่: รวมไม้แท่งเดียวกัน ฝั่งเดียวกัน ที่อยู่ใกล้กันบนจอ (< 8px) แล้วเก็บ 4 กลุ่มใหญ่สุดต่อแท่งต่อฝั่ง
+    const groups = new Map();
+    trades.forEach(x => { if (x.q < T) return; const bt = barOf(x.t), k = bt + '|' + x.s; (groups.get(k) || groups.set(k, []).get(k)).push({ p: x.p - offAt(bt), q: x.q }); });
+    const list = [];
+    groups.forEach((arr, k) => {
+      const [bt, s] = k.split('|').map(Number); const x = ts.timeToCoordinate(bt); if (x === null || x < 0 || x > plotW) return;
+      arr.sort((a, b) => a.p - b.p); const cl = [];
+      arr.forEach(t => { const y = sr.priceToCoordinate(t.p); if (y === null) return; const c = cl[cl.length - 1]; if (c && Math.abs(c.y - y) < 8) { c.pq += t.p * t.q; c.q += t.q; c.y = sr.priceToCoordinate(c.pq / c.q); } else cl.push({ y, pq: t.p * t.q, q: t.q }); });
+      cl.sort((a, b) => b.q - a.q).slice(0, 4).forEach(c => list.push({ x, y: c.y, q: c.q, s }));
     });
+    list.sort((a, b) => a.q - b.q);
+    const rMax = Math.max(6, Math.min(16, sp * 0.9));
+    list.forEach(a => {
+      if (a.y < 0 || a.y > plotH) return;
+      const r = Math.max(3, Math.min(rMax, 2.5 + 4 * Math.sqrt(a.q / T)));
+      ctx.globalAlpha = 0.28; ctx.fillStyle = a.s > 0 ? '#22e39a' : '#ff4d6a'; ctx.beginPath(); ctx.arc(a.x, a.y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.9; ctx.lineWidth = 1.3; ctx.strokeStyle = a.s > 0 ? '#22e39a' : '#ff4d6a'; ctx.stroke();
+    });
+    // ป้ายขนาดเฉพาะ 3 ไม้ใหญ่สุดที่มองเห็น
+    list.filter(a => a.y >= 0 && a.y <= plotH).sort((a, b) => b.q - a.q).slice(0, 3).forEach(a => { const r = Math.max(3, Math.min(rMax, 2.5 + 4 * Math.sqrt(a.q / T))); ctx.globalAlpha = 1; ctx.font = `bold 9px ${mono}`; ctx.fillStyle = a.s > 0 ? '#9ff5cf' : '#ffb3bf'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(`${a.s > 0 ? 'B' : 'S'}${a.q >= 100 ? Math.round(a.q) : a.q.toFixed(1)}`, a.x + r + 2, a.y); });
     // 2) Delta ต่อแท่ง: แถบล่างของกราฟ (ตัวเลขเมื่อแท่งกว้างพอ ไม่งั้นเป็นแท่งสี)
     if (cfg.delta && delta.size) {
       const B = O.series.data() || [], lr = ts.getVisibleLogicalRange(); if (lr) {

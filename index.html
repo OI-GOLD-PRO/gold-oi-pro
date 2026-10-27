@@ -206,6 +206,27 @@
   .legend i { display: inline-block; width: 10px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
   .legend .rt { margin-left: auto; font-family: var(--mono); }
   button.icon.on { border-color: var(--gold); color: var(--gold); }
+  /* ===== ตั้งค่า (⚙️): แจ้งเตือน + บัญชี ===== */
+  #setBtn { position: relative; }
+  #setBtn.on::after { content: ''; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+  #setPanel { position: fixed; inset: 0; z-index: 47; background: rgba(3,5,12,.55); }
+  #setPanel .sp { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 6px); width: min(460px, calc(100vw - 16px)); max-height: calc(100% - env(safe-area-inset-top, 0px) - 20px); overflow-y: auto; transform: translateX(-50%);
+    background: linear-gradient(180deg, #121a3c, #0b1024); border: 1px solid rgba(224,180,76,.45); border-radius: 16px; box-shadow: 0 16px 40px rgba(0,0,0,.6); padding: 12px 14px 14px; animation: spDrop .28s cubic-bezier(.2,.9,.25,1); }
+  @keyframes spDrop { from { transform: translate(-50%, -24px); opacity: 0; } }
+  #setPanel .hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  #setPanel .hd b { font: 700 15px var(--mono); color: var(--gold); }
+  #setPanel .hd button { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); }
+  #setPanel h4 { margin: 12px 0 6px; font: 600 12px var(--sans); color: var(--muted); letter-spacing: .04em; }
+  #setPanel .row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-top: 1px solid rgba(255,255,255,.06); font-size: 14px; }
+  #setPanel .row .tx { flex: 1; min-width: 0; } #setPanel .row small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  #setPanel .sw { position: relative; width: 44px; height: 26px; border-radius: 13px; background: #2a3150; border: 0; flex: none; transition: background .2s; }
+  #setPanel .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #c9d1ea; transition: transform .2s; }
+  #setPanel .sw.on { background: #2fbf8f; } #setPanel .sw.on::after { transform: translateX(18px); background: #fff; }
+  #setPanel .sw:disabled { opacity: .4; }
+  #setPanel #bell { height: auto; padding: 10px 14px; border-radius: 12px; font: 600 14px var(--sans); display: flex; gap: 8px; align-items: center; width: 100%; justify-content: center; }
+  #setPanel #bell.on { border-color: var(--gold); background: rgba(224,180,76,.12); color: var(--gold); }
+  #setPanel #logout { width: 100%; height: auto; padding: 10px 14px; border-radius: 12px; font: 600 14px var(--sans); color: #ff8a9b; border-color: rgba(229,87,107,.5); }
+  #setPanel .note { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 6px; }
   /* ป้ายแจ้งเตือน: เลื่อนลงจากขอบบนกลางจอ อยู่ในพื้นที่หัวแอป (ไม่บังกราฟ) ข้อความยาวเลื่อนอ่านในป้าย */
   #toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 4px); width: min(560px, calc(100vw - 20px)); max-height: var(--toastMax, 140px); overflow-y: auto; -webkit-overflow-scrolling: touch;
     z-index: 46; background: rgba(42,34,8,.97); border: 1px solid var(--gold); color: var(--fg); border-radius: 14px; padding: 9px 12px; font-size: 13px; line-height: 1.45; box-shadow: 0 10px 30px rgba(0,0,0,.55);
@@ -299,11 +320,20 @@
     <div id="symMenu" hidden></div>
     <button class="siren" id="siren" aria-label="ข่าวแดงที่กำลังจะออก"><span class="bulb">🚨</span><span class="new">new!!</span></button>
     <div class="px"><div id="price">–</div><div id="chg">กำลังโหลด</div></div>
-    <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือนโซน OI">🔕</button>
+    <button class="icon" id="setBtn" aria-label="ตั้งค่า">⚙️</button>
     <button class="icon" id="layBtn" aria-label="เลย์เอาต์กราฟ: 1 กราฟ / บนล่าง / ซ้ายขวา">▭</button>
     <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่"><span class="ri">⟳</span></button>
-    <button class="icon" id="logout" aria-label="ออกจากระบบ">⏻</button>
   </header>
+  <div id="setPanel" hidden><div class="sp" role="dialog" aria-label="ตั้งค่า">
+    <div class="hd"><b>⚙️ ตั้งค่า</b><button id="setClose" aria-label="ปิด">✕</button></div>
+    <h4>🔔 แจ้งเตือน</h4>
+    <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือน">🔕</button>
+    <div id="alertList"></div>
+    <div class="note" id="alertNote"></div>
+    <h4>บัญชี</h4>
+    <button class="icon" id="logout" aria-label="ออกจากระบบ">⏻ ออกจากระบบ</button>
+    <div class="note" id="setVer"></div>
+  </div></div>
   <div class="chips" id="chips"><span class="chip">กำลัง Sync Data…</span></div>
   <div class="tfs" id="tfs">
     <button data-tf="1m">M1</button>
@@ -341,6 +371,20 @@
   <iframe id="paneB" title="กราฟที่ 2" hidden></iframe>
 
 <script>
+  // ---------- ทะเบียนแจ้งเตือน: แต่ละอย่าง (และอินดี้ที่เพิ่มทีหลัง) ลงชื่อไว้ ผู้ใช้เลือกเปิด/ปิดได้ในเมนู ⚙️ ----------
+  window.OIAlerts = (() => {
+    const list = [], KEY = 'oi_alert_types'; let pref = {}, master = () => false, onChange = () => {};
+    try { pref = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+    return {
+      list,
+      // id, ชื่อ, { def: ค่าเริ่มต้น, desc: คำอธิบาย, active: () => อินดี้นั้นเปิดอยู่ไหม (ไม่มี = แสดงเสมอ), push: เซิร์ฟเวอร์ส่งให้ได้ }
+      reg(id, label, o) { const i = list.findIndex(x => x.id === id); const it = Object.assign({ id, label, def: true }, o || {}); if (i >= 0) list[i] = it; else list.push(it); onChange(); },
+      type(id) { const it = list.find(x => x.id === id); return pref[id] !== undefined ? !!pref[id] : it ? it.def !== false : true; },
+      set(id, v) { pref[id] = !!v; try { localStorage.setItem(KEY, JSON.stringify(pref)); } catch (e) {} onChange(); },
+      on(id) { return master() && this.type(id); }, // เปิดแจ้งเตือนรวม + เปิดชนิดนี้
+      _bind(m, ch) { master = m; onChange = ch; },
+    };
+  })();
 (function () {
   // สัญลักษณ์ที่เลือกได้: แต่ละตัวมีแท็บ OI/offset ในชีตของตัวเอง (ทอง = แท็บเดิม)
   // tol/rearm = ระยะเตือนโซน (หน่วยราคา), mult = ตัวคูณสัญญาออปชันสำหรับ MM P/L (US30: ใช้ออปชัน DIA 1 สัญญา = $1 ต่อ 1 จุด Dow), tick = 1 จุด
@@ -362,7 +406,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '2.0.41';
+  const APP_VER = '2.0.42';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
@@ -1172,9 +1216,13 @@
   chartEl.addEventListener('touchend', touchEnd, { capture: true });
   chartEl.addEventListener('touchcancel', touchEnd, { capture: true });
 
+  OIAlerts.reg('zone', 'ราคาถึงโซน OI / เส้น Volume', { desc: 'โซนที่ไฮไลต์ 10 อันดับต่อฝั่ง + Volume 5 อันดับ · ซ้ำได้ทุก 1 ชม.', push: true });
+  OIAlerts.reg('break', 'เบรกเอ้าท์ M5 พ้นโซน', { desc: 'แท่ง M5 ปิดพ้นขอบโซนเกิน $2 · ครั้งเดียวต่อวันเทรด', push: true });
+  OIAlerts.reg('news', 'ข่าวแดง USD ก่อนออก 10 นาที', { push: true });
   function fire(r, price, kind) {
     hit = { strike: r.strike, until: Date.now() + 60000 }; dirty = true;
     if (pushOn) return; // เปิด Web Push แล้ว: เซิร์ฟเวอร์เป็นคนเตือน (กันเตือนซ้ำ 2 ทาง)
+    if (!OIAlerts.type(kind === 'up' || kind === 'down' ? 'break' : 'zone')) return;
     beep();
     try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {}
     const side = zRank(r) ? (r.c >= r.p ? 'แนวต้าน' : 'แนวรับ') + (isVolLine(r) ? ' + Vol' : '') : 'Vol วันนี้';
@@ -1210,7 +1258,7 @@
   // ข่าวแดง USD: เตือนก่อนออก 10 นาที (ครั้งเดียวต่อเวลาข่าว)
   const NEWS_WARN = 10 * 60000, newsWarned = new Set();
   function checkNewsAlert() {
-    if (!alertsOn || pushOn || !news.length) return;
+    if (!alertsOn || pushOn || !news.length || !OIAlerts.type('news')) return;
     const now = Date.now();
     const due = news.filter(e => e.i === 'H' && e.ms - now <= NEWS_WARN && e.ms - now > 0 && !newsWarned.has(e.ms));
     if (!due.length) return;
@@ -1235,7 +1283,8 @@
   const pushOK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   const isStandalone = () => window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
   const keyBytes = b64 => { const s = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((b64.length + 3) % 4)); return Uint8Array.from(s, ch => ch.charCodeAt(0)); };
-  const postSub = (path, sub, off) => fetch(PUSH_API + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sub: sub.toJSON(), off: !!off }) }).then(r => r.json());
+  const pushTypes = () => { const t = {}; OIAlerts.list.filter(x => x.push).forEach(x => { t[x.id] = OIAlerts.type(x.id); }); return t; };
+  const postSub = (path, sub, off) => fetch(PUSH_API + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sub: sub.toJSON(), off: !!off, types: pushTypes() }) }).then(r => r.json());
   if (pushOK() && !EMBED) {
     navigator.serviceWorker.register('sw.js').then(async reg => {
       swReg = reg;
@@ -1271,8 +1320,30 @@
   }
 
   function paintBell() {
-    const b = $('bell'); b.textContent = alertsOn ? '🔔' : '🔕'; b.classList.toggle('on', alertsOn);
+    const b = $('bell'); b.textContent = alertsOn ? '🔔 แจ้งเตือน: เปิดอยู่ (แตะเพื่อปิด)' : '🔕 แจ้งเตือน: ปิดอยู่ (แตะเพื่อเปิด)'; b.classList.toggle('on', alertsOn);
+    $('setBtn').classList.toggle('on', alertsOn);
+    paintAlertList();
   }
+  // รายการชนิดแจ้งเตือน (อินดี้ที่เปิดอยู่จะเพิ่มเข้ามาเอง)
+  function paintAlertList() {
+    const box = $('alertList'); if (!box || $('setPanel').hidden) return;
+    const items = OIAlerts.list.filter(x => !x.active || x.active());
+    box.innerHTML = items.map(x => `<div class="row"><div class="tx">${esc(x.label)}${x.desc ? `<small>${esc(x.desc)}</small>` : ''}</div><button class="sw${OIAlerts.type(x.id) ? ' on' : ''}" data-at="${esc(x.id)}" aria-label="${esc(x.label)}" ${alertsOn ? '' : 'disabled'}></button></div>`).join('');
+    const hiddenN = OIAlerts.list.length - items.length;
+    $('alertNote').innerHTML = (alertsOn ? (pushOn ? '📲 แจ้งเตือนแบบปิดแอปเปิดอยู่: ราคาถึงโซน / เบรกเอ้าท์ / ข่าวแดง ส่งจากเซิร์ฟเวอร์ตามที่เลือก' : 'แจ้งเตือนทำงานขณะเปิดแอปอยู่') : 'เปิดแจ้งเตือนก่อน แล้วเลือกชนิดที่ต้องการ') + (hiddenN ? `<br>อินดี้ที่มีแจ้งเตือนจะเพิ่มในรายการเมื่อเปิดอินดี้นั้น (ยังปิดอยู่ ${hiddenN} รายการ)` : '');
+  }
+  OIAlerts._bind(() => alertsOn, () => paintAlertList());
+  function openSettings() { $('setPanel').hidden = false; $('setVer').textContent = 'OI Gold Pro V' + APP_VER; paintBell(); }
+  function closeSettings() { $('setPanel').hidden = true; }
+  $('setBtn').addEventListener('click', openSettings);
+  $('setClose').addEventListener('click', closeSettings);
+  $('setPanel').addEventListener('click', e => {
+    if (e.target === $('setPanel')) { closeSettings(); return; }
+    const sw = e.target.closest('[data-at]'); if (!sw || sw.disabled) return;
+    OIAlerts.set(sw.dataset.at, !OIAlerts.type(sw.dataset.at));
+    // ส่งตัวเลือกให้เซิร์ฟเวอร์ (แจ้งเตือนแบบปิดแอปจะส่งเฉพาะชนิดที่เปิด)
+    if (pushOn) { try { (swReg ? Promise.resolve(swReg) : navigator.serviceWorker.getRegistration()).then(reg => reg && reg.pushManager.getSubscription()).then(sub => { if (sub) postSub('sub', sub).catch(() => {}); }); } catch (er) {} }
+  });
 
   $('bell').addEventListener('click', () => {
     alertsOn = !alertsOn;
@@ -2124,7 +2195,7 @@
     }
   }
   $('loginForm').addEventListener('submit', e => { e.preventDefault(); tryLogin($('code').value, false); });
-  $('logout').addEventListener('click', () => { $('code').value = ''; showLogin('ออกจากระบบแล้ว'); });
+  $('logout').addEventListener('click', () => { closeSettings(); $('code').value = ''; showLogin('ออกจากระบบแล้ว'); });
 
   if (!tfSec[tf]) tf = '5m';
   // เปิดแอป: ถ้าเคยใส่รหัสผ่านไว้ ตรวจซ้ำอัตโนมัติ ไม่ต้องกรอกใหม่
@@ -2244,8 +2315,8 @@
 <script src="colorize.js?v=20017"></script>
 <script src="dash.js?v=20017"></script>
 <script src="live.js?v=20035"></script>
-<script src="intraday.js?v=20023"></script>
-<script src="bigtrade.js?v=20041"></script>
+<script src="intraday.js?v=20042"></script>
+<script src="bigtrade.js?v=20042"></script>
 <script src="quant.js?v=20031"></script>
 <script src="aitray.js?v=20032"></script>
 </body>

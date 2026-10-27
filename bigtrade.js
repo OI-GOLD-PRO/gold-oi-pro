@@ -124,7 +124,7 @@
   function live(t) {
     // ไม้ใหม่ใหญ่มาก (≥ 3 เท่าเกณฑ์) → แจ้งในแอป
     const x = trades[trades.length - 1];
-    if (x && x.t === t && x.q >= thrCache * 3 && Date.now() - lastAlert > 20000) { lastAlert = Date.now(); O.showToast && O.showToast(`🐋 ไม้ใหญ่ ${x.s > 0 ? '<b style="color:#2fe3a6">ไล่ซื้อ</b>' : '<b style="color:#ff6b82">ไล่ขาย</b>'} ${x.q.toFixed(2)} oz @ ${(x.p - offAt(barOf(x.t))).toFixed(2)}`, 6000); }
+    if (x && x.t === t && x.q >= thrCache * 3 && Date.now() - lastAlert > 20000 && (!window.OIAlerts || OIAlerts.on('whale'))) { lastAlert = Date.now(); O.showToast && O.showToast(`🐋 ไม้ใหญ่ ${x.s > 0 ? '<b style="color:#2fe3a6">ไล่ซื้อ</b>' : '<b style="color:#ff6b82">ไล่ขาย</b>'} ${x.q.toFixed(2)} oz @ ${(x.p - offAt(barOf(x.t))).toFixed(2)}`, 6000); }
     if (x && x.t === t && x.q >= thrCache && Date.now() - lastLive > 500) { lastLive = Date.now(); O.markDirty(); }
   }
   // ตัดไม้เล็ก/เก่าทิ้งเป็นระยะ ไม่ให้หน่วยความจำโต
@@ -229,5 +229,6 @@
     });
   }
   if (cfg.on) setTimeout(reload, 3500);
+  if (window.OIAlerts) OIAlerts.reg('whale', 'ไม้ใหญ่ 🐋 Big Traders', { desc: 'ไม้ไล่ซื้อ/ไล่ขายใหญ่กว่าเกณฑ์ 3 เท่า', active: () => cfg.on });
   window.OI_bigtr = { get pxOff() { return pxOff; }, offAt, get cfg() { return cfg; }, get trades() { return trades; }, get delta() { return delta; }, get src() { return src; }, thr, reload };
 })();

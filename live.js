@@ -91,6 +91,15 @@
     tick();
   }
   // OI ของสัญญาวันนี้จาก Worker (TradingView อัปเดตวันละครั้งเอง) แทน OI ในชีต
+  // OI ของ CME เป็นตัวเลข "ปิดวันเทรด" และออกหลังวันนั้นจบ → เวลาที่ TradingView อัปเดต (oi.time) มักเป็นวันถัดไป
+  // วันเทรดที่แท้จริง = วันทำการก่อนหน้าเวลาที่อัปเดต (ถ้าอัปเดตหลัง 16:00 ชิคาโก นับวันนั้นได้) และข้ามเสาร์-อาทิตย์
+  function tradeDate(t) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(t * 1000)).map(x => [x.type, x.value]));
+    const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day, 12));
+    if (+p.hour < 16) d.setUTCDate(d.getUTCDate() - 1);
+    while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1);
+    return d.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+  }
   function syncLevels() {
     const d = st.d;
     if (!d || !d.rows || !O.setLevels || !O.cfgData || !O.oi) return;
@@ -105,7 +114,7 @@
     const th = (t, o) => new Date(t * 1000).toLocaleString('th-TH', Object.assign({ timeZone: 'Asia/Bangkok' }, o));
     const exp = d.expTs ? `หมด ${th(d.expTs, { weekday: 'short', day: 'numeric', month: 'short' })} ${th(d.expTs, { hour: '2-digit', minute: '2-digit', hour12: false })}` : '';
     const oiT = fb ? fb.oiT : d.oiT;
-    let oiD = oiT ? `OI ปิด ${new Date(oiT * 1000).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/Chicago' })}` : 'OI สด';
+    let oiD = oiT ? `OI ปิด ${tradeDate(oiT)}` : 'OI สด';
     if (fb) oiD = `⚠️ ยืม OI จาก ${fb.root} (หมด ${th(fb.expTs, { weekday: 'short', day: 'numeric', month: 'short' })}) · ${oiD}`;
     O.setLevels(lv, d.root, [exp, oiD].filter(Boolean).join(' · '));
     st.lvSig = sig; st.lvOi = O.oi; st.oiSrc = 'tv';

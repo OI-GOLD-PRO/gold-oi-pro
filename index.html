@@ -53,7 +53,7 @@
   #src { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   header > * { flex: none; }
   header > .sym { flex: 0 1 auto; min-width: 0; }
-  @media (max-width: 440px) { header { flex-wrap: wrap; gap: 6px !important; row-gap: 6px; } header > .sym { flex: 1 1 calc(100% - 64px); } header > .px { margin-left: auto; } button.icon { width: 32px; height: 32px; font-size: 14px; } .siren .new { display: none; } }
+  @media (max-width: 440px) { header { flex-wrap: wrap; gap: 6px !important; row-gap: 6px; } header > .sym { flex: 1 1 calc(100% - 64px); } header > .px { margin-left: 0; margin-right: auto; text-align: left; } button.icon { width: 32px; height: 32px; font-size: 14px; } .siren .new { display: none; } }
   .sym b { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
   .symbtn { background: none; border: 0; color: inherit; padding: 0; display: flex; align-items: center; gap: 4px; font: inherit; text-align: left; }
   .symbtn i { font-style: normal; font-size: 10px; color: var(--gold); }
@@ -320,9 +320,9 @@
     <div id="symMenu" hidden></div>
     <button class="siren" id="siren" aria-label="ข่าวแดงที่กำลังจะออก"><span class="bulb">🚨</span><span class="new">new!!</span></button>
     <div class="px"><div id="price">–</div><div id="chg">กำลังโหลด</div></div>
-    <button class="icon" id="setBtn" aria-label="ตั้งค่า">⚙️</button>
     <button class="icon" id="layBtn" aria-label="เลย์เอาต์กราฟ: 1 กราฟ / บนล่าง / ซ้ายขวา">▭</button>
     <button class="icon" id="reload" aria-label="โหลดข้อมูล OI จากชีตใหม่"><span class="ri">⟳</span></button>
+    <button class="icon" id="setBtn" aria-label="ตั้งค่า">⚙️</button>
   </header>
   <div id="setPanel" hidden><div class="sp" role="dialog" aria-label="ตั้งค่า">
     <div class="hd"><b>⚙️ ตั้งค่า</b><button id="setClose" aria-label="ปิด">✕</button></div>
@@ -406,7 +406,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '2.0.42';
+  const APP_VER = '2.0.43';
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 

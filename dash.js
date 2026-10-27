@@ -160,7 +160,7 @@
   btn.className = 'icon'; btn.id = 'dashBtn'; btn.textContent = '📊';
   btn.setAttribute('aria-label', 'แดชบอร์ดวิเคราะห์ตลาด');
   const hdr = document.querySelector('header');
-  if (hdr) hdr.insertBefore(btn, $('bell'));
+  if (hdr) { const ref = $('layBtn'); ref && ref.parentNode === hdr ? hdr.insertBefore(btn, ref) : hdr.appendChild(btn); }
   if (document.documentElement.classList.contains('embed')) btn.hidden = true;
 
   const box = document.createElement('div');

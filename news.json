@@ -15,7 +15,9 @@
       "i": "H",
       "title": "Federal Funds Rate",
       "forecast": "4.00%",
-      "previous": "4.00%"
+      "previous": "4.00%",
+      "actual": "4.00%",
+      "better": null
     },
     {
       "date": "2026-10-28T14:00:00-04:00",

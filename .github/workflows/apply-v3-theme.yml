@@ -19,7 +19,7 @@ jobs:
           p=Path('index.html')
           s=p.read_text()
           tag='<link rel="stylesheet" href="v3-premium.css?v=30201">'
-          s=s.replace('v3-premium.css?v=30100','v3-premium.css?v=30201')
+          s=s.replace('v3-premium.css?v=30200','v3-premium.css?v=30201')
           while s.count(tag) > 1:
               s=s.replace(tag+'\n'+tag,tag,1)
           s=s.replace('v3-premium.css?v=30100','v3-premium.css?v=30201')

@@ -20,3 +20,40 @@ header button.icon:last-child{border-color:#c99b44}
 .legend i{height:5px;border-radius:4px}
 .legend .rt{color:#d1d9e6}
 @media(max-width:440px){header{padding-top:10px;padding-bottom:12px}.tfs{gap:4px}.tfs button{min-height:32px}.chip{padding:6px 9px}}
+
+/* V3.1 — chart-first terminal redesign: responsive UI without touching chart data */
+:root{--terminal-edge:#34445e;--terminal-soft:#0c1424}
+header{padding:8px 12px 10px;row-gap:5px;background:linear-gradient(155deg,#101b2e,#090f1c 75%);border-bottom:0}
+header::after{height:1px;opacity:.85}
+header>.px{isolation:isolate}
+.price-line{gap:10px}
+.price-logo{width:48px;height:48px;flex-basis:48px;box-shadow:0 0 0 1px #cfa34b,0 0 18px rgba(230,181,69,.12)}
+.price-stack{gap:0}
+.price-stack #price{font-weight:600;line-height:1.12;letter-spacing:-.04em}
+.price-stack #chg{line-height:1.14;letter-spacing:-.03em}
+header button.icon{border-radius:11px;border-color:#35435b;background:#172339;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+header button.icon:focus-visible,.tfs button:focus-visible{outline:2px solid #f0cb79;outline-offset:2px}
+.chips{padding:7px 12px 6px;gap:7px;background:#0b1321;scrollbar-width:none}
+.chip{border:1px solid #303e55;background:#111d30;border-radius:9px;min-height:29px;display:inline-flex;align-items:center;padding:5px 9px;box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}
+.chip.warn{background:#241d14;border-color:#886b37}
+.tfs{padding:4px 12px 8px;gap:4px;background:#0b1321;border-bottom:1px solid #35445e}
+.tfs button{min-height:33px;border-radius:8px;background:#111b2c;border:1px solid #2b3a53;box-shadow:none;letter-spacing:.005em}
+.tfs button.on{background:linear-gradient(160deg,#f5d989,#d5a94e);border-color:#ffdf8e;color:#17191e;box-shadow:0 0 0 1px rgba(235,184,79,.2),0 3px 12px rgba(215,163,66,.12)}
+.tfs button#oiBtn.has{background:rgba(224,180,76,.08)}
+#wrap{border-top:0;background:#0c1424}
+#tip{background:rgba(9,16,29,.97);border:1px solid #52617a;box-shadow:0 8px 25px #0007;border-radius:9px}
+.legend{padding:6px 12px 4px;gap:3px 10px;background:linear-gradient(180deg,#0e182a,#0a1220);border-top:1px solid #2d3c55;align-items:center}
+.legend span{white-space:nowrap}
+.legend i{width:10px;height:4px}
+.legend .rt{margin-left:auto;color:#c6d1e1}
+@media(max-width:440px){
+ header{padding:7px 12px 10px}
+ .price-logo{width:46px;height:46px;flex-basis:46px}
+ body.half .price-logo{width:38px;height:38px;flex-basis:38px}
+ .chips{padding:6px 10px}
+ .chip{padding:5px 8px}
+ .tfs{padding:4px 10px 8px;gap:3px}
+ .tfs button{min-height:31px;border-radius:7px}
+ .legend{padding:6px 10px 3px;font-size:9.5px}
+}
+@media(prefers-reduced-motion:reduce){.tfs button{transition:none}}

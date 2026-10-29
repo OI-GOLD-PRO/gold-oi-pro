@@ -80,3 +80,14 @@ header button.icon:focus-visible,.tfs button:focus-visible{outline:2px solid #f0
  .legend{column-gap:9px;row-gap:4px}
  .legend .rt{width:100%;text-align:right;margin-top:1px}
 }
+
+/* V3.2.1 — Restore V3.1 single-line footer; keep clock inside right edge */
+.legend{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;column-gap:clamp(4px,1.1vw,10px);overflow:hidden;min-width:0}
+.legend>span{flex:0 0 auto;white-space:nowrap;min-width:0}
+.legend>span.rt{flex:0 0 auto;width:auto!important;min-width:0;margin-left:auto!important;margin-top:0!important;text-align:right;white-space:nowrap}
+@media(max-width:440px){
+ .legend{padding:6px 9px 5px;column-gap:clamp(3px,1vw,7px);font-size:clamp(8px,2.35vw,10px)}
+ .legend>span{gap:1px}
+ .legend i{width:8px;height:4px;margin-right:2px}
+ .legend>span.rt{width:auto!important;margin-left:auto!important;margin-top:0!important}
+}

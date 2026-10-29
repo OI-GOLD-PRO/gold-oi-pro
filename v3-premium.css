@@ -1,0 +1,22 @@
+/* OI Gold Pro V3.0.0 — Institutional Premium. UI only. */
+:root{--bg:#080d19;--panel:#101a2b;--line:#28364c;--gold:#e5bb60;--muted:#9ca8bc;--fg:#f0f2f7}
+body{background:#080d19}
+header{background:linear-gradient(135deg,#0d1729,#101b2f 58%,#0a1120);padding-top:12px;padding-bottom:13px}
+header::after{left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#d7a846 15%,#f5d58a 44%,rgba(215,168,70,.25) 75%,transparent)}
+.price-logo{border-radius:12px;box-shadow:0 0 0 1px rgba(240,198,106,.55),0 5px 22px rgba(0,0,0,.35)}
+.price-stack #price{color:#f3ca70;text-shadow:0 0 17px rgba(222,170,60,.13)}
+header button.icon{background:linear-gradient(155deg,#1c2a41,#111b2e);border:1px solid #34445d;border-radius:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 3px 9px rgba(0,0,0,.18)}
+header button.icon:last-child{border-color:#c99b44}
+.chips{background:#0b1424;padding-top:10px;padding-bottom:10px;gap:8px}
+.chip{border-radius:10px;background:linear-gradient(180deg,#19263c,#111b2e);border-color:#344158;color:#b1bbcd;padding:7px 11px;font-size:11px}
+.chip b{color:#f1f1f5}
+.chip.warn{border-color:#b08b45}
+.tfs{background:#0b1424;padding-top:3px;padding-bottom:12px;gap:5px}
+.tfs button{border-radius:10px;background:#111c2d;border-color:#304059;min-height:34px;color:#aab6ca;box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}
+.tfs button.on{background:linear-gradient(155deg,#f3d17d,#c79a3f);color:#1a1a1b;border-color:#f3d17d;box-shadow:0 2px 11px rgba(208,160,65,.18)}
+.tfs button#oiBtn.has{border-color:#e2b957;color:#e2b957}
+#wrap{border-top:1px solid rgba(232,188,93,.38)}
+.legend{background:#0a1323;padding-top:9px;padding-bottom:7px;border-top:1px solid #31405a;color:#aab5c7}
+.legend i{height:5px;border-radius:4px}
+.legend .rt{color:#d1d9e6}
+@media(max-width:440px){header{padding-top:10px;padding-bottom:12px}.tfs{gap:4px}.tfs button{min-height:32px}.chip{padding:6px 9px}}

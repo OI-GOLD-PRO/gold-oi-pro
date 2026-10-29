@@ -180,3 +180,39 @@ body{padding-bottom:0!important}
  #main>header.v35header .v35actions{gap:1px!important}
  #main>header.v35header .v35actions button.icon{width:25px!important;flex-basis:25px!important}
 }
+
+/* V3.5.4 lock the action rail to the right edge; never let GC push it out */
+@media(max-width:600px){
+ #main>header.v35header{
+  box-sizing:border-box!important;width:100%!important;max-width:100%!important;
+  grid-template-columns:58px minmax(0,1fr) 124px!important;
+  grid-template-areas:"brand quote actions" "source source source"!important;
+  column-gap:4px!important;padding-left:5px!important;padding-right:5px!important;
+  overflow:visible!important;
+ }
+ #main>header.v35header .v35brand{min-width:0!important}
+ #main>header.v35header .v35quote{min-width:0!important;max-width:100%!important;overflow:hidden!important;gap:2px!important;padding-left:0!important}
+ #main>header.v35header .v35quote .sym{flex:0 0 auto!important}
+ #main>header.v35header .v35quote .symbtn{padding:3px!important}
+ #main>header.v35header .v35quote .symbtn b{font-size:11px!important}
+ #main>header.v35header .v35quote .price-stack{flex:1 1 0!important;min-width:0!important;overflow:hidden!important}
+ #main>header.v35header .v35quote #price{font-size:clamp(14px,3.9vw,19px)!important;letter-spacing:-.4px!important}
+ #main>header.v35header .v35quote #chg{font-size:clamp(8px,1.9vw,10px)!important}
+ #main>header.v35header .v35actions{
+  position:relative!important;grid-area:actions!important;
+  width:124px!important;min-width:124px!important;max-width:124px!important;
+  justify-self:end!important;display:flex!important;flex-wrap:nowrap!important;
+  justify-content:flex-end!important;align-items:center!important;
+  gap:2px!important;box-sizing:border-box!important;overflow:visible!important;
+ }
+ #main>header.v35header .v35actions .siren{position:relative!important;flex:0 0 24px!important;width:24px!important}
+ #main>header.v35header .v35actions button.icon{position:relative!important;flex:0 0 31px!important;width:31px!important;min-width:0!important;margin:0!important}
+}
+@media(max-width:390px){
+ #main>header.v35header{grid-template-columns:53px minmax(0,1fr) 112px!important;column-gap:3px!important}
+ #main>header.v35header .v35brand .price-logo{width:48px!important;height:48px!important}
+ #main>header.v35header .v35actions{width:112px!important;min-width:112px!important;max-width:112px!important;gap:1px!important}
+ #main>header.v35header .v35actions .siren{flex-basis:20px!important;width:20px!important}
+ #main>header.v35header .v35actions button.icon{flex-basis:29px!important;width:29px!important}
+ #main>header.v35header .v35quote #price{font-size:clamp(13px,3.7vw,16px)!important}
+}

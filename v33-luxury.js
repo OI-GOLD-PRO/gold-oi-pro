@@ -4,6 +4,30 @@
   const main=document.getElementById('main');if(!main)return;
   document.getElementById('v33nav')?.remove();
   document.getElementById('v33sheet')?.remove();
+  // V3.5: keep original interactive elements, only relocate their DOM nodes.
+  const header=main.querySelector(':scope > header');
+  if(header && !header.querySelector('.v35brand')){
+    const px=header.querySelector('.px'), logo=px?.querySelector('.price-logo'), quote=px?.querySelector('.price-stack');
+    const sym=header.querySelector('.sym'), source=header.querySelector('#src');
+    const siren=header.querySelector('#siren');
+    const brand=document.createElement('div');brand.className='v35brand';
+    const quoteRow=document.createElement('div');quoteRow.className='v35quote';
+    const actions=document.createElement('div');actions.className='v35actions';
+    const sourceRow=document.createElement('div');sourceRow.className='v35source';
+    if(logo)brand.appendChild(logo);
+    if(sym)quoteRow.appendChild(sym);
+    if(quote)quoteRow.appendChild(quote);
+    if(source)sourceRow.appendChild(source);
+    // The dashboard shortcut is injected by dash.js; preserve its click handler.
+    const icons=[...header.querySelectorAll('button.icon')].filter(b=>b.id!=='setBtn');
+    const dashboard=icons.find(b=>b.id!=='layBtn'&&b.id!=='reload')||null;
+    if(siren)actions.appendChild(siren);
+    if(dashboard)actions.appendChild(dashboard);
+    for(const id of ['layBtn','reload']){const b=header.querySelector('#'+id);if(b)actions.appendChild(b);}
+    header.append(brand,quoteRow,actions,sourceRow);
+    if(px)px.style.display='none';
+    header.classList.add('v35header');
+  }
   const sheet=document.createElement('section');sheet.id='v34oi';sheet.hidden=true;sheet.setAttribute('aria-label','OI และ Gamma');sheet.innerHTML='<div class="v34oihead"><strong>OI / Gamma</strong><button type="button" id="v34close" aria-label="ปิด">✕</button></div><p>OI ราย Strike จากข้อมูลที่แอปโหลดล่าสุด</p><div id="v34oiStatus">กำลังรอข้อมูล OI…</div><div id="v34oiChart" role="img" aria-label="กราฟแท่ง Open Interest แยก Call และ Put ตาม Strike"></div><div class="v34oiactions"><button type="button" id="v34show">แสดง OI บนกราฟ</button><button type="button" id="v34hide">ซ่อน OI</button></div><small>ข้อมูล OI ยังเป็น Overlay บนกราฟราคา ไม่ใช่กราฟแยก</small>';main.appendChild(sheet);sheet.querySelector('#v34close').addEventListener('click',()=>{sheet.hidden=true;setActive('chart');});sheet.querySelector('#v34show').addEventListener('click',()=>{const b=document.getElementById('oiBtn');if(b&&!b.classList.contains('has'))b.click();sheet.hidden=true;setActive('oi');});sheet.querySelector('#v34hide').addEventListener('click',()=>{const b=document.getElementById('oiBtn');if(b&&b.classList.contains('has'))b.click();sheet.hidden=true;setActive('chart');});
   function renderOI(data){
     const host=sheet.querySelector('#v34oiChart'), status=sheet.querySelector('#v34oiStatus');
@@ -29,7 +53,7 @@
   window.addEventListener('oi-gold-data',e=>renderOI(e.detail));
   if(window.__oiGoldLatest)renderOI(window.__oiGoldLatest);
   const nav=document.createElement('nav');nav.id='v33nav';nav.setAttribute('aria-label','เมนูหลัก');
-  const tabs=[['chart','▥','กราฟ'],['oi','◉','OI / Gamma'],['ind','ƒx','อินดิเคเตอร์'],['tools','✎','เครื่องมือ'],['settings','⚙','ตั้งค่า']];
+  const tabs=[['chart','▥','กราฟ'],['oi','◎','OI / Gamma'],['ind','ƒx','อินดิเคเตอร์'],['tools','✎','เครื่องมือ'],['settings','⚙','ตั้งค่า']];
   function setActive(k){nav.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b.dataset.page===k);b.setAttribute('aria-current',b.dataset.page===k?'page':'false');});}
   function go(k){
    if(k!=='oi')sheet.hidden=true;
@@ -39,7 +63,7 @@
    if(k==='settings'){document.getElementById('setBtn')?.click();setActive('settings');return;}
    setActive('chart');document.getElementById('indMenu')?.setAttribute('hidden','');document.getElementById('drawBar')?.setAttribute('hidden','');
   }
-  tabs.forEach(([k,glyph,label])=>{const b=document.createElement('button');b.type='button';b.dataset.page=k;const icon=document.createElement('span');icon.className='v33glyph';icon.textContent=glyph;const text=document.createElement('span');text.textContent=label;b.append(icon,text);b.addEventListener('click',e=>{e.stopPropagation();go(k);});nav.appendChild(b);});
+  tabs.forEach(([k,glyph,label])=>{const b=document.createElement('button');b.type='button';b.dataset.page=k;const icon=document.createElement('span');icon.className='v33glyph';icon.textContent=glyph;icon.classList.add('v35glyph-'+k);const text=document.createElement('span');text.textContent=label;b.append(icon,text);b.addEventListener('click',e=>{e.stopPropagation();go(k);});nav.appendChild(b);});
   main.appendChild(nav);
   setActive('chart');
  }

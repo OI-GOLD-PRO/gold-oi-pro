@@ -51,3 +51,20 @@ body.half #v33nav,body.half #v33sheet,body.embed #v33nav,body.embed #v33sheet,bo
 .legend i{width:7px!important;margin-right:1px!important}
 }
 @media(max-height:700px){#v33nav{flex-basis:49px;min-height:49px}#v33sheet{bottom:52px}#main>header .price-logo{width:46px;height:46px;flex-basis:46px}}
+
+/* V3.3.1 iPhone header hotfix: prevent orphaned injected action button */
+#main>header{display:flex!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:7px!important;row-gap:10px!important;padding:10px 12px 12px!important}
+#main>header .dot{position:static!important;flex:0 0 9px!important;align-self:center!important;margin:0!important}
+#main>header .sym{flex:1 1 calc(100% - 75px)!important;width:auto!important;padding:0!important;min-width:0!important;align-self:center!important}
+#main>header .siren{flex:0 0 auto!important;margin-left:auto!important;order:0!important}
+#main>header .px{order:1!important;flex:1 1 155px!important;min-width:155px!important;margin:0!important}
+#main>header button.icon{order:2!important;flex:0 0 35px!important;width:35px!important;height:35px!important;margin:0!important}
+#main>header #symMenu{position:absolute!important}
+#main>header .price-logo{width:48px!important;height:48px!important;flex-basis:48px!important}
+#main>header .price-line{gap:9px!important}
+#main>header .price-stack #price{font-size:clamp(22px,5.8vw,30px)!important}
+@media(max-width:440px){
+#main>header{column-gap:6px!important;row-gap:9px!important}
+#main>header .px{flex:1 1 155px!important;min-width:155px!important}
+#main>header button.icon{flex-basis:33px!important;width:33px!important;height:33px!important}
+}

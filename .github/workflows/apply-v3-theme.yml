@@ -18,7 +18,7 @@ jobs:
           from pathlib import Path
           p=Path('index.html')
           s=p.read_text()
-          tag='<link rel="stylesheet" href="v3-premium.css?v=30000">'
+          tag='<link rel="stylesheet" href="v3-premium.css?v=30100">'
           s=s.replace('v3-premium.css?v=30000','v3-premium.css?v=30100')
           if tag not in s:
               assert '</head>' in s

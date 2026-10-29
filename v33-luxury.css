@@ -1,0 +1,53 @@
+/* OI Gold Pro V3.3.0 — Luxury Institutional, chart-first responsive shell */
+:root{--bg:#060d19;--panel:#0b1728;--line:#28384e;--fg:#f2f4f7;--muted:#9ba9bd;--gold:#e8bf69}
+body{background:#060d19}
+#main{background:#081221}
+#main>header{display:grid!important;grid-template-columns:1fr auto auto auto;grid-template-areas:"status status status alert" "quote quote layout reload" "quote quote layout settings";column-gap:7px!important;row-gap:4px!important;align-items:center;padding:12px 14px 13px!important;background:radial-gradient(ellipse at 18% 0%,#1b2a40 0%,#0b1729 55%,#080f1d 100%);border-bottom:1px solid rgba(228,185,92,.5);position:relative}
+#main>header .dot{grid-area:status;justify-self:start;position:absolute;top:19px;left:14px;z-index:1}
+#main>header .sym{grid-area:status;min-width:0;padding-left:24px;display:flex;align-items:center}
+#main>header .sym b{font-size:16px;letter-spacing:.04em}
+#main>header #src{font-size:10px;opacity:.65}
+#main>header .siren{grid-area:alert;justify-self:end}
+#main>header .px{grid-area:quote;margin:0!important;min-width:0}
+#main>header .price-line{gap:13px}
+#main>header .price-logo{width:57px;height:57px;flex:0 0 57px;border-radius:14px;border:1px solid #b88e40;box-shadow:0 0 0 3px #07111d,0 0 0 4px #705a32,0 5px 20px #0007}
+#main>header .price-stack #price{font-size:clamp(23px,6vw,32px);color:#f3c96f;line-height:1.14;letter-spacing:-.035em;text-shadow:none}
+#main>header .price-stack #chg{font-size:clamp(10px,2.8vw,13px);line-height:1.25}
+#main>header #layBtn{grid-area:layout}
+#main>header #reload{grid-area:reload}
+#main>header #setBtn{grid-area:settings}
+#main>header button.icon{width:37px;height:37px;border:1px solid #3b4b64;border-radius:11px;background:linear-gradient(150deg,#1b2b42,#0d182a);box-shadow:inset 0 1px #ffffff14,0 2px 8px #0004}
+#main>header #setBtn{border-color:#b88d3b}
+#main>header::after{display:none}
+#chips{background:#0b1728!important;border-bottom:1px solid #27364a;padding:7px 12px 8px!important}
+#chips .chip{border:1px solid #34445c!important;border-radius:10px!important;background:#142239!important;color:#bdc8d7;min-height:30px}
+#chips .chip.warn{border-color:#977039!important;background:#201c19!important}
+#tfs{background:#0b1728!important;border-bottom:1px solid #a47b36!important;padding:7px 11px 10px!important}
+#tfs button{border:1px solid #35445b!important;background:#101d30!important;border-radius:9px!important;min-height:35px!important;color:#a8b6c8!important}
+#tfs button.on{color:#161b22!important;background:linear-gradient(135deg,#ffe29a,#d5a54c)!important;border-color:#ffe09a!important;box-shadow:0 0 14px #dba84533!important}
+#tfs button#oiBtn.has{color:#e8bd64!important;border-color:#b99044!important}
+#wrap{border:0!important;background:#0b1527!important;box-shadow:inset 0 1px #34465d}
+#chart{background:#0b1527!important}
+.legend{background:#0a1627!important;border-top:1px solid #3c4c61!important;min-height:30px;flex-wrap:nowrap!important;overflow:hidden;padding:6px 10px!important;column-gap:clamp(3px,1.1vw,9px)!important}
+.legend>span{white-space:nowrap;flex:0 0 auto}
+.legend>span.rt{margin-left:auto!important;width:auto!important;white-space:nowrap}
+#v33nav{display:flex;flex:0 0 57px;min-height:57px;align-items:stretch;justify-content:space-around;background:linear-gradient(180deg,#0e1b2d,#070e1a);border-top:1px solid #7c602f;box-shadow:0 -6px 22px #0004;z-index:12}
+#v33nav button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:transparent;color:#a6b2c5;border:0;font:500 10px var(--sans);padding:4px 0}
+#v33nav button .v33glyph{font:600 19px var(--sans);line-height:21px}
+#v33nav button.active{color:#f4cb74;background:linear-gradient(180deg,#e4ae3514,transparent)}
+#v33nav button:focus-visible{outline:2px solid #f1cc77;outline-offset:-2px}
+#v33sheet{position:absolute;left:10px;right:10px;bottom:61px;z-index:34;background:linear-gradient(160deg,#14253b,#0a1526);border:1px solid #b58b43;border-radius:16px;padding:16px;box-shadow:0 14px 45px #000b;color:#e8edf4}
+#v33sheet[hidden]{display:none!important}
+#v33sheet .v33title{font-size:15px;font-weight:600;color:#f2cc80;margin-bottom:12px}
+#v33sheet .v33row{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #293a51;padding:8px 0;font-size:12px}
+#v33sheet .v33row strong{color:#f2f4f7;text-align:right;overflow-wrap:anywhere}
+#v33sheet button{background:#182b42;color:#f4ce83;border:1px solid #846637;border-radius:10px;padding:9px 12px;margin-top:13px;font:600 12px var(--sans)}
+body.half #v33nav,body.half #v33sheet,body.embed #v33nav,body.embed #v33sheet,body.lay-h #v33nav,body.lay-h #v33sheet,body.lay-v #v33nav,body.lay-v #v33sheet{display:none!important}
+@media(max-width:440px){
+#main>header{padding:10px 12px 12px!important;grid-template-columns:1fr auto auto auto}
+#main>header .price-logo{width:52px;height:52px;flex-basis:52px}
+#main>header button.icon{width:35px;height:35px}
+.legend{font-size:clamp(8px,2.2vw,10px)!important}
+.legend i{width:7px!important;margin-right:1px!important}
+}
+@media(max-height:700px){#v33nav{flex-basis:49px;min-height:49px}#v33sheet{bottom:52px}#main>header .price-logo{width:46px;height:46px;flex-basis:46px}}

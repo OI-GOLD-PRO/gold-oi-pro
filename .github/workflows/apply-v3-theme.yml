@@ -19,15 +19,16 @@ jobs:
           p=Path('index.html')
           s=p.read_text()
           tag='<link rel="stylesheet" href="v3-premium.css?v=30000">'
+          s=s.replace('v3-premium.css?v=30000','v3-premium.css?v=30100')
           if tag not in s:
               assert '</head>' in s
               s=s.replace('</head>',tag+'\n</head>',1)
-          s=s.replace("const APP_VER = '2.0.49'","const APP_VER = '3.0.0'")
-          assert "const APP_VER = '3.0.0'" in s
+          s=s.replace("const APP_VER = '3.0.0'","const APP_VER = '3.1.0'")
+          assert "const APP_VER = '3.1.0'" in s
           p.write_text(s)
           p=Path('CHANGELOG.md')
           s=p.read_text()
-          entry='### V3.0.0 — 2026-10-29 — ChatGPT\n- ไฟล์: index.html, v3-premium.css\n- แก้อะไร: Institutional Premium theme แบบแยก CSS; หน้ากราฟเป็นหน้าแรกเหมือนเดิม\n- ระวัง: ปรับเฉพาะ UI ไม่เปลี่ยนตรรกะข้อมูลหรือ OI\n\n'
+          entry='### V3.1.0 — 2026-10-29 — ChatGPT\n- ไฟล์: index.html, v3-premium.css\n- แก้อะไร: Chart-first Premium redesign ปรับหัวราคา ชิปข่าว ปุ่ม Timeframe พื้นกราฟและแถบล่าง\n- ระวัง: ปรับเฉพาะ UI ไม่เปลี่ยนตรรกะข้อมูลหรือ OI\n\n'
           if entry not in s:
               s=s.replace('## รายการ\n','## รายการ\n\n'+entry,1)
           p.write_text(s)
@@ -37,4 +38,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html CHANGELOG.md
-          git diff --cached --quiet || (git commit -m "V3.0.0 Apply Premium UI stylesheet" && git push)
+          git diff --cached --quiet || (git commit -m "V3.1.0 Apply chart-first Premium UI" && git push)

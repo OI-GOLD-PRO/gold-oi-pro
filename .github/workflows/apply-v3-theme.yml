@@ -20,6 +20,8 @@ jobs:
           s=p.read_text()
           tag='<link rel="stylesheet" href="v3-premium.css?v=30100">'
           s=s.replace('v3-premium.css?v=30000','v3-premium.css?v=30100')
+          while s.count(tag) > 1:
+              s=s.replace(tag+'\n'+tag,tag,1)
           if tag not in s:
               assert '</head>' in s
               s=s.replace('</head>',tag+'\n</head>',1)

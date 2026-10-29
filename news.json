@@ -41,7 +41,9 @@
       "i": "H",
       "title": "Advance GDP q/q",
       "forecast": "3.2%",
-      "previous": "1.5%"
+      "previous": "1.5%",
+      "actual": "3.4%",
+      "better": true
     },
     {
       "date": "2026-10-29T08:30:00-04:00",
@@ -49,7 +51,9 @@
       "i": "H",
       "title": "Core PCE Price Index m/m",
       "forecast": "0.3%",
-      "previous": "0.2%"
+      "previous": "0.2%",
+      "actual": "0.3%",
+      "better": null
     },
     {
       "date": "2026-10-29T08:30:00-04:00",
@@ -65,7 +69,9 @@
       "i": "M",
       "title": "Unemployment Claims",
       "forecast": "198K",
-      "previous": "194K"
+      "previous": "194K",
+      "actual": "194K",
+      "better": true
     },
     {
       "date": "2026-10-30T08:30:00-04:00",

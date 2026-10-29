@@ -86,3 +86,16 @@ body{padding-bottom:0!important}
 #v34oi button{border:1px solid #8e7040;background:#1c3047;color:#f4d38d;border-radius:9px;padding:9px;font:600 12px sans-serif}
 #v34oi .v34oiactions{display:flex;gap:8px;margin:12px 0}
 #v34oi .v34oiactions button{flex:1}
+
+/* V3.4.3 live OI strike butterfly chart */
+#v34oi{max-height:min(76dvh,720px);overflow-y:auto;overscroll-behavior:contain}
+#v34oiStatus{font-size:11px;color:#d5c094;line-height:1.6;margin:8px 0 10px}
+#v34oiChart{display:flex;flex-direction:column;gap:5px}
+#v34oiChart .v34strike{display:grid;grid-template-columns:minmax(0,1fr) 58px minmax(0,1fr);align-items:center;gap:6px;min-height:22px;font:12px ui-monospace,SFMono-Regular,monospace}
+#v34oiChart .v34strike strong{text-align:center;color:#e7edf7;font-weight:600}
+#v34oiChart .v34side{display:flex;align-items:center;gap:5px;min-width:0}
+#v34oiChart .v34side span{color:#b5c0d2;min-width:32px;font-size:11px}
+#v34oiChart .v34side i{height:12px;border-radius:3px;min-width:1px}
+#v34oiChart .v34side.call{justify-content:flex-end}
+#v34oiChart .v34side.call i{background:#29b995}
+#v34oiChart .v34side.put i{background:#e95b76}

@@ -17,6 +17,12 @@
 
 ## รายการ
 
+### V3.1.0 — 2026-10-29 — ChatGPT
+- ไฟล์: index.html, v3-premium.css
+- แก้อะไร: Chart-first Premium redesign ปรับหัวราคา ชิปข่าว ปุ่ม Timeframe พื้นกราฟและแถบล่าง
+- ระวัง: ปรับเฉพาะ UI ไม่เปลี่ยนตรรกะข้อมูลหรือ OI
+
+
 ### V3.0.0 — 2026-10-29 — ChatGPT
 - ไฟล์: index.html, v3-premium.css
 - แก้อะไร: Institutional Premium theme แบบแยก CSS; หน้ากราฟเป็นหน้าแรกเหมือนเดิม

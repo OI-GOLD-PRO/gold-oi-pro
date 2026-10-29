@@ -20,17 +20,18 @@ jobs:
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
           assert '</head>' in s and '</body>' in s
-          css='<link rel="stylesheet" href="v33-luxury.css?v=33000">'
+          css='<link rel="stylesheet" href="v33-luxury.css?v=33001">'
           js='<script src="v33-luxury.js?v=33000"></script>'
+          s=s.replace('v33-luxury.css?v=33000','v33-luxury.css?v=33001')
           if css not in s: s=s.replace('</head>',css+'\n</head>',1)
           if js not in s: s=s.replace('</body>',js+'\n</body>',1)
-          s=s.replace("const APP_VER = '3.2.1'","const APP_VER = '3.3.0'")
-          assert "const APP_VER = '3.3.0'" in s
+          s=s.replace("const APP_VER = '3.3.0'","const APP_VER = '3.3.1'")
+          assert "const APP_VER = '3.3.1'" in s
           assert s.count(css)==1 and s.count(js)==1
           p.write_text(s,encoding='utf-8')
           p=Path('CHANGELOG.md')
           s=p.read_text(encoding='utf-8')
-          entry='### V3.3.0 — 2026-10-29 — ChatGPT\n- ไฟล์: index.html, v33-luxury.css, v33-luxury.js\n- แก้อะไร: Luxury Institutional UI layout ใหม่ หน้ากราฟเป็นหน้าแรก เพิ่มแถบเมนูด้านล่างที่ใช้งานได้จริงและแผงสรุปข้อมูลที่อ่านจากหน้าแอป\n- ระวัง: ไม่แก้ตรรกะราคา/OI/Gamma/Canvas; เมนู OI ใช้ปุ่มเดิม, หน้าข่าวแสดงเฉพาะข้อมูลที่แอปมี ไม่สร้างข้อมูลจำลอง; โหมด 2 กราฟซ่อนเมนูใหม่\n\n'
+          entry='### V3.3.1 — 2026-10-29 — ChatGPT\n- ไฟล์: index.html, v33-luxury.css, v33-luxury.js\n- แก้อะไร: แก้ header iPhone: โลโก้ ราคา และปุ่มเครื่องมือกลับมาอยู่แถวเดียวกัน ไม่ให้ปุ่มตกบรรทัด\n- ระวัง: ไม่แก้ตรรกะราคา/OI/Gamma/Canvas; เมนู OI ใช้ปุ่มเดิม, หน้าข่าวแสดงเฉพาะข้อมูลที่แอปมี ไม่สร้างข้อมูลจำลอง; โหมด 2 กราฟซ่อนเมนูใหม่\n\n'
           if '### V3.3.0' not in s: s=s.replace('## รายการ\n','## รายการ\n\n'+entry,1)
           p.write_text(s,encoding='utf-8')
           PY
@@ -39,4 +40,4 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html CHANGELOG.md
-          git diff --cached --quiet || (git commit -m "V3.3.0 Integrate Luxury UI" && git push)
+          git diff --cached --quiet || (git commit -m "V3.3.1 Fix header wrapping" && git push)

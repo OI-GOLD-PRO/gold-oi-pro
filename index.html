@@ -237,14 +237,14 @@
   /* โลโก้และราคาใช้พื้นที่ที่เหลือ โดยปุ่มเครื่องมือไม่หด */
   header > .px { flex: 1 1 0; min-width: 0; container-type: inline-size; text-align: left; }
   .price-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .price-logo { display: block; width: 32px; height: 32px; flex: 0 0 32px; object-fit: contain; border-radius: 7px; }
+  .price-logo { display: block; width: 46px; height: 46px; flex: 0 0 46px; object-fit: contain; border-radius: 7px; }
   .px .price-line #price { min-width: 0; white-space: nowrap; font-size: 18px; line-height: 1.2; }
   header > .px #chg { white-space: nowrap; font-size: 9px; }
   @supports (font-size: 1cqi) {
     .px .price-line #price { font-size: clamp(11px, calc(23cqi - 9px), 22px); }
     header > .px #chg { font-size: clamp(7px, 5.5cqi, 11px); }
   }
-  body.half .price-logo { width: 26px; height: 26px; flex-basis: 26px; }
+  body.half .price-logo { width: 38px; height: 38px; flex-basis: 38px; }
   body.half .px .price-line #price { font-size: clamp(10px, calc(23cqi - 7px), 16px); }
 </style>
 </head>
@@ -420,7 +420,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '2.0.46';
+  const APP_VER = '2.0.47';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา

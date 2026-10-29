@@ -57,3 +57,26 @@ header button.icon:focus-visible,.tfs button:focus-visible{outline:2px solid #f0
  .legend{padding:6px 10px 3px;font-size:9.5px}
 }
 @media(prefers-reduced-motion:reduce){.tfs button{transition:none}}
+
+/* V3.2.0 — Chart Clarity: compact chrome and readable information hierarchy */
+#chips{display:flex;align-items:center;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+#chips .chip{flex:0 0 auto;scroll-snap-align:start;max-width:none;white-space:nowrap;letter-spacing:0}
+#chips .chip:first-child{border-color:#475571;background:#172337}
+#chips .chip:first-child b{color:#f3d58c}
+#tfs{display:flex;align-items:center;justify-content:space-between}
+#tfs button{flex:1 1 0;min-width:0;padding-left:0;padding-right:0}
+#tfs button#oiBtn{font-style:italic;font-weight:600;letter-spacing:.03em}
+#wrap{isolation:isolate;box-shadow:inset 0 1px 0 rgba(240,202,112,.25)}
+#chart{background:#101827}
+#tip{font-variant-numeric:tabular-nums;max-width:min(90vw,340px);overflow-wrap:anywhere}
+.legend{display:flex;flex-wrap:wrap;column-gap:11px;row-gap:5px;align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:2px}
+.legend .rt{font-variant-numeric:tabular-nums;white-space:nowrap}
+@media(max-width:440px){
+ #chips{padding:6px 10px 7px;gap:6px}
+ #chips .chip{font-size:10.5px;min-height:28px}
+ #tfs{padding:4px 9px 8px;gap:3px}
+ #tfs button{font-size:11px;min-height:32px}
+ .legend{column-gap:9px;row-gap:4px}
+ .legend .rt{width:100%;text-align:right;margin-top:1px}
+}

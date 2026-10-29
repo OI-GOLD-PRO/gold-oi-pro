@@ -1,58 +1,43 @@
-name: Apply V3.3 Luxury UI
+name: Validate OI Gold Pro UI
 on:
   push:
     paths:
+      - 'index.html'
       - 'v33-luxury.css'
       - 'v33-luxury.js'
       - '.github/workflows/apply-v33-luxury.yml'
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
-  apply:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Integrate UI assets and update version
+      - name: Validate version and asset links
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('index.html')
-          s=p.read_text(encoding='utf-8')
-          assert '</head>' in s and '</body>' in s
-          css='<link rel="stylesheet" href="v33-luxury.css?v=34300">'
-          js='<script src="v33-luxury.js?v=34300"></script>'
-          s=s.replace('v33-luxury.css?v=34200','v33-luxury.css?v=34300')
-          s=s.replace('v33-luxury.js?v=34200','v33-luxury.js?v=34300')
-          if css not in s: s=s.replace('</head>',css+'\n</head>',1)
-          if js not in s: s=s.replace('</body>',js+'\n</body>',1)
-          s=s.replace("const APP_VER = '3.4.2'","const APP_VER = '3.4.3'")
-          assert "const APP_VER = '3.4.3'" in s
-          assert s.count(css)==1 and s.count(js)==1
-          # Publish real OI data to presentation layer after sheet and contract updates
-          hook="  function calcOI(d) {"
-          bridge="  function publishOIStrikes() { if (!oi) return; const payload = { rows: oi.rows.map(r => ({strike:r.strike,c:r.c,p:r.p})), contract: lastCfg && lastCfg.contract }; window.__oiGoldLatest = payload; window.dispatchEvent(new CustomEvent('oi-gold-data',{detail:payload})); }\n"
-          if bridge.strip() not in s:
-              assert hook in s
-              s=s.replace(hook,bridge+hook,1)
-          a="    afterOI(d);"
-          if "    afterOI(d);\n    publishOIStrikes();" not in s:
-              assert a in s
-              s=s.replace(a,a+"\n    publishOIStrikes();",1)
-          a="    oi = calcOI({ levels, cfg: lastCfg });"
-          if a+"\n    publishOIStrikes();" not in s:
-              assert a in s
-              s=s.replace(a,a+"\n    publishOIStrikes();",1)
-          p.write_text(s,encoding='utf-8')
-          p=Path('CHANGELOG.md')
-          s=p.read_text(encoding='utf-8')
-          entry='### V3.4.3 — 2026-10-29 — ChatGPT\n- ไฟล์: index.html, v33-luxury.css, v33-luxury.js\n- แก้อะไร: เพิ่มกราฟ OI ราย Strike แบบ Call/Put butterfly ในแผงลอย โดยอ่าน OI rows จาก engine เดิม\n- ระวัง: ไม่แก้ตรรกะราคา/OI/Gamma/Canvas; เมนู OI ใช้ปุ่มเดิม, หน้าข่าวแสดงเฉพาะข้อมูลที่แอปมี ไม่สร้างข้อมูลจำลอง; โหมด 2 กราฟซ่อนเมนูใหม่\n\n'
-          if '### V3.3.0' not in s: s=s.replace('## รายการ\n','## รายการ\n\n'+entry,1)
-          p.write_text(s,encoding='utf-8')
+          import re
+          html = Path('index.html').read_text(encoding='utf-8')
+          css = Path('v33-luxury.css').read_text(encoding='utf-8')
+          js = Path('v33-luxury.js').read_text(encoding='utf-8')
+          match = re.search(r"const APP_VER = '([0-9]+\.[0-9]+\.[0-9]+)'", html)
+          assert match, 'APP_VER missing'
+          version = match.group(1)
+          for filename in ('v33-luxury.css', 'v33-luxury.js'):
+              matches = re.findall(re.escape(filename) + r'\?v=([0-9]+)', html)
+              assert len(matches) == 1, f'{filename}: expected one reference, got {matches}'
+              assert Path(filename).is_file(), f'{filename} missing'
+          assert 'v35header' in css and 'v35header' in js, 'V3.5 header missing'
+          assert 'v34oiChart' in js, 'OI strike panel missing'
+          assert 'v33nav' in js, 'Bottom navigation missing'
+          assert version in Path('CHANGELOG.md').read_text(encoding='utf-8'), 'Version not in CHANGELOG'
+          print(f'PASS: OI Gold Pro V{version}; linked assets and UI markers verified')
           PY
-      - name: Commit UI integration
+      - name: Check JavaScript syntax
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html CHANGELOG.md
-          git diff --cached --quiet || (git commit -m "V3.4.3 OI strike butterfly" && git push)
+          node --check v33-luxury.js
+      - name: Check changes
+        run: |
+          git diff --check

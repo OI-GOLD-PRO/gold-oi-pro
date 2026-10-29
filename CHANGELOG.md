@@ -17,6 +17,12 @@
 
 ## รายการ
 
+### V3.2.0 — 2026-10-29 — ChatGPT
+- ไฟล์: index.html, v3-premium.css
+- แก้อะไร: Chart Clarity: ชิปข่าวเลื่อนอ่านครบ ปุ่ม Timeframe กระชับ แถบล่างจัดใหม่; ไม่แก้ canvas OI
+- ระวัง: ปรับเฉพาะ UI ไม่เปลี่ยนตรรกะข้อมูลหรือ OI
+
+
 ### V3.1.0 — 2026-10-29 — ChatGPT
 - ไฟล์: index.html, v3-premium.css
 - แก้อะไร: Chart-first Premium redesign ปรับหัวราคา ชิปข่าว ปุ่ม Timeframe พื้นกราฟและแถบล่าง

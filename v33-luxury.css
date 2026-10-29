@@ -162,3 +162,21 @@ body{padding-bottom:0!important}
  #main>header.v35header .v35actions .siren{width:19px!important;flex-basis:19px!important}
  #main>header.v35header .v35quote #price{font-size:clamp(16px,4.4vw,20px)!important}
 }
+
+/* V3.5.3 prevent GC symbol from overlapping the logo */
+@media(max-width:600px){
+ #main>header.v35header{grid-template-columns:clamp(58px,15.5vw,66px) minmax(0,1fr) auto!important;column-gap:5px!important}
+ #main>header.v35header .v35brand{width:100%;display:flex;align-items:center;justify-content:flex-start;overflow:visible}
+ #main>header.v35header .v35brand .price-logo{width:clamp(48px,13vw,54px)!important;height:clamp(48px,13vw,54px)!important;max-width:100%!important}
+ #main>header.v35header .v35quote{padding-left:2px!important;gap:3px!important}
+ #main>header.v35header .v35quote #price{font-size:clamp(16px,4.4vw,23px)!important}
+ #main>header.v35header .v35quote #chg{font-size:clamp(8px,2vw,10px)!important}
+}
+@media(max-width:390px){
+ #main>header.v35header{grid-template-columns:58px minmax(0,1fr) auto!important;column-gap:4px!important}
+ #main>header.v35header .v35brand .price-logo{width:49px!important;height:49px!important}
+ #main>header.v35header .v35quote .symbtn{padding:3px!important}
+ #main>header.v35header .v35quote #price{font-size:clamp(15px,4.1vw,18px)!important}
+ #main>header.v35header .v35actions{gap:1px!important}
+ #main>header.v35header .v35actions button.icon{width:25px!important;flex-basis:25px!important}
+}

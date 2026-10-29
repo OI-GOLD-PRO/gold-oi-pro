@@ -99,3 +99,39 @@ body{padding-bottom:0!important}
 #v34oiChart .v34side.call{justify-content:flex-end}
 #v34oiChart .v34side.call i{background:#29b995}
 #v34oiChart .v34side.put i{background:#e95b76}
+
+/* V3.5 premium compact quote header, based on approved visual mockup */
+#main>header.v35header{display:grid!important;grid-template-columns:54px minmax(0,1fr) auto!important;grid-template-areas:"brand quote actions" "source source source"!important;gap:5px 9px!important;align-items:center!important;padding:9px 11px 6px!important;min-height:0!important}
+#main>header.v35header>.dot{display:none!important}
+#main>header.v35header .v35brand{grid-area:brand;min-width:0}
+#main>header.v35header .v35brand .price-logo{width:52px!important;height:52px!important;display:block!important;object-fit:contain;flex:none!important}
+#main>header.v35header .v35quote{grid-area:quote;display:flex;align-items:center;gap:7px;min-width:0}
+#main>header.v35header .v35quote .sym{width:auto!important;flex:0 0 auto!important;min-width:0!important;max-width:72px;padding:0!important}
+#main>header.v35header .v35quote .symbtn{display:flex;align-items:center;gap:2px;border:1px solid #49617b;border-radius:16px;padding:5px 6px;background:#0b1829;white-space:nowrap}
+#main>header.v35header .v35quote .symbtn b{font-size:clamp(11px,3vw,14px)!important}
+#main>header.v35header .v35quote .price-stack{min-width:0}
+#main>header.v35header .v35quote #price{font-size:clamp(19px,5.2vw,29px)!important;white-space:nowrap;color:#f5c66b}
+#main>header.v35header .v35quote #chg{font-size:clamp(9px,2.45vw,12px)!important;white-space:nowrap}
+#main>header.v35header .v35actions{grid-area:actions;display:flex;align-items:center;gap:4px;min-width:0}
+#main>header.v35header .v35actions .siren{position:relative!important;inset:auto!important;margin:0!important;order:0!important;display:flex!important;align-items:center;justify-content:center;width:29px!important;height:34px!important;border-radius:10px!important;flex:0 0 29px!important}
+#main>header.v35header .v35actions .siren .bulb{font-size:17px}
+#main>header.v35header .v35actions .siren .new{display:none}
+#main>header.v35header .v35actions button.icon{order:0!important;width:32px!important;height:34px!important;flex:0 0 32px!important;font-size:17px!important;margin:0!important}
+#main>header.v35header .v35source{grid-area:source;min-width:0;overflow:hidden;padding:1px 2px 0}
+#main>header.v35header .v35source #src{display:block;font-size:10px!important;opacity:.66;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#main>header.v35header #symMenu{position:absolute!important;z-index:70}
+#v33nav button .v33glyph{font-size:23px!important;line-height:26px!important;color:#b9c4d4;text-shadow:0 1px 8px #0007}
+#v33nav button.active .v33glyph{color:#f5c766;text-shadow:0 0 9px #e6b65077}
+#v33nav button .v35glyph-oi{color:#dfb45d!important}
+#v33nav button .v35glyph-tools{color:#e4b85e!important}
+#v33nav button .v35glyph-settings{color:#c8d5e5!important}
+#v33nav button{font-size:11px!important;gap:4px!important}
+@media(max-width:390px){
+ #main>header.v35header{grid-template-columns:46px minmax(0,1fr) auto!important;gap:5px 5px!important;padding:8px 7px 5px!important}
+ #main>header.v35header .v35brand .price-logo{width:45px!important;height:45px!important}
+ #main>header.v35header .v35quote{gap:4px}
+ #main>header.v35header .v35quote .symbtn{padding:4px}
+ #main>header.v35header .v35actions{gap:2px}
+ #main>header.v35header .v35actions .siren{width:25px!important;flex-basis:25px!important}
+ #main>header.v35header .v35actions button.icon{width:27px!important;flex-basis:27px!important;height:32px!important}
+}

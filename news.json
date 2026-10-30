@@ -295,7 +295,7 @@
       "c": "USD",
       "i": "H",
       "title": "Average Hourly Earnings (MoM)",
-      "forecast": "",
+      "forecast": "0.3%",
       "previous": "0.1%",
       "src": "fxstreet"
     },
@@ -322,7 +322,7 @@
       "c": "USD",
       "i": "H",
       "title": "Nonfarm Payrolls",
-      "forecast": "",
+      "forecast": "56",
       "previous": "29",
       "src": "fxstreet"
     },
@@ -340,7 +340,7 @@
       "c": "USD",
       "i": "M",
       "title": "Unemployment Rate",
-      "forecast": "",
+      "forecast": "4.2%",
       "previous": "4.2%",
       "src": "fxstreet"
     },
@@ -358,7 +358,7 @@
       "c": "USD",
       "i": "H",
       "title": "Michigan Consumer Sentiment Index",
-      "forecast": "",
+      "forecast": "47.3",
       "previous": "48",
       "src": "fxstreet"
     },

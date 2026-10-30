@@ -79,7 +79,324 @@
       "i": "M",
       "title": "Employment Cost Index q/q",
       "forecast": "0.8%",
-      "previous": "0.9%"
+      "previous": "0.9%",
+      "actual": "0.8%",
+      "better": null
+    },
+    {
+      "date": "2026-10-30T13:45:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Chicago PMI",
+      "forecast": "56.1",
+      "previous": "58.8",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-10-30T16:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Fed's Daly speech",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-10-30T16:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Fed's Musalem speech",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-02T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Manufacturing Employment Index",
+      "forecast": "",
+      "previous": "52.7",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-02T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Manufacturing New Orders Index",
+      "forecast": "",
+      "previous": "55.3",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-02T15:00:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "ISM Manufacturing PMI",
+      "forecast": "",
+      "previous": "54.5",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-02T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Manufacturing Prices Paid",
+      "forecast": "",
+      "previous": "77.9",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-02T16:15:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Fed's Goolsbee speech",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-02T19:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Loan Officer Survey",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-03T05:00:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "US Midterm Elections",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-03T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Factory Orders (MoM)",
+      "forecast": "",
+      "previous": "0.1%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-03T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "JOLTS Job Openings",
+      "forecast": "",
+      "previous": "7.079",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-04T13:15:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "ADP Employment Change",
+      "forecast": "",
+      "previous": "90",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-04T14:45:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "S&P Global Composite PMI",
+      "forecast": "57.6",
+      "previous": "57.6",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-04T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Services Employment Index",
+      "forecast": "",
+      "previous": "50.1",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-04T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Services New Orders Index",
+      "forecast": "",
+      "previous": "59.8",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-04T15:00:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "ISM Services PMI",
+      "forecast": "",
+      "previous": "54.9",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-04T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Services Prices Paid",
+      "forecast": "",
+      "previous": "74",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-05T10:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Challenger Job Cuts",
+      "forecast": "",
+      "previous": "43.281",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-05T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Initial Jobless Claims",
+      "forecast": "",
+      "previous": "194",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-05T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Nonfarm Productivity",
+      "forecast": "",
+      "previous": "1.4%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-05T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Unit Labor Costs",
+      "forecast": "",
+      "previous": "1.2%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-05T13:50:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Fed's Hammack speech",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T09:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Fed's Williams speech",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T13:30:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "Average Hourly Earnings (MoM)",
+      "forecast": "",
+      "previous": "0.1%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T13:30:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "Average Hourly Earnings (YoY)",
+      "forecast": "",
+      "previous": "3%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Labor Force Participation Rate",
+      "forecast": "",
+      "previous": "61.8%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T13:30:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "Nonfarm Payrolls",
+      "forecast": "",
+      "previous": "29",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "U6 Underemployment Rate",
+      "forecast": "",
+      "previous": "7.6%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Unemployment Rate",
+      "forecast": "",
+      "previous": "4.2%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Michigan Consumer Expectations Index",
+      "forecast": "",
+      "previous": "48.8",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T15:00:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "Michigan Consumer Sentiment Index",
+      "forecast": "",
+      "previous": "48",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "UoM 1-year Consumer Inflation Expectations",
+      "forecast": "",
+      "previous": "4.7%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "UoM 5-year Consumer Inflation Expectation",
+      "forecast": "",
+      "previous": "3.5%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-06T17:15:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Fed's Bowman speech",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
     }
   ]
 }

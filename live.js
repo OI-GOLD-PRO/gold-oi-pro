@@ -230,13 +230,15 @@
     if (c && c.em) badges.push([`EM ±${c.em.toFixed(1)}`, '#9aa7ff']);
     if (st.err && !c) badges.push(['ข้อมูลสดไม่ได้', C('--muted')]);
     else if (c && !c.match) badges.push([`สด ${c.root} ≠ ชีต ${c.cfgC || '–'}`, C('--muted')]);
+    // ป้ายจากอินดี้อื่น (เช่น dealer.js) → [ข้อความ, สี, key สำหรับแตะ]
+    (window.OIBadgeExtra || []).forEach(f => { try { const x = f(); if (x) badges.push(x); } catch (e) {} });
     // V3.5.7: ป้ายสถานะอยู่ในแถบของตัวเองเหนือกราฟ (เดิมวาดทับกราฟ ทำให้ซ้อนกับป้ายราคา/OI มุมซ้ายบน)
     const wrap = document.getElementById('wrap');
     if (wrap) {
       let bar = document.getElementById('badges');
       if (!bar) { bar = document.createElement('div'); bar.id = 'badges'; wrap.appendChild(bar); }
       const esc = t => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-      const html = badges.map(([t, col]) => `<span style="color:${col};border-color:${col}">${esc(t)}</span>`).join('');
+      const html = badges.map(([t, col, k]) => `<span style="color:${col};border-color:${col}"${k ? ` data-k="${esc(k)}"` : ''}>${esc(t)}</span>`).join('');
       if (bar.dataset.h !== html) { bar.dataset.h = html; bar.innerHTML = html; wrap.classList.toggle('bdg', badges.length > 0); }
     }
   });

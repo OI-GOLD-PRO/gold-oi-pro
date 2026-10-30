@@ -73,7 +73,8 @@ body.half #v33nav,body.half #v33sheet,body.embed #v33nav,body.embed #v33sheet,bo
 #main>header #setBtn,#tfs #oiBtn,#tfs #indBtn,#tfs #drawBtn{display:none!important}
 #tfs button[data-tf]{flex:1 1 0!important;min-width:0!important}
 #v33nav{flex:0 0 auto!important;min-height:58px!important;margin-top:auto!important;padding-bottom:max(5px,env(safe-area-inset-bottom,0px))!important;width:100%;z-index:22}
-#main{height:100%!important;min-height:0!important}
+/* V3.5.5 (Claude): ห้ามใช้ height:100% กับ #main — iPhone แอปจากหน้าโฮมคิดความสูงสั้นกว่าจอ เกิดช่องว่างใต้เมนูล่าง ใช้ flex เติมเต็ม body (position:fixed) แทน */
+#main{height:auto!important;flex:1 1 0!important;min-height:0!important}
 #wrap{flex:1 1 auto!important;min-height:0!important}
 body{padding-bottom:0!important}
 

@@ -120,7 +120,17 @@
       : 'สัญญาณยังไม่ชัด รอให้ราคาเข้าใกล้โซนหรือมีแรงไล่ชัดขึ้น';
     O.showToast && O.showToast(`<b style="color:${col}">${t}${R.mode === 'neutral' ? '' : ' ' + R.conf + '%'}</b> · คะแนน ${f1(R.S * 100)}<br>${meaning}<br>${rows}${R.vo !== null && R.vo !== undefined ? `<br>● Vol/OI ใกล้ราคา ${R.vo.toFixed(2)} (หนา = สัญญาณชัดขึ้น)` : ''}<br><span style="opacity:.6">เป็นการอนุมานจากร่องรอย ไม่ใช่ข้อมูลพอร์ต dealer จริง</span>`, 25000);
   }
-  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('#badges [data-k="dealer"]')) explain(); });
+  // แตะได้ทั้งป้าย (ไม่ใช่แค่ไอคอน): ป้ายถูกวาดใหม่ทุกครั้งที่ % เปลี่ยน ถ้าใช้ click ปุ่มที่ถูกแทนที่ระหว่างกดจะไม่ทำงาน
+  // จึงใช้ pointerdown/pointerup ที่ระดับเอกสาร + กันกรณีเลื่อนแถบ (ขยับเกิน 10px = เลื่อน ไม่ใช่แตะ)
+  let down = null;
+  const onBadge = e => { const el = e.target && (e.target.nodeType === 1 ? e.target : e.target.parentElement); return el && el.closest ? el.closest('#badges [data-k="dealer"]') : null; };
+  document.addEventListener('pointerdown', e => { down = onBadge(e) ? { x: e.clientX, y: e.clientY } : null; }, true);
+  document.addEventListener('pointerup', e => {
+    if (!down) return;
+    const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10; down = null;
+    const r = document.querySelector('#badges [data-k="dealer"]')?.getBoundingClientRect();
+    if (!moved && r && e.clientX >= r.left - 4 && e.clientX <= r.right + 4 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6) explain();
+  }, true);
 
   function run() {
     if (!cfg.on) { if (R) { R = null; O.markDirty(); } return; }

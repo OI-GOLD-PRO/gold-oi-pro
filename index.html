@@ -452,7 +452,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '3.5.5';
+  const APP_VER = '3.5.6';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -1715,6 +1715,38 @@
     window.OISplash && OISplash.done();
   }
 
+  // V3.5.6: วาดแท่งจากข้อมูลสด/ที่ดึงมาเติม — อัปเดตเฉพาะแท่งล่าสุดหรือใหม่กว่า (snapshot บางแหล่งส่งแท่งเก่ามาด้วย)
+  function applyRows(rows) {
+    rows.sort((a, b) => a[0] - b[0]).forEach(k => {
+      if (cmeClosed(k[0])) return; // ช่วงตลาดทอง CME ปิด ไม่วาดแท่ง
+      const b = toBar(k);
+      if (lastBarTime !== null && b.time < lastBarTime) return;
+      try {
+        series.update(b); lastBarTime = b.time; rawClose = k[4]; lastClose = rawClose - adj;
+        const lastRaw = rawBars[rawBars.length - 1];
+        if (lastRaw && lastRaw[0] === k[0]) rawBars[rawBars.length - 1] = k; else if (!lastRaw || k[0] > lastRaw[0]) rawBars.push(k);
+      } catch (e) {}
+    });
+  }
+  // ดึงแท่งล่าสุดผ่าน REST มาทับ (แก้แท่งค้าง/ขาดหลังสาย websocket เงียบหรือหลุด)
+  let lastMsgAt = 0, backfilling = false;
+  async function backfill(p, t) {
+    if (backfilling || !p || p.fetchRows) return;
+    backfilling = true;
+    try {
+      const rows = (await fetchBars(p, t, 30)).filter(k => !cmeClosed(k[0]));
+      if (prov !== p || tf !== t) return;
+      applyRows(rows); showPrice(); indTick(); dirty = true;
+    } catch (e) {} finally { backfilling = false; }
+  }
+  // สุนัขเฝ้า websocket: ตลาดเปิดแต่ไม่มีแท่งใหม่เข้ามาเกิน 30 วินาที = สายค้าง → ต่อใหม่ + เติมแท่ง
+  setInterval(() => {
+    if (!ws || !prov || !prov.ws || document.visibilityState === 'hidden' || cmeClosed(Date.now())) return;
+    if (Date.now() - lastMsgAt > 30000) openWS();
+  }, 10000);
+  // กันแท่งเพี้ยนสะสม: ทุก 1 นาทีดึงแท่งล่าสุดมาทับ (เบา 30 แท่ง)
+  setInterval(() => { if (prov && prov.ws && document.visibilityState !== 'hidden' && !cmeClosed(Date.now())) backfill(prov, tf); }, 60000);
+
   function openWS() {
     clearTimeout(wsTimer); clearInterval(pingTimer); clearInterval(pollTimer);
     if (ws) { ws.onclose = null; ws.close(); }
@@ -1741,8 +1773,11 @@
       return;
     }
     ws = new WebSocket(p.ws(t));
+    lastMsgAt = Date.now();
     ws.onopen = () => {
+      lastMsgAt = Date.now();
       if (p.sub) ws.send(JSON.stringify(p.sub(t)));
+      backfill(p, t); // V3.5.6: เติมแท่งที่ขาดช่วงสายหลุด/ต่อใหม่ ให้แท่งตรงกับเวลาจริง
       if (p.ping) pingTimer = setInterval(() => { try { ws.send(p.ping); } catch (e) {} }, p.pingMs);
       $('dot').classList.add('live');
     };
@@ -1750,17 +1785,8 @@
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       const rows = p.msg(m, t);
       if (!rows) return;
-      // อัปเดตเฉพาะแท่งล่าสุดหรือใหม่กว่า (snapshot ของบางแหล่งส่งแท่งเก่ามาด้วย)
-      rows.sort((a, b) => a[0] - b[0]).forEach(k => {
-        if (cmeClosed(k[0])) return; // ช่วงตลาดทอง CME ปิด ไม่วาดแท่ง
-        const b = toBar(k);
-        if (lastBarTime !== null && b.time < lastBarTime) return;
-        try {
-          series.update(b); lastBarTime = b.time; rawClose = k[4]; lastClose = rawClose - adj;
-          const lastRaw = rawBars[rawBars.length - 1];
-          if (lastRaw && lastRaw[0] === k[0]) rawBars[rawBars.length - 1] = k; else rawBars.push(k);
-        } catch (e) {}
-      });
+      lastMsgAt = Date.now();
+      applyRows(rows);
       showPrice();
       indTick();
       checkAlerts(lastClose);

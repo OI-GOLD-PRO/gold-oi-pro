@@ -230,18 +230,14 @@
     if (c && c.em) badges.push([`EM ±${c.em.toFixed(1)}`, '#9aa7ff']);
     if (st.err && !c) badges.push(['ข้อมูลสดไม่ได้', C('--muted')]);
     else if (c && !c.match) badges.push([`สด ${c.root} ≠ ชีต ${c.cfgC || '–'}`, C('--muted')]);
-    if (badges.length) {
-      ctx.save(); ctx.font = `bold 10px ${mono}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-      let x = 6; const y = 12;
-      badges.forEach(([t, col]) => {
-        const tw = ctx.measureText(t).width + 10;
-        if (x + tw > plotW - 4) return;
-        ctx.globalAlpha = 0.82; ctx.fillStyle = C('--bg') || '#0b1020'; ctx.fillRect(x, y - 8, tw, 16);
-        ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y - 7.5, tw - 1, 15);
-        ctx.fillStyle = col; ctx.fillText(t, x + 5, y + .5);
-        x += tw + 4;
-      });
-      ctx.restore();
+    // V3.5.7: ป้ายสถานะอยู่ในแถบของตัวเองเหนือกราฟ (เดิมวาดทับกราฟ ทำให้ซ้อนกับป้ายราคา/OI มุมซ้ายบน)
+    const wrap = document.getElementById('wrap');
+    if (wrap) {
+      let bar = document.getElementById('badges');
+      if (!bar) { bar = document.createElement('div'); bar.id = 'badges'; wrap.appendChild(bar); }
+      const esc = t => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+      const html = badges.map(([t, col]) => `<span style="color:${col};border-color:${col}">${esc(t)}</span>`).join('');
+      if (bar.dataset.h !== html) { bar.dataset.h = html; bar.innerHTML = html; wrap.classList.toggle('bdg', badges.length > 0); }
     }
   });
 })();

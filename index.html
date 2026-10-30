@@ -200,6 +200,12 @@
   #chart, #ov { position: absolute; inset: 0; }
   #chart { z-index: 1; }
   #ov { pointer-events: none; z-index: 2; }
+  /* V3.5.7: แถบป้ายสถานะ (γ Flip, COT, Skew, EM) แยกเหนือกราฟ ไม่ซ้อนกับป้ายราคา/OI */
+  #badges { position: absolute; left: 0; right: 0; top: 0; height: 22px; display: none; align-items: center; gap: 4px; padding: 0 6px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--line); }
+  #badges::-webkit-scrollbar { display: none; }
+  #badges span { flex: none; font: bold 10px var(--mono); line-height: 14px; padding: 0 5px; border: 1px solid; border-radius: 3px; }
+  #wrap.bdg #badges { display: flex; }
+  #wrap.bdg #chart, #wrap.bdg #ov { top: 22px; }
   #tip { position: absolute; left: 10px; top: 8px; z-index: 3; font-size: 12px; background: rgba(18,26,48,.92); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-family: var(--mono); pointer-events: none; }
   #tip .p { color: var(--put); } #tip .c { color: var(--call); }
   #msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--muted); font-size: 13px; z-index: 4; pointer-events: none; }
@@ -452,7 +458,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '3.5.6';
+  const APP_VER = '3.5.7';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -631,12 +637,13 @@
     const x0 = w - axW + 2, bw = axW - 4, bh = 16;
     ctx.font = `11px ${C('--mono')}`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    let n = 0;
+    let n = 0; const yNow = series.priceToCoordinate(lastClose);
     for (let v = Math.ceil(bot); v <= Math.floor(top) && n < 60; v++) {
       const tail = String(((v % 100) + 100) % 100).padStart(2, '0');
       if (!GOLD_HL.includes(tail)) continue;
       const y = series.priceToCoordinate(v);
       if (y === null || y < bh / 2 || y > plotH - bh / 2) continue;
+      if (yNow !== null && Math.abs(y - yNow) < bh) continue; // V3.5.7: ไม่บังป้ายราคาปัจจุบัน
       n++;
       ctx.fillStyle = C('--bg');
       ctx.fillRect(x0, y - bh / 2, bw, bh);
@@ -2391,7 +2398,7 @@
 <script src="cotgroups.js?v=20009"></script>
 <script src="colorize.js?v=20017"></script>
 <script src="dash.js?v=20045"></script>
-<script src="live.js?v=20035"></script>
+<script src="live.js?v=30507"></script>
 <script src="intraday.js?v=20042"></script>
 <script src="bigtrade.js?v=20042"></script>
 <script src="quant.js?v=20031"></script>

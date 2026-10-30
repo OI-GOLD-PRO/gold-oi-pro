@@ -84,15 +84,6 @@
       "better": null
     },
     {
-      "date": "2026-10-30T16:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Daly speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
       "date": "2026-10-30T16:30:00+00:00",
       "c": "USD",
       "i": "M",
@@ -124,7 +115,7 @@
       "c": "USD",
       "i": "H",
       "title": "ISM Manufacturing PMI",
-      "forecast": "",
+      "forecast": "54.7",
       "previous": "54.5",
       "src": "fxstreet"
     },
@@ -133,7 +124,7 @@
       "c": "USD",
       "i": "M",
       "title": "ISM Manufacturing Prices Paid",
-      "forecast": "",
+      "forecast": "77.5",
       "previous": "77.9",
       "src": "fxstreet"
     },
@@ -169,7 +160,7 @@
       "c": "USD",
       "i": "M",
       "title": "Factory Orders (MoM)",
-      "forecast": "",
+      "forecast": "1.1%",
       "previous": "0.1%",
       "src": "fxstreet"
     },
@@ -178,7 +169,7 @@
       "c": "USD",
       "i": "M",
       "title": "JOLTS Job Openings",
-      "forecast": "",
+      "forecast": "7.1",
       "previous": "7.079",
       "src": "fxstreet"
     },
@@ -187,7 +178,7 @@
       "c": "USD",
       "i": "H",
       "title": "ADP Employment Change",
-      "forecast": "",
+      "forecast": "65",
       "previous": "90",
       "src": "fxstreet"
     },
@@ -223,7 +214,7 @@
       "c": "USD",
       "i": "H",
       "title": "ISM Services PMI",
-      "forecast": "",
+      "forecast": "54.8",
       "previous": "54.9",
       "src": "fxstreet"
     },
@@ -250,7 +241,7 @@
       "c": "USD",
       "i": "M",
       "title": "Initial Jobless Claims",
-      "forecast": "",
+      "forecast": "197",
       "previous": "194",
       "src": "fxstreet"
     },
@@ -322,7 +313,7 @@
       "c": "USD",
       "i": "H",
       "title": "Nonfarm Payrolls",
-      "forecast": "56",
+      "forecast": "65",
       "previous": "29",
       "src": "fxstreet"
     },

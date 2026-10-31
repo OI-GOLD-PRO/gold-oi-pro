@@ -489,7 +489,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.1.1';
+  const APP_VER = '4.1.2';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -528,7 +528,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     priceFormat: { type: 'price', precision: SC.dec, minMove: SC.tick },
   });
 
-  // Quarter-price background grid for gold: $0.00 / .25 / .50 / .75
+  // $25 background grid for gold, anchored on whole-dollar quarter levels: .00 / .25 / .50 / .75
   const quarterGridLines = [];
   let quarterGridTimer = 0;
   function refreshQuarterPriceGrid() {
@@ -544,9 +544,9 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       if (!visible.length) return;
       const lows = visible.map(k => k[3] - adjFor(k[0]));
       const highs = visible.map(k => k[2] - adjFor(k[0]));
-      const lo = Math.ceil(Math.min(...lows) * 4 - 1e-7) / 4;
-      const hi = Math.floor(Math.max(...highs) * 4 + 1e-7) / 4;
-      for (let p = lo, n = 0; p <= hi + 1e-7 && n < 800; p += .25, n++) {
+      const lo = Math.ceil(Math.min(...lows) / 25 - 1e-7) * 25;
+      const hi = Math.floor(Math.max(...highs) / 25 + 1e-7) * 25;
+      for (let p = lo; p <= hi + 1e-7; p += 25) {
         quarterGridLines.push(series.createPriceLine({
           price: Math.round(p * 100) / 100,
           color: 'rgba(216,177,93,.20)', lineWidth: 1, lineStyle: 0,

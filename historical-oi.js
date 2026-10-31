@@ -55,10 +55,14 @@ window.OIHistoryZonesDraw=function(ctx,w,h,chart,series,rawBars,tzShift,oscFrac)
   const width=Math.max(3,x1-x0+Math.max(2,step));
   const left=Math.max(0,x0),right=Math.min(pw,x0+width),available=right-left;if(available<4)continue;
   ctx.save();ctx.setLineDash([4,5]);ctx.strokeStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.moveTo(x0,0);ctx.lineTo(x0,ymax);ctx.stroke();ctx.setLineDash([]);ctx.font='11px sans-serif';ctx.fillStyle='#ddd';if(available>60)ctx.fillText(d.date.slice(8)+'/'+d.date.slice(5,7),left+5,ymax-24);ctx.restore();
-  for(const r of rank(d.rows,state.top)){
+  const ranked=rank(d.rows,state.top);
+  for(let ri=0;ri<ranked.length;ri++){
+   const r=ranked[ri];
+   const t=ranked.length<=1?0:ri/(ranked.length-1);
+   const rgb=[220,38,38].map((v,i)=>Math.round(v+([251,146,60][i]-v)*t));
+   const color='rgb('+rgb.join(',')+')',alpha=(.34-.20*t).toFixed(2);
    const y=series.priceToCoordinate(r.strike);if(y===null||y<10||y>ymax-6)continue;
-   const call=(r.c??0)>=(r.p??0),color=call?'#e7b64a':'#49a5df';
-   ctx.fillStyle=call?'rgba(231,182,74,.18)':'rgba(73,165,223,.18)';ctx.fillRect(Math.max(0,x0+2),y-8,Math.max(0,Math.min(pw,x0+width-2)-Math.max(0,x0+2)),16);
+   ctx.fillStyle='rgba('+rgb.join(',')+','+alpha+')';ctx.fillRect(Math.max(0,x0+2),y-8,Math.max(0,Math.min(pw,x0+width-2)-Math.max(0,x0+2)),16);
    ctx.strokeStyle=color;ctx.globalAlpha=.7;ctx.beginPath();ctx.moveTo(Math.max(0,x0),y);ctx.lineTo(Math.min(pw,x0+width),y);ctx.stroke();ctx.globalAlpha=1;
    const label=r.strike+' · P '+fmt(r.p)+' · C '+fmt(r.c);
    ctx.font='bold 11px sans-serif';const tx=left+4;

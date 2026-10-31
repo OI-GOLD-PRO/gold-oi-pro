@@ -1,3 +1,9 @@
+### V3.5.11 — 2026-10-31 — ChatGPT
+- เพิ่ม Historical OI Zones บนกราฟ (historical-oi.js): Top N ค่าเริ่มต้น 10 เรียง max(P,C) ต่อ strike, ป้าย strike/P/C, โซนแยกวัน, เลือกเปิด/ปิดและจำนวนอันดับได้
+- เพิ่ม API helper scripts/oi_history_api.gs อ่าน oi_backup snapshots (ตรวจ SHA256/parts) และ oi_recovered แบบแยกวัน พร้อมสถานะข้อมูลบางส่วน
+- index.html เชื่อม UI และ authenticated history API URL, CSS เพิ่มแผงตั้งค่า; ไม่แตะการคำนวณ OI ปัจจุบัน
+- ข้อจำกัดการปล่อยจริง: ต้องนำไฟล์ GAS helper เข้า Apps Script ที่ใช้งานจริง เพิ่ม api=oi_history ใน doGet หลังตรวจ auth เดิม และ Deploy เวอร์ชันใหม่ก่อนจึงโหลดข้อมูลย้อนหลังได้; ยังไม่ยืนยัน browser/CI
+
 ### V3.5.10 — 2026-10-31 — ChatGPT
 - ไฟล์: scripts/sync_live.gs, index.html (เลขเวอร์ชัน)
 - แก้อะไร: สำรอง /opt ทุกชั่วโมงลงแท็บ oi_backup รวม OI/Volume/IV/Delta/Gamma ราย strike, ชื่อและวันหมดอายุสัญญา, source timestamps, EM/GMF/GEX และ borrowed OI; เก็บ raw JSON แบ่งส่วนพร้อม SHA256, กันรอบซ้ำด้วย lock + snapshot id และลองใหม่เมื่อเขียนล้มเหลว

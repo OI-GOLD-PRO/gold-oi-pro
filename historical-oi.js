@@ -45,20 +45,24 @@ window.OIHistoryZonesDraw=function(ctx,w,h,chart,series,rawBars,tzShift,oscFrac)
  if(!state.on||!state.days.length||!rawBars.length)return;
  const ts=chart.timeScale(),pw=ts.width(),ph=h-ts.height(),ymax=ph*(1-(oscFrac||0));
  const fmt=v=>v===null||v===undefined?'—':Number(v).toLocaleString('en-US');
- const bars=rawBars.map((b,i)=>({i,date:new Date(b[0]+7*3600000).toISOString().slice(0,10)}));
+ const bars=rawBars.map((b,i)=>({i,date:new Date(Number(b[0])+7*3600000).toISOString().slice(0,10)}));
  for(const d of state.days){
   const matches=bars.filter(b=>b.date===d.date);if(!matches.length)continue;
-  const x0=ts.logicalToCoordinate(matches[0].i),x1=ts.logicalToCoordinate(matches[matches.length-1].i);
+  const first=matches[0].i,last=matches[matches.length-1].i;
+  const x0=ts.timeToCoordinate(Math.floor(Number(rawBars[first][0])/1000)+tzShift),x1=ts.timeToCoordinate(Math.floor(Number(rawBars[last][0])/1000)+tzShift);
   if(x0===null||x1===null||x1<0||x0>pw)continue;
-  const width=Math.max(3,x1-x0+Math.max(2,Math.abs(ts.logicalToCoordinate(matches[0].i+1)-x0)||4));
-  ctx.save();ctx.setLineDash([4,5]);ctx.strokeStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.moveTo(x0,0);ctx.lineTo(x0,ymax);ctx.stroke();ctx.setLineDash([]);ctx.font='11px sans-serif';ctx.fillStyle='#ddd';ctx.fillText(d.date.slice(8)+'/'+d.date.slice(5,7),Math.max(3,x0+5),ymax-8);ctx.restore();
+  const step=last>first?(x1-x0)/(last-first):6;
+  const width=Math.max(3,x1-x0+Math.max(2,step));
+  const left=Math.max(0,x0),right=Math.min(pw,x0+width),available=right-left;if(available<4)continue;
+  ctx.save();ctx.setLineDash([4,5]);ctx.strokeStyle='rgba(255,255,255,.25)';ctx.beginPath();ctx.moveTo(x0,0);ctx.lineTo(x0,ymax);ctx.stroke();ctx.setLineDash([]);ctx.font='11px sans-serif';ctx.fillStyle='#ddd';if(available>60)ctx.fillText(d.date.slice(8)+'/'+d.date.slice(5,7),left+5,ymax-24);ctx.restore();
   for(const r of rank(d.rows,state.top)){
    const y=series.priceToCoordinate(r.strike);if(y===null||y<10||y>ymax-6)continue;
    const call=(r.c??0)>=(r.p??0),color=call?'#e7b64a':'#49a5df';
    ctx.fillStyle=call?'rgba(231,182,74,.18)':'rgba(73,165,223,.18)';ctx.fillRect(Math.max(0,x0+2),y-8,Math.max(0,Math.min(pw,x0+width-2)-Math.max(0,x0+2)),16);
    ctx.strokeStyle=color;ctx.globalAlpha=.7;ctx.beginPath();ctx.moveTo(Math.max(0,x0),y);ctx.lineTo(Math.min(pw,x0+width),y);ctx.stroke();ctx.globalAlpha=1;
    const label=r.strike+' · P '+fmt(r.p)+' · C '+fmt(r.c);
-   ctx.font='bold 11px sans-serif';const tx=Math.max(3,Math.min(pw-ctx.measureText(label).width-3,x0+3));
+   ctx.font='bold 11px sans-serif';const tx=left+4;
+   if(ctx.measureText(label).width+8>available)continue;
    ctx.save();ctx.beginPath();ctx.rect(Math.max(0,x0),0,Math.max(0,Math.min(pw,x0+width)-Math.max(0,x0)),ymax);ctx.clip();ctx.fillStyle='#f1f3f7';ctx.fillText(label,tx,y-12);ctx.restore();
   }
  }

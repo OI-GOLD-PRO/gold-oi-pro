@@ -1,0 +1,38 @@
+# OI ราย strike ของสัญญาออปชันทองวันนี้ จากเว็บ CME (ใหม่กว่า TradingView ที่อัปเดตช้า) → cme_oi.json
+# Worker และแอปเลือกใช้ OI ชุดที่วันเทรดใหม่กว่าระหว่าง CME กับ TradingView
+name: cme-oi
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/cme-oi.yml', 'scripts/cme_oi.mjs']
+permissions:
+  contents: write
+concurrency: cme-oi
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null
+          npm i playwright@1.48.2 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+      - name: Fetch CME OI
+        run: node scripts/cme_oi.mjs cme_oi.json
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          [ -f cme_oi.json ] || { echo "no file"; exit 0; }
+          git add cme_oi.json
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "Update CME OI"
+          git pull --rebase -q || true
+          git push

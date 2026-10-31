@@ -1,3 +1,8 @@
+### V3.5.10 — 2026-10-31 — ChatGPT
+- ไฟล์: scripts/sync_live.gs, index.html (เลขเวอร์ชัน)
+- แก้อะไร: สำรอง /opt ทุกชั่วโมงลงแท็บ oi_backup รวม OI/Volume/IV/Delta/Gamma ราย strike, ชื่อและวันหมดอายุสัญญา, source timestamps, EM/GMF/GEX และ borrowed OI; เก็บ raw JSON แบ่งส่วนพร้อม SHA256, กันรอบซ้ำด้วย lock + snapshot id และลองใหม่เมื่อเขียนล้มเหลว
+- ระวัง: ผู้ใช้อนุมัติงานสำรองข้อมูล OI โดยตรง; ใช้ Apps Script loader/trigger เดิม (cache <=5 นาที); FRESH/STALE และ OI_PARTIAL ระบุคุณภาพข้อมูล; endpoint /opt คืน strikes ภายใน ±10% F; EM เป็น ATM straddle ของ Worker ไม่ใช่ IV-derived; ไม่เปลี่ยน logic สัญญา/อินดี้; ไม่ backfill ข้อมูลที่ไม่เคยบันทึก
+
 ### V3.5.9 — 2026-10-31 — Claude
 - ไฟล์: dealer.js (การแตะป้าย), index.html (CSS ป้ายแตะได้, เลขเวอร์ชัน)
 - แก้อะไร: แตะป้าย Dealer ได้ทั้งป้าย (เดิมติดเฉพาะไอคอน) — ป้ายถูกวาดใหม่เมื่อ % เปลี่ยน ทำให้ click หาย เปลี่ยนเป็น pointerdown/pointerup ตามตำแหน่งป้าย

@@ -42,10 +42,14 @@ function syncLive() {
   } catch (e) { console.warn('px: ' + e); }
 
   // 2) ออปชันสัญญาวันนี้: OI, volume, gmf (ข้ามถ้ายังไม่ถึงรอบ)
-  if (!dueVol && !dueGmf && !dueLog) return;
+  const dueBackup = P.getProperty('oi_backup_hour_v1') !== hourKey;
+  if (!dueVol && !dueGmf && !dueLog && !dueBackup) return;
   let o = null;
   try { o = get('/opt'); } catch (e) { console.warn('opt: ' + e); }
   if (!o || !o.root || !o.rows || !o.rows.length) return;
+  // Archive source rows before live-sheet updates; retry on the next trigger if write fails.
+  try { backupOIHourly_(ss, o); }
+  catch (e) { P.setProperty('oi_backup_last_error', String(e)); console.error('oi_backup: ' + e); }
   const vol = {}, levels = [];
   o.rows.forEach(r => {
     const k = r[0], t = r[1], v = r[8] || 0, oi = r[11] || 0;
@@ -115,4 +119,93 @@ function installSyncTrigger() {
 // ถ้าอยากหยุดซิงก์อัตโนมัติ
 function removeSyncTrigger() {
   ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'syncLive').forEach(t => ScriptApp.deleteTrigger(t));
+}
+
+// ===== Hourly immutable OI archive v1 (all rows returned by /opt, including nulls) =====
+// Reassemble raw_json_chunk in part order for each snapshot_id, then JSON.parse.
+// Raw /opt row schema: [strike,side,iv_decimal,delta,gamma,bid,ask,last,volume,buy,sell,oi].
+// Source endpoint currently covers strikes within +/-10% of Worker F; borrowed OI remains in oiFb.
+// Missing source values stay null/blank. EM is the Worker's ATM straddle, not IV-derived EM.
+const OI_BACKUP_HEADERS = ["snapshot_id","captured_th","hour_th","contract","expiry_ymd","expiry_th","source_updated_th","oi_asof_th","status","futures_price","oi_call","oi_put","volume_call","volume_put","atm_strike","atm_iv_pct","em","em_method","gamma_flip_itd","gamma_flip_30d","gex_itd","gex_30d","rows_count","oi_missing_rows","source","part","parts","payload_sha256","raw_json_chunk"];
+
+function oiBackupAtm_(o) {
+  const rows = o.rows || [], by = {};
+  rows.forEach(r => {
+    if (typeof r[0] !== 'number' || !isFinite(r[0])) return;
+    const q = by[r[0]] || (by[r[0]] = {});
+    q[r[1]] = r[2];
+  });
+  if (!(o.F > 0)) return { k: null, iv: null };
+  const ks = Object.keys(by).map(Number).filter(k =>
+    ['C','P'].some(t => typeof by[k][t] === 'number' && isFinite(by[k][t]) && by[k][t] > 0)
+  ).sort((a,b) => Math.abs(a-o.F)-Math.abs(b-o.F) || a-b);
+  if (!ks.length) return { k: null, iv: null };
+  const k = ks[0], vals = ['C','P'].map(t => by[k][t]).filter(v => typeof v === 'number' && isFinite(v) && v > 0);
+  return { k: k, iv: vals.reduce((a,b)=>a+b,0) / vals.length * 100 };
+}
+
+function backupOIHourly_(ss, o, clock) {
+  const now = clock || new Date();
+  const fmt = d => Utilities.formatDate(d, 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+  const stamp = sec => typeof sec === 'number' && isFinite(sec) && sec > 0 ? fmt(new Date(sec*1000)) : '';
+  const hour = Utilities.formatDate(now, 'Asia/Bangkok', 'yyyy-MM-dd HH');
+  const id = 'oi-v1|' + hour;
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return false;
+  try {
+    const p = PropertiesService.getScriptProperties();
+    if (p.getProperty('oi_backup_hour_v1') === hour) return true;
+    let sh = ss.getSheetByName('oi_backup');
+    if (!sh) {
+      sh = ss.insertSheet('oi_backup');
+      if (sh.getMaxColumns() < OI_BACKUP_HEADERS.length) sh.insertColumnsAfter(sh.getMaxColumns(), OI_BACKUP_HEADERS.length-sh.getMaxColumns());
+      sh.getRange(1,1,1,OI_BACKUP_HEADERS.length).setValues([OI_BACKUP_HEADERS]);
+      sh.setFrozenRows(1);
+      sh.getRange(1,1,1,OI_BACKUP_HEADERS.length).setFontWeight('bold').setBackground('#14283f').setFontColor('#ffffff');
+    }
+    const headers = sh.getRange(1,1,1,OI_BACKUP_HEADERS.length).getValues()[0];
+    if (headers.join('|') !== OI_BACKUP_HEADERS.join('|')) throw new Error('oi_backup header mismatch');
+    const last = sh.getLastRow();
+    // A successful write followed by a property failure must not create duplicate snapshots.
+    if (last > 1) {
+      const start = Math.max(2,last-99);
+      const tail = sh.getRange(start,1,last-start+1,OI_BACKUP_HEADERS.length).getValues();
+      const own = tail.filter(r => r[0] === id);
+      if (own.length && own.length === Number(own[0][26]) &&
+          new Set(own.map(r=>r[25])).size === own.length) {
+        p.setProperty('oi_backup_hour_v1',hour); return true;
+      }
+      if (own.length) throw new Error('incomplete existing oi_backup snapshot: '+id);
+    }
+    const rows = o.rows || [], atm = oiBackupAtm_(o);
+    const num = v => typeof v === 'number' && isFinite(v) ? v : '';
+    const total = (side,index) => {
+      const a = rows.filter(r=>r[1]===side && typeof r[index]==='number' && isFinite(r[index]));
+      return a.length ? a.reduce((s,r)=>s+r[index],0) : '';
+    };
+    const missing = rows.filter(r=>typeof r[11]!=='number' || !isFinite(r[11])).length;
+    const age = o.updated ? now.getTime()/1000-o.updated : Infinity;
+    const status = (age >= -120 && age < 900 ? 'FRESH' : 'STALE') +
+      (missing ? '|OI_PARTIAL' : '') + (o.oiFb ? '|BORROWED_OI_AVAILABLE' : '');
+    const raw = JSON.stringify({ schema: 1, captured_th:fmt(now), coverage:'Worker /opt: strikes +/-10% F; oiFb separate', payload:o });
+    const chunks = [];
+    for (let i=0;i<raw.length;i+=40000) chunks.push(raw.slice(i,i+40000));
+    const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,raw,Utilities.Charset.UTF_8)
+      .map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
+    const m = o.gmfM || {}, prefix = [
+      id,fmt(now),hour,o.root || '',o.exp || '',stamp(o.expTs),stamp(o.updated),stamp(o.oiT),
+      status,num(o.F),total('C',11),total('P',11),total('C',8),total('P',8),
+      num(atm.k),num(atm.iv),num(o.em),'Worker ATM straddle (call mid + put mid)',
+      num(o.itd),num(m.M),num(o.gexItd),num(m.gexM),rows.length,missing,'TradingView via Worker /opt'
+    ];
+    const out = chunks.map((chunk,i)=>prefix.concat([i+1,chunks.length,hash,chunk]));
+    const end = last + out.length;
+    if (end > sh.getMaxRows()) sh.insertRowsAfter(sh.getMaxRows(),Math.max(100,end-sh.getMaxRows()));
+    sh.getRange(last+1,1,out.length,OI_BACKUP_HEADERS.length).setValues(out);
+    SpreadsheetApp.flush();
+    p.setProperty('oi_backup_hour_v1',hour);
+    p.setProperty('oi_backup_last_success_th',fmt(now));
+    p.deleteProperty('oi_backup_last_error');
+    return true;
+  } finally { lock.releaseLock(); }
 }

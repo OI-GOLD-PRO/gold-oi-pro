@@ -35,9 +35,9 @@ function status(s){state.status=s;if($('oihStatus'))$('oihStatus').textContent=s
 async function load(){
  if(state.loading)return;state.loading=true;status('กำลังโหลดข้อมูลจริง…');
  try{
-  const api=window.OIHistoryZonesAPI;if(!api)throw Error('ยังไม่ได้เชื่อม API อ่าน oi_backup / oi_recovered จาก Apps Script');
+  const api=window.OIHistoryZonesAPI;if(!api)throw Error('ยังไม่ได้เปิด API อ่านข้อมูลย้อนหลังจาก Apps Script');
   const data=await api();if(!data||!Array.isArray(data.days))throw Error('รูปแบบข้อมูลไม่ถูกต้อง');
-  state.days=data.days.filter(d=>/^\\d{4}-\\d{2}-\\d{2}$/.test(d.date)&&Array.isArray(d.rows)).sort((a,b)=>a.date.localeCompare(b.date));
+  state.days=data.days.filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d.date)&&Array.isArray(d.rows)).sort((a,b)=>a.date.localeCompare(b.date));
   status('พบข้อมูล '+state.days.length+' วัน'+(data.warning?' · '+data.warning:''));window.OIHistoryZonesRedraw?.();
  }catch(e){status('โหลดไม่สำเร็จ: '+e.message);}finally{state.loading=false;}
 }

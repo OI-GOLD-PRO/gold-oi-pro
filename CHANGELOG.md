@@ -1,3 +1,8 @@
+### V3.5.13 — 2026-10-31 — ChatGPT
+- ไฟล์: scripts/oi_history_api.gs, index.html (APP_VER), Apps Script Code.gs
+- แก้อะไร: แปลงวันที่ Date ของ Google Sheets เป็น YYYY-MM-DD ตาม Asia/Bangkok เพื่อไม่ข้ามข้อมูล `oi_recovered`; คงการป้องกันด้วย checkCode_ เดิม
+- ระวัง: `oi_recovered` เป็นข้อมูลบางส่วนตามที่บันทึกไว้; ห้ามตีความ strike ที่ไม่มีแถวว่า OI = 0; deploy Apps Script และเว็บใหม่ก่อนทดสอบ
+
 ### V3.5.12 — 2026-10-31 — ChatGPT
 - ไฟล์: scripts/oi_history_api.gs, index.html (APP_VER), Apps Script Code.gs
 - แก้อะไร: ใช้ SHEET_ID ที่มีอยู่จริงในโปรเจกต์ Apps Script; ต่อ `api=oi_history` หลังตรวจ `checkCode_` เดิมเพื่ออ่าน `oi_backup` และ `oi_recovered`; เพิ่มเวอร์ชันเว็บ

@@ -39,11 +39,18 @@ function oiHistoryResponse_() {
       }catch(err){console.warn('oi_history skip snapshot',id,err);}
     });
   }
+  const dateOnly = v => {
+    if (v instanceof Date && isFinite(v.getTime())) return Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
+    const s = String(v || '').trim();
+    if (/^\\d{4}-\\d{2}-\\d{2}/.test(s)) return s.slice(0, 10);
+    const d = new Date(s);
+    return isFinite(d.getTime()) ? Utilities.formatDate(d, TZ, 'yyyy-MM-dd') : '';
+  };
   const recovered=ss.getSheetByName('oi_recovered');
   if(recovered&&recovered.getLastRow()>1){
     const rr=recovered.getRange(2,1,recovered.getLastRow()-1,10).getValues();
     rr.forEach(r=>{
-      const date=String(r[0]||'').slice(0,10);
+      const date=dateOnly(r[0]);
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||byDay[date])return;
       const strike=Number(r[4]),oi=Number(r[5]),side=String(r[6]||'').toUpperCase();
       if(!isFinite(strike)||!isFinite(oi)||!['P','C'].includes(side))return;

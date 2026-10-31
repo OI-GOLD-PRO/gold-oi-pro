@@ -39,10 +39,11 @@ function oiHistoryResponse_() {
       }catch(err){console.warn('oi_history skip snapshot',id,err);}
     });
   }
+  const backupDates = new Set(Object.keys(byDay));
   const dateOnly = v => {
     if (v instanceof Date && isFinite(v.getTime())) return Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
     const s = String(v || '').trim();
-    if (/^\\d{4}-\\d{2}-\\d{2}/.test(s)) return s.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
     const d = new Date(s);
     return isFinite(d.getTime()) ? Utilities.formatDate(d, TZ, 'yyyy-MM-dd') : '';
   };
@@ -51,7 +52,7 @@ function oiHistoryResponse_() {
     const rr=recovered.getRange(2,1,recovered.getLastRow()-1,10).getValues();
     rr.forEach(r=>{
       const date=dateOnly(r[0]);
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||byDay[date])return;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||backupDates.has(date))return;
       const strike=Number(r[4]),oi=Number(r[5]),side=String(r[6]||'').toUpperCase();
       if(!isFinite(strike)||!isFinite(oi)||!['P','C'].includes(side))return;
       const item=byDay[date]||(byDay[date]={date:date,contract:String(r[3]||''),captured_th:String(r[1]||''),

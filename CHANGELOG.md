@@ -1,3 +1,8 @@
+### V3.5.16 — 2026-10-31 — ChatGPT
+- scripts/oi_history_api.gs: แก้ recovered ถูกข้ามหลังแถวแรกของแต่ละวัน โดยแยกชุดวันที่ backup ออกจากวันที่กำลังสะสม recovered
+- index.html: แก้ APP_VER เป็น 3.5.16 จริง และเปลี่ยน cache key สคริปต์
+- ต้อง deploy Apps Script helper ใหม่จึงได้ข้อมูลหลาย strike ครบ
+
 ### V3.5.15 — 2026-10-31 — ChatGPT
 - historical-oi.js, index.html: จับพิกัดตามเวลาแท่งจริงแทน index ของ rawBars; แปลง timestamp เป็น Number; ไม่วาดป้ายที่กว้างเกินช่องวัน; ลดวันที่ซ้อนแกนเวลา
 - ระวัง: ซูมออกมากจะซ่อนป้ายที่ใส่ไม่พอ แต่คงแถบโซนไว้

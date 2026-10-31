@@ -459,7 +459,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '3.5.10';
+  const APP_VER = '3.5.11';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -624,6 +624,8 @@
   const ov = $('ov'), ctx = ov.getContext('2d');
   let dirty = true, lastKey = '';
   const overlayHooks = []; // ส่วนเสริม (เช่น goldscalp.js) วาดทับกราฟได้
+  window.OIHistoryZonesRedraw = () => { dirty = true; };
+  overlayHooks.push((c,w,h) => { if (window.OIHistoryZonesDraw) window.OIHistoryZonesDraw(c,w,h,chart,series,rawBars,TZ_SHIFT,oscFrac); });
 
   // ---------- กรอบเหลืองคลอบเลขราคาบนแกนขวา (เฉพาะกราฟทอง) ----------
   // ไฮไลต์ราคาเต็มที่ลงท้ายด้วย 00, 25, 50, 75 โดยวาดทับป้ายแกนของ lightweight-charts
@@ -2406,5 +2408,6 @@
 <script src="quant.js?v=20031"></script>
 <script src="aitray.js?v=20032"></script>
 <script src="v33-luxury.js?v=35000"></script>
+<script src="historical-oi.js?v=100"></script>
 </body>
 </html>

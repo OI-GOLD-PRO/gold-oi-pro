@@ -283,6 +283,35 @@
     .tfs { padding-left: 12px; padding-right: 12px; }
     .legend { padding-left: 12px; padding-right: 12px; }
   }
+
+/* V4.0.0 — compact premium terminal; retain existing chart, OI and volume overlays */
+:root{--bg:#07111f;--panel:#0d1a2b;--line:#21334a;--fg:#e8edf5;--muted:#9aa9bd;--gold:#d8b15d;--put:#ef6470;--call:#2fbf9f}
+header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-gradient(180deg,#0b1728,#081321);border-bottom:1px solid rgba(216,177,93,.28)}
+.price-logo{width:36px;height:36px;flex-basis:36px;border-radius:9px}
+.px #price{font-size:21px;letter-spacing:-.03em}
+.chips{padding:5px 10px 7px;gap:7px}
+.chip{border-radius:10px;background:linear-gradient(180deg,#101f32,#0c1828);border-color:#253850;padding:5px 9px}
+.tfs{gap:6px;padding:4px 10px 8px}
+.tfs button{min-height:34px;border-radius:10px;background:#0d1a2b;border-color:#293d55;font-size:11px;transition:background .15s,border-color .15s}
+.tfs button.on{background:linear-gradient(135deg,#f4d991,#c99d45);border-color:#f0d58d;color:#17130b;box-shadow:0 3px 12px #d8b15d30}
+#wrap{border-top-color:#24354b;background:#07111f}
+.legend{padding:6px 10px;background:#0a1625;border-top-color:#23354b}
+@media(max-width:440px){
+ header{min-height:48px;padding:4px 8px 4px;gap:6px!important;flex-wrap:nowrap!important}
+ header>.sym{flex:0 1 auto!important;min-width:0}
+ .price-logo{width:30px;height:30px;flex-basis:30px}
+ .sym b{font-size:13px}
+ header>.px{margin:0 0 0 auto!important;text-align:right!important;min-width:0}
+ .px #price{font-size:19px}
+ header>.px #chg{font-size:9px}
+ button.icon{width:30px;height:30px;font-size:13px}
+ .siren{margin:0 2px}
+ .chips{padding:4px 8px 6px;gap:6px}
+ .chip{font-size:10px;padding:4px 7px}
+ .tfs{padding:3px 8px 7px;gap:5px}
+ .tfs button{min-width:34px;min-height:32px;font-size:10px;border-radius:9px}
+ .legend{font-size:10px;gap:3px 8px;padding:5px 8px}
+}
 </style>
 <link rel="stylesheet" href="v3-premium.css?v=30201">
 <link rel="stylesheet" href="v33-luxury.css?v=35600">
@@ -459,7 +488,7 @@
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '3.6.1';
+  const APP_VER = '4.0.0';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา

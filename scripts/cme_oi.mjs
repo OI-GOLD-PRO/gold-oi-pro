@@ -13,9 +13,10 @@ const PAGE = 'https://www.cmegroup.com/markets/metals/precious/gold.volume.optio
 const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const DAYG = { 1: 'Weekly Monday Option', 2: 'Weekly Tuesday Option', 3: 'Weekly Wednesday Option', 4: 'Weekly Thursday Option', 5: 'Weekly Friday Option' };
 
-const opt = await (await fetch(W + '?t=' + Date.now())).json();
+let opt = {}, optTxt = '';
+try { const r = await fetch(W + '?t=' + Date.now(), { headers: { 'user-agent': 'Mozilla/5.0 oi-gold-pro-actions' } }); optTxt = await r.text(); opt = JSON.parse(optTxt); } catch (e) { optTxt = 'ERR ' + e.message + ' ' + optTxt.slice(0, 200); }
 const root = opt.root, exp = +opt.exp;
-if (!root || !exp) { console.log('no contract from worker'); process.exit(0); }
+if (!root || !exp) { console.log('no contract from worker', optTxt.slice(0, 300)); status({ ok: false, step: 'worker', body: optTxt.slice(0, 300) }); process.exit(0); }
 const y = Math.floor(exp / 10000), m = Math.floor(exp / 100) % 100, d = exp % 100;
 const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 const monthly = root === 'OG';

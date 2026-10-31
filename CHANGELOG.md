@@ -1,3 +1,8 @@
+### V3.6.0 — 2026-11-01 — Claude
+- ไฟล์: scripts/cme_oi.mjs (ใหม่), .github/workflows/cme-oi.yml (ใหม่), cme_oi.json / cme_oi_status.json (ไฟล์ข้อมูลอัตโนมัติ), live.js (ชิปบอกแหล่ง OI), index.html (เลขเวอร์ชัน) · Worker ใน repo gold-oi-trade (applyCmeOI)
+- แก้อะไร: ดึง OI ราย strike ของสัญญาวันนี้จากเว็บ CME ทุกชั่วโมง (GitHub Actions เปิด Chrome จริงใต้ xvfb เพราะ CME กันบอต) → cme_oi.json · Worker ใช้ OI ของ CME เมื่อวันเทรดใหม่กว่า TradingView (TradingView อัปเดต OI ช้า เช่น เสาร์-อาทิตย์ยังเป็นของพฤหัส) · ชิปสัญญาขึ้น "OI CME ปิด …" เมื่อใช้ของ CME
+- ระวัง: ถ้า CME บล็อก ดูเหตุผลใน cme_oi_status.json (ok:false) ระบบจะกลับไปใช้ TradingView เอง · ห้ามลบ cme_oi.json / ห้ามเปลี่ยนชื่อ (Worker อ่านจาก raw.githubusercontent)
+
 ### V3.5.16 — 2026-10-31 — ChatGPT
 - scripts/oi_history_api.gs: แก้ recovered ถูกข้ามหลังแถวแรกของแต่ละวัน โดยแยกชุดวันที่ backup ออกจากวันที่กำลังสะสม recovered
 - index.html: แก้ APP_VER เป็น 3.5.16 จริง และเปลี่ยน cache key สคริปต์

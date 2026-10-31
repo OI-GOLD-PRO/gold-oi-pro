@@ -217,3 +217,14 @@ body{padding-bottom:0!important}
  #main>header.v35header .v35actions button.icon{flex-basis:29px!important;width:29px!important}
  #main>header.v35header .v35quote #price{font-size:clamp(13px,3.7vw,16px)!important}
 }
+
+/* Historical OI Zones controls — mobile-safe, independent of the header */
+#oihToggle{font:600 10px var(--sans,sans-serif);padding:3px 7px;border:1px solid #ad8741;border-radius:7px;color:#e8bc62;background:#172132;white-space:nowrap}
+#oiHistPanel{position:absolute;top:8px;left:8px;z-index:40;width:min(300px,calc(100% - 16px));box-sizing:border-box;padding:12px;display:flex;flex-direction:column;gap:10px;border:1px solid #a98846;border-radius:12px;background:#121b2c;color:#f4e9d2;box-shadow:0 10px 35px #000b;font:12px var(--sans,sans-serif)}
+#oiHistPanel[hidden]{display:none!important}
+#oiHistPanel .oih-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#oiHistPanel label{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#oiHistPanel input[type=number]{width:55px;padding:5px;border-radius:6px;background:#090f19;color:white;border:1px solid #576177}
+#oiHistPanel button{border:1px solid #6d7890;border-radius:7px;padding:6px;background:#24354d;color:#fff}
+#oiHistPanel small{color:#aebbd0;line-height:1.45}
+#oihStatus{font-size:11px;color:#e6bd68;overflow-wrap:anywhere}

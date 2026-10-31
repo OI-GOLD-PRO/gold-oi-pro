@@ -34,16 +34,7 @@ for (let i = 0; dates.length < 5 && i < 10; i++) {
   dates.push(`${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}`);
 }
 
-const browser = await chromium.launch({ channel: process.env.PW_CHANNEL || undefined, headless: true, args: ['--disable-blink-features=AutomationControlled'] });
-const ctx = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', locale: 'en-US', viewport: { width: 1366, height: 900 } });
-const page = await ctx.newPage();
-let result = null, err = null;
-try {
-  const resp = await page.goto(PAGE, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  console.log('page status', resp && resp.status());
-  globalThis.__pageStatus = resp && resp.status(); globalThis.__title = await page.title().catch(() => '');
-  await page.waitForTimeout(6000);
-  result = await page.evaluate(async ({ dates, wantGroup, wantLabel }) => {
+const FETCHER = async ({ dates, wantGroup, wantLabel }) => {
     const j = async u => { const r = await fetch(u + (u.includes('?') ? '&' : '?') + 'isProtected&_t=' + Date.now()); if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + u); return r.json(); };
     const n = s => +String(s).replace(/,/g, '') || 0;
     const log = [];
@@ -64,9 +55,35 @@ try {
       return { tradeDate: td, productId: e.productId, expirationCode: e.expirationCode, totals, rows, log };
     }
     return { error: 'not found', log };
-  }, { dates, wantGroup, wantLabel });
-} catch (e) { err = e.message; }
-await browser.close();
+};
+
+// CME มีระบบกันบอต (Akamai) → ลองหลายแบบจนกว่าจะผ่าน (headful ต้องรันใต้ xvfb)
+const STRATS = [
+  { name: 'chrome-headful', channel: 'chrome', headless: false, args: [] },
+  { name: 'chrome-headful-nohttp2', channel: 'chrome', headless: false, args: ['--disable-http2'] },
+  { name: 'chrome-headless', channel: 'chrome', headless: true, args: [] },
+  { name: 'chromium-nohttp2', channel: undefined, headless: true, args: ['--disable-http2'] },
+];
+let result = null, err = null; const tries = [];
+for (const st of STRATS) {
+  if (st.headless === false && !process.env.DISPLAY) { tries.push(st.name + ': no display'); continue; }
+  let browser;
+  try {
+    browser = await chromium.launch({ channel: st.channel, headless: st.headless, args: ['--disable-blink-features=AutomationControlled', ...st.args] });
+    const ctx = await browser.newContext({ locale: 'en-US', viewport: { width: 1366, height: 900 } });
+    await ctx.addInitScript(() => { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); });
+    const page = await ctx.newPage();
+    const resp = await page.goto(PAGE, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    globalThis.__pageStatus = resp && resp.status(); globalThis.__title = await page.title().catch(() => '');
+    await page.waitForTimeout(6000);
+    result = await page.evaluate(FETCHER, { dates, wantGroup, wantLabel });
+    tries.push(st.name + ': ' + (result && !result.error ? 'ok' : 'page ' + globalThis.__pageStatus + ' ' + JSON.stringify(result).slice(0, 200)));
+  } catch (e) { tries.push(st.name + ': ' + e.message.split('\n')[0]); result = null; }
+  try { if (browser) await browser.close(); } catch (e) {}
+  if (result && !result.error) break;
+}
+err = tries.join(' | ');
+console.log(err);
 
 if (!result || result.error) { console.log('FAILED', err || JSON.stringify(result)); status({ ok: false, root, exp, want: wantGroup + ' / ' + wantLabel, page: globalThis.__pageStatus, title: globalThis.__title, err, result }); process.exit(0); }
 const out = { root, exp, tradeDate: result.tradeDate, productId: result.productId, expirationCode: result.expirationCode, group: wantGroup, label: wantLabel, fetchedAt: Math.floor(Date.now() / 1000), totals: result.totals, rows: result.rows.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1])) };

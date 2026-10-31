@@ -25,7 +25,7 @@ jobs:
           npm i playwright@1.48.2 >/dev/null
           npx playwright install --with-deps chromium >/dev/null
       - name: Fetch CME OI
-        run: node scripts/cme_oi.mjs cme_oi.json
+        run: xvfb-run -a node scripts/cme_oi.mjs cme_oi.json
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"

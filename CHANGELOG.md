@@ -1,3 +1,8 @@
+### V3.5.14 — 2026-10-31 — ChatGPT
+- ไฟล์: historical-oi.js, index.html
+- ย้าย Historical OI Zones เข้าเมนูอินดิเคเตอร์; แถบทอง/ฟ้ารายวัน ป้าย Strike · P · C และเส้นแบ่งวัน; ปุ่มดูหลายวัน H1 เพื่อดูวันที่อยู่นอกช่วง M5
+- ระวัง: แสดงเฉพาะวันที่มีข้อมูลและแท่งกราฟ; ข้อมูล recovered บางส่วน; ต้องตรวจกราฟจริงหลัง deploy
+
 ### V3.5.13 — 2026-10-31 — ChatGPT
 - ไฟล์: scripts/oi_history_api.gs, index.html (APP_VER), Apps Script Code.gs
 - แก้อะไร: แปลงวันที่ Date ของ Google Sheets เป็น YYYY-MM-DD ตาม Asia/Bangkok เพื่อไม่ข้ามข้อมูล `oi_recovered`; คงการป้องกันด้วย checkCode_ เดิม

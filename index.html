@@ -635,6 +635,7 @@
   let dirty = true, lastKey = '';
   const overlayHooks = []; // ส่วนเสริม (เช่น goldscalp.js) วาดทับกราฟได้
   window.OIHistoryZonesRedraw = () => { dirty = true; };
+  window.OIHistoryZonesWide=()=>{ document.querySelector('.tfs button[data-tf="1H"]')?.click(); const b=[...document.querySelectorAll('.tfs button')].find(b=>b.textContent.trim()==='H1');b?.click();setTimeout(()=>{chart.timeScale().fitContent();dirty=true;},2500); };
   overlayHooks.push((c,w,h) => { if (window.OIHistoryZonesDraw) window.OIHistoryZonesDraw(c,w,h,chart,series,rawBars,TZ_SHIFT,oscFrac); });
 
   // ---------- กรอบเหลืองคลอบเลขราคาบนแกนขวา (เฉพาะกราฟทอง) ----------
@@ -1960,11 +1961,12 @@
       const c = cfgOf(d), lab = d.type === 'stoch' ? PLABEL_STOCH : PLABEL;
       const ins = Object.keys(d.p).map(k => `<label>${lab[k] || k}<input type="number" inputmode="decimal" step="any" data-id="${d.id}" data-k="${k}" value="${c.p[k]}"></label>`).join('');
       return `<div class="row"><button data-ind="${d.id}" class="${c.on ? 'on' : ''}"><i style="background:${d.col}"></i>${d.name}</button><span class="ps">${ins}</span></div>`;
-    }).join('') + '<button class="reset" data-reset="1">คืนค่าเริ่มต้นทั้งหมด</button>';
+    }).join('') + '<div class="row"><button data-oih="1">Historical OI Zones</button></div><button class="reset" data-reset="1">คืนค่าเริ่มต้นทั้งหมด</button>';
   }
   $('indBtn').addEventListener('click', e => { e.stopPropagation(); const m = $('indMenu'); m.hidden = !m.hidden; $('drawBar').hidden = true; if (!m.hidden) paintIndMenu(); });
   $('indMenu').addEventListener('click', e => {
     e.stopPropagation();
+    if(e.target.closest('[data-oih]')){ $('indMenu').hidden=true;window.OIHistoryZonesOpen?.();return; }
     if (e.target.closest('[data-reset]')) { indCfg = {}; saveInd(); paintIndMenu(); rebuildSeries(); return; }
     const b = e.target.closest('button[data-ind]'); if (!b) return;
     const c = indCfg[b.dataset.ind] = indCfg[b.dataset.ind] || {};

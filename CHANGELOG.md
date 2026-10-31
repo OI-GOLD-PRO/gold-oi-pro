@@ -1,3 +1,8 @@
+### V3.6.1 — 2026-11-01 — Claude
+- ไฟล์: live.js (contractName ในชิปสัญญา), index.html (เลขเวอร์ชัน)
+- แก้อะไร: ชิปสัญญาแสดงชื่อเต็มของสัญญาวันนั้น เช่น "Gold Weekly Monday Options สัปดาห์ 1 พ.ย. 2026 (G1MX6)" / รายเดือน "Gold Monthly Options DEC 2026 (OGZ6)"
+- ระวัง: ค่า contract ที่ส่งให้ setLevels ยังเป็น root (G1M) เพราะใช้จับคู่กับข้อมูลสด — ชื่อเต็มอยู่ในส่วน note
+
 ### V3.6.0 — 2026-11-01 — Claude
 - ไฟล์: scripts/cme_oi.mjs (ใหม่), .github/workflows/cme-oi.yml (ใหม่), cme_oi.json / cme_oi_status.json (ไฟล์ข้อมูลอัตโนมัติ), live.js (ชิปบอกแหล่ง OI), index.html (เลขเวอร์ชัน) · Worker ใน repo gold-oi-trade (applyCmeOI)
 - แก้อะไร: ดึง OI ราย strike ของสัญญาวันนี้จากเว็บ CME ทุกชั่วโมง (GitHub Actions เปิด Chrome จริงใต้ xvfb เพราะ CME กันบอต) → cme_oi.json · Worker ใช้ OI ของ CME เมื่อวันเทรดใหม่กว่า TradingView (TradingView อัปเดต OI ช้า เช่น เสาร์-อาทิตย์ยังเป็นของพฤหัส) · ชิปสัญญาขึ้น "OI CME ปิด …" เมื่อใช้ของ CME

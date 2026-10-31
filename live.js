@@ -100,6 +100,16 @@
     while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1);
     return d.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
   }
+  // ชื่อเต็มของสัญญา: OG = รายเดือน (อ้างอิงฟิวเจอร์สเดือนถัดไป) · อื่น ๆ = รายสัปดาห์ตามวันหมดอายุ "สัปดาห์ที่ N" ของเดือน · พร้อมรหัสเต็ม เช่น G1MX6
+  function contractName(root, exp) {
+    if (!root || !exp) return '';
+    const y = Math.floor(exp / 10000), m = Math.floor(exp / 100) % 100, dd = exp % 100;
+    const MC = 'FGHJKMNQUVXZ', TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    const DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    if (root === 'OG') { const nm = m % 12 + 1, ny = m === 12 ? y + 1 : y; return `Gold Monthly Options ${['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][nm - 1]} ${ny} (OG${MC[nm - 1]}${ny % 10})`; }
+    const wd = new Date(Date.UTC(y, m - 1, dd)).getUTCDay();
+    return `Gold Weekly ${DAY[wd]} Options สัปดาห์ ${Math.ceil(dd / 7)} ${TH[m - 1]} ${y} (${root}${MC[m - 1]}${y % 10})`;
+  }
   function syncLevels() {
     const d = st.d;
     if (!d || !d.rows || !O.setLevels || !O.cfgData || !O.oi) return;
@@ -116,7 +126,7 @@
     const oiT = fb ? fb.oiT : d.oiT;
     let oiD = oiT ? `OI${d.oiSrc === 'cme' && !fb ? ' CME' : ''} ปิด ${tradeDate(oiT)}` : 'OI สด';
     if (fb) oiD = `⚠️ ยืม OI จาก ${fb.root} (หมด ${th(fb.expTs, { weekday: 'short', day: 'numeric', month: 'short' })}) · ${oiD}`;
-    O.setLevels(lv, d.root, [exp, oiD].filter(Boolean).join(' · '));
+    O.setLevels(lv, d.root, [contractName(d.root, d.exp), exp, oiD].filter(Boolean).join(' · '));
     st.lvSig = sig; st.lvOi = O.oi; st.oiSrc = 'tv';
   }
   function tick() {

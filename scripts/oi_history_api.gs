@@ -3,7 +3,7 @@
 // IMPORTANT: enforce the same auth code/expiry checks as api=data BEFORE calling this helper.
 // Deploy Apps Script web app again after adding the route.
 function oiHistoryResponse_() {
-  const ss = SpreadsheetApp.openById(SYNC_SHEET_ID);
+  const ss = SpreadsheetApp.openById(SHEET_ID);
   const byDay = {};
   const backup = ss.getSheetByName('oi_backup');
   if (backup && backup.getLastRow() > 1) {

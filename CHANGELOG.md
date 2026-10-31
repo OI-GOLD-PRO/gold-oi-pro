@@ -1,3 +1,8 @@
+### V3.5.12 — 2026-10-31 — ChatGPT
+- ไฟล์: scripts/oi_history_api.gs, index.html (APP_VER), Apps Script Code.gs
+- แก้อะไร: ใช้ SHEET_ID ที่มีอยู่จริงในโปรเจกต์ Apps Script; ต่อ `api=oi_history` หลังตรวจ `checkCode_` เดิมเพื่ออ่าน `oi_backup` และ `oi_recovered`; เพิ่มเวอร์ชันเว็บ
+- ระวัง: endpoint ยังต้องใช้รหัสผ่านที่ไม่หมดอายุเหมือน `api=data`; ไม่เปลี่ยนสิทธิ์ชีตหรือเผยข้อมูลสำรองสาธารณะ; Apps Script ต้อง deploy เวอร์ชันใหม่
+
 ### V3.5.11 — 2026-10-31 — ChatGPT
 - เพิ่ม Historical OI Zones บนกราฟ (historical-oi.js): Top N ค่าเริ่มต้น 10 เรียง max(P,C) ต่อ strike, ป้าย strike/P/C, โซนแยกวัน, เลือกเปิด/ปิดและจำนวนอันดับได้
 - เพิ่ม API helper scripts/oi_history_api.gs อ่าน oi_backup snapshots (ตรวจ SHA256/parts) และ oi_recovered แบบแยกวัน พร้อมสถานะข้อมูลบางส่วน

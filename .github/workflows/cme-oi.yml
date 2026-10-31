@@ -30,8 +30,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          [ -f cme_oi.json ] || { echo "no file"; exit 0; }
-          git add cme_oi.json
+          git add cme_oi.json cme_oi_status.json 2>/dev/null || true
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -m "Update CME OI"
           git pull --rebase -q || true

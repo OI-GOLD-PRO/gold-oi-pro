@@ -6,6 +6,8 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 
 const OUT = process.argv[2] || 'cme_oi.json';
+const STATUS = 'cme_oi_status.json';
+const status = (o) => fs.writeFileSync(STATUS, JSON.stringify(Object.assign({ at: new Date().toISOString() }, o)));
 const W = 'https://gc-yahoo.oigoldpro.workers.dev/opt';
 const PAGE = 'https://www.cmegroup.com/markets/metals/precious/gold.volume.options.html';
 const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -38,6 +40,7 @@ let result = null, err = null;
 try {
   const resp = await page.goto(PAGE, { waitUntil: 'domcontentloaded', timeout: 60000 });
   console.log('page status', resp && resp.status());
+  globalThis.__pageStatus = resp && resp.status(); globalThis.__title = await page.title().catch(() => '');
   await page.waitForTimeout(6000);
   result = await page.evaluate(async ({ dates, wantGroup, wantLabel }) => {
     const j = async u => { const r = await fetch(u + (u.includes('?') ? '&' : '?') + 'isProtected&_t=' + Date.now()); if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + u); return r.json(); };
@@ -64,9 +67,10 @@ try {
 } catch (e) { err = e.message; }
 await browser.close();
 
-if (!result || result.error) { console.log('FAILED', err || JSON.stringify(result)); process.exit(0); }
+if (!result || result.error) { console.log('FAILED', err || JSON.stringify(result)); status({ ok: false, root, exp, want: wantGroup + ' / ' + wantLabel, page: globalThis.__pageStatus, title: globalThis.__title, err, result }); process.exit(0); }
 const out = { root, exp, tradeDate: result.tradeDate, productId: result.productId, expirationCode: result.expirationCode, group: wantGroup, label: wantLabel, fetchedAt: Math.floor(Date.now() / 1000), totals: result.totals, rows: result.rows.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1])) };
 let prev = null; try { prev = JSON.parse(fs.readFileSync(OUT, 'utf8')); } catch (e) {}
 const same = prev && prev.root === out.root && prev.exp === out.exp && prev.tradeDate === out.tradeDate && JSON.stringify(prev.rows) === JSON.stringify(out.rows);
 console.log('OK', out.root, out.exp, 'trade', out.tradeDate, 'C', out.totals.C, 'P', out.totals.P, 'strikes', out.rows.length, same ? '(unchanged)' : '(new)');
 if (!same) fs.writeFileSync(OUT, JSON.stringify(out));
+status({ ok: true, root, exp, tradeDate: out.tradeDate, strikes: out.rows.length, page: globalThis.__pageStatus });

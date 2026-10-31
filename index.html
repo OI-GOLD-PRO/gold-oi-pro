@@ -590,6 +590,16 @@
   // ข้อมูล OI ดึงจาก Apps Script (?api=data) ซึ่งอ่านชีตให้
   const API_BASE = 'https://script.google.com/macros/s/AKfycbwQrp29KWhUCVO0ojjS73SiLtDKe1QKx69KOOF90QQOlV3csHXqxfOGUYKYw2D6nZp0tw/exec';
   const apiData = () => `${API_BASE}?api=data&sym=${DATA_SYM}&code=${encodeURIComponent(authCode || '')}`;
+  window.OIHistoryZonesAPI = async () => {
+    if (!authCode) throw Error('กรุณาเข้าสู่ระบบก่อน');
+    const url = `${API_BASE}?api=oi_history&code=${encodeURIComponent(authCode)}&t=${Date.now()}`;
+    const ac = new AbortController(), timer = setTimeout(() => ac.abort(), 20000);
+    try { const response = await fetch(url, {cache:'no-store',signal:ac.signal});
+      if(!response.ok) throw Error('HTTP '+response.status);
+      const data = await response.json(); if(data.error) throw Error(data.reason||data.error);
+      return data;
+    } finally { clearTimeout(timer); }
+  };
 
   // Sync ข้อมูลจากชีต: หมดเวลา 15 วินาทีต่อครั้ง ลองใหม่สูงสุด 3 ครั้ง
   // ถ้ามีข้อมูลชุดเดิมอยู่แล้ว จะไม่ล้างชิปทิ้งระหว่างโหลด (เส้น OI ยังแสดงต่อ)
@@ -2408,6 +2418,6 @@
 <script src="quant.js?v=20031"></script>
 <script src="aitray.js?v=20032"></script>
 <script src="v33-luxury.js?v=35000"></script>
-<script src="historical-oi.js?v=100"></script>
+<script src="historical-oi.js?v=101"></script>
 </body>
 </html>

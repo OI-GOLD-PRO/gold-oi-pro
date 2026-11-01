@@ -43,7 +43,7 @@
         const dm = new Map(), om = new Map();
         k.forEach(x => { const t = Math.floor(x[0] / 1000) + TZ, v = +x[5], tb = +x[9]; dm.set(t, { b: tb, s: v - tb }); om.set(t, +x[4]); });
         delta = dm; if (om.size >= 5) pxOff = om; src = 'binance'; return;
-      } catch (e) { src = 'bitget'; }
+      } catch (e) { window.__btErr = 'klines: ' + (e && e.message || e); src = 'bitget'; }
     }
     // สำรอง: Bitget klines (ไม่มีฝั่ง taker) → ใช้แค่ราคาอ้างอิง ส่วน Delta คิดจากไม้ที่ดึงได้
     try {
@@ -147,7 +147,7 @@
         trades.sort((a, b) => a.t - b.t);
         saveCache();
         return;
-      } catch (e) { src = 'bitget'; await loadKlines(); }
+      } catch (e) { window.__btErr = 'backfill: ' + (e && e.stack || e); src = 'bitget'; await loadKlines(); }
     }
     // Bitget: ไล่ย้อนจากล่าสุดทีละ 1000 (ไม้ย่อยเวลาเดียวกัน ฝั่งเดียวกัน = ออเดอร์เดียว → รวมกัน)
     let idLess = null, calls = 0; const raw = [];

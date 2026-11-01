@@ -29,14 +29,14 @@
   function run() {
     const c = window.OILive && window.OILive.calc;
     if (!c || !c.match) { if (R) { R = null; O.markDirty(); } return; }
-    const iv = atmIV(c); if (iv === null || !isFinite(iv)) return;
+    const iv = c.ivAtm > 0 ? c.ivAtm : atmIV(c); if (iv === null || !isFinite(iv)) return; // V4.3.12: IV คำนวณเอง (Black-76) จาก live.js
     const key = c.root + (c.expTs || ''), now = Date.now();
     const H = hist[key] = (hist[key] || []).filter(h => now - h[0] < 26 * 3600e3);
-    if (!H.length || now - H[H.length - 1][0] >= 5 * 60e3) { H.push([now, +iv.toFixed(5)]); Object.keys(hist).forEach(k => { if (k !== key && !(hist[k] || []).some(h => now - h[0] < 26 * 3600e3)) delete hist[k]; }); saveH(); }
+    if (c.ivMode === 'live' && (!H.length || now - H[H.length - 1][0] >= 5 * 60e3)) { H.push([now, +iv.toFixed(5)]); Object.keys(hist).forEach(k => { if (k !== key && !(hist[k] || []).some(h => now - h[0] < 26 * 3600e3)) delete hist[k]; }); saveH(); }
     const near = ms => { let b = null; H.forEach(h => { if (h[0] <= ms && (!b || h[0] > b[0])) b = h; }); return b; };
     const h1 = near(now - 3600e3), op = H.find(h => h[0] >= sessStart());
     const prev = R && R.iv;
-    R = { iv, d1h: h1 && now - h1[0] < 2 * 3600e3 ? iv - h1[1] : null, dOpen: op && op !== H[H.length - 1] ? iv - op[1] : null, em: c.em, T: c.T, root: c.root };
+    R = { iv, d1h: h1 && now - h1[0] < 2 * 3600e3 ? iv - h1[1] : null, dOpen: op && op !== H[H.length - 1] ? iv - op[1] : null, em: c.em, T: c.T, root: c.root, mode: c.ivMode, sd: c.ivSettle, F: c.ivF, smile: c.smile };
     if (prev !== R.iv) O.markDirty();
   }
   setInterval(run, 15000);
@@ -48,10 +48,18 @@
   function badge() {
     if (!R) return null;
     const d = R.d1h, up = d !== null && d >= 0.005, dn = d !== null && d <= -0.005;
+    if (R.mode === 'settle') return [`IV ${pct(R.iv)}% ⏸`, '#c9b8ff', 'iv'];
     return [`IV ${pct(R.iv)}%${d === null ? '' : up ? ` ▲${Math.abs(d * 100).toFixed(1)}` : dn ? ` ▼${Math.abs(d * 100).toFixed(1)}` : ' ·'}`, up ? '#ff8a3d' : dn ? '#22e39a' : '#c9b8ff', 'iv'];
   }
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(badge);
 
+  // เส้น smile สรุปสั้น ๆ: IV ฝั่ง Put ห่าง 100 จุด เทียบ Call ห่าง 100 จุด
+  function skewLine() {
+    const sm = R && R.smile, F = R && R.F; if (!sm || !F || sm.length < 3) return '';
+    const at = x => { let b = null; sm.forEach(p => { if (!b || Math.abs(p[0] - x) < Math.abs(b[0] - x)) b = p; }); return b; };
+    const lo = at(F - 100), hi = at(F + 100);
+    return `● เส้น smile: Put ${lo[0]} = ${pct(lo[1])}% · ATM ${pct(R.iv)}% · Call ${hi[0]} = ${pct(hi[1])}%${lo[1] - hi[1] > 0.02 ? ' → <b style="color:#ff6b82">ฝั่ง Put แพงกว่า (กลัวขาลง)</b>' : hi[1] - lo[1] > 0.02 ? ' → <b style="color:#2fe3a6">ฝั่ง Call แพงกว่า (ไล่ขาขึ้น)</b>' : ''}<br>`;
+  }
   function explain() {
     if (!R) { O.showToast && O.showToast('IV: รอข้อมูลออปชันสดของสัญญาวันนี้…', 5000); return; }
     const d = R.d1h, mood = d === null ? 'ยังไม่มีประวัติพอเทียบ (เก็บทุก 5 นาที)'
@@ -60,7 +68,9 @@
       : 'IV ทรงตัว → ใช้โซน OI ตามปกติ';
     const daily = R.iv / Math.sqrt(365), px = O.lastClose || 0;
     O.showToast && O.showToast(
-      `<b style="color:#c9b8ff">IV ATM ${pct(R.iv)}%</b> (สัญญา ${R.root}, ต่อปี)<br>` +
+      `<b style="color:#c9b8ff">IV ATM ${pct(R.iv)}%</b> (สัญญา ${R.root}, ต่อปี · คำนวณเองด้วย Black-76)<br>` +
+      (R.mode === 'settle' ? `⏸ ตลาดปิด: คิดจากราคา settlement CME วันที่ ${R.sd} (ตรงกับเส้น Vol Settle ใน QuikStrike)<br>` : `● สด: คิดจากค่ากลาง bid/ask ของออปชัน (ฟิวเจอร์สอ้างอิง ${R.F ? R.F.toFixed(1) : '–'})<br>`) +
+      skewLine() +
       `เปลี่ยนใน 1 ชม.: ${d === null ? '–' : pts(d) + ' จุด'} · ตั้งแต่เปิดวัน: ${R.dOpen === null ? '–' : pts(R.dOpen) + ' จุด'}<br>` +
       `${mood}<br>` +
       `● ตลาดคาดว่าราคาแกว่งเฉลี่ยวันละ ~${(px * daily).toFixed(0)} จุด (1σ) · ถึงหมดอายุ ±${R.em ? R.em.toFixed(1) : '–'} (EM)<br>` +

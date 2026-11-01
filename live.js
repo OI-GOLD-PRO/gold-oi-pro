@@ -27,6 +27,64 @@
     return { flip: best === null ? null : Math.round(best * 10) / 10, gexAtF: g(F) };
   }
 
+  // ---------- IV คำนวณเอง (Black-76) ----------
+  // ตลาดเปิด + ข้อมูลสด → ค่ากลาง bid/ask (เฉพาะ strike ที่ spread แคบ) · ตลาดปิด/ข้อมูลค้าง → ราคา settlement ของ CME (cme_oi.json)
+  // ใช้ IV ฝั่ง OTM ของแต่ละ strike (Put ใต้ราคา / Call เหนือราคา) แบบเดียวกับเส้น Vol Settle ของ CME
+  const NCDF = x => { const z = Math.abs(x) / Math.SQRT2, t = 1 / (1 + 0.3275911 * z), y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z); return x >= 0 ? 0.5 * (1 + y) : 0.5 * (1 - y); };
+  const b76 = (F, K, T, s, call) => { const v = s * Math.sqrt(T), d1 = (Math.log(F / K) + v * v / 2) / v, d2 = d1 - v; return call ? F * NCDF(d1) - K * NCDF(d2) : K * NCDF(-d2) - F * NCDF(-d1); };
+  function implVol(p, F, K, T, call) {
+    const intr = Math.max(0, call ? F - K : K - F);
+    if (!(p > intr + 0.02) || !(T > 0)) return null;
+    let lo = 0.01, hi = 3;
+    if (b76(F, K, T, hi, call) < p) return null;
+    for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (b76(F, K, T, m, call) > p) hi = m; else lo = m; }
+    return (lo + hi) / 2;
+  }
+  // ตลาด CME ทองเปิด? (ปิด ศ. 17:00 – อา. 18:00 นิวยอร์ก และพักทุกวัน 17:00–18:00)
+  const etFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', hourCycle: 'h23' });
+  function cmeOpen(ms) { const p = Object.fromEntries(etFmt.formatToParts(new Date(ms)).map(x => [x.type, x.value])), h = +p.hour, wd = p.weekday; return !(wd === 'Sat' || (wd === 'Fri' && h >= 17) || (wd === 'Sun' && h < 18) || h === 17); }
+  // เวลา settlement CME (13:30 ชิคาโก) ของวันเทรด MM/DD/YYYY → ms
+  function settleMs(mdY) {
+    const [m, d, y] = String(mdY).split('/').map(Number); if (!y) return null;
+    const nthSun = (mm, n) => { const f = new Date(Date.UTC(y, mm - 1, 1)).getUTCDay(); return 1 + ((7 - f) % 7) + (n - 1) * 7; };
+    const t = Date.UTC(y, m - 1, d), dst = t >= Date.UTC(y, 2, nthSun(3, 2)) && t < Date.UTC(y, 10, nthSun(11, 1));
+    return Date.UTC(y, m - 1, d, 13 + (dst ? 5 : 6), 30);
+  }
+  async function loadCme() { try { const j = await (await fetch('cme_oi.json?t=' + Math.floor(Date.now() / 600e3), { cache: 'no-store' })).json(); if (j && j.root) { st.cme = j; tick(); } } catch (e) {} }
+  setTimeout(loadCme, 1500); setInterval(loadCme, 10 * 60e3);
+
+  function ownIV(d, map, ks, now, S0) {
+    let mode = null, px = null, Tiv = null, settleDate = null;
+    if (cmeOpen(now) && d.updated && now / 1000 - d.updated < 900) {
+      mode = 'live'; Tiv = Math.max((d.expTs * 1000 - now) / YEAR, 60e3 / YEAR);
+      px = (k, t) => { const o = (map.get(k) || {})[t]; if (!o) return null; const b = +o.bid, a = +o.ask; if (b > 0 && a > b) { const m = (a + b) / 2; if (a - b <= Math.max(0.6, m * 0.25)) return m; } return null; };
+    } else if (st.cme && st.cme.settle && st.cme.root === d.root && +st.cme.exp === +d.exp) {
+      const sm = new Map(st.cme.settle.rows.map(([k, t, v]) => [k + t, v])), t0 = settleMs(st.cme.settle.tradeDate);
+      if (t0) { mode = 'settle'; settleDate = st.cme.settle.tradeDate; Tiv = Math.max((d.expTs * 1000 - t0) / YEAR, 60e3 / YEAR); px = (k, t) => sm.get(k + t) || null; }
+      ks = [...new Set([...ks, ...st.cme.settle.rows.map(r => r[0])])].sort((a, b) => a - b);
+    }
+    if (!mode) return null;
+    // ราคาฟิวเจอร์สอ้างอิง = put-call parity (K + C − P) ของ 3 strike ที่ใกล้ราคาที่สุด
+    const ref = S0 || d.F, par = ks.filter(k => px(k, 'C') && px(k, 'P')).sort((a, b) => Math.abs(a - ref) - Math.abs(b - ref)).slice(0, 3).map(k => k + px(k, 'C') - px(k, 'P')).sort((a, b) => a - b);
+    const F = par.length ? par[Math.floor(par.length / 2)] : ref;
+    const pts = [];
+    ks.forEach(k => {
+      if (Math.abs(k - F) > F * 0.08) return;
+      const otmC = k >= F, p1 = px(k, otmC ? 'C' : 'P');
+      let iv = p1 ? implVol(p1, F, k, Tiv, otmC) : null;
+      if (iv === null) { const p2 = px(k, otmC ? 'P' : 'C'); if (p2) iv = implVol(p2, F, k, Tiv, !otmC); }
+      if (iv !== null && iv > 0.02 && iv < 2.5) pts.push([k, iv]);
+    });
+    if (pts.length < 3) return null;
+    const ivAt = x => { if (x <= pts[0][0]) return pts[0][1]; if (x >= pts[pts.length - 1][0]) return pts[pts.length - 1][1]; for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) { const [k0, v0] = pts[i - 1], [k1, v1] = pts[i]; return v0 + (v1 - v0) * (x - k0) / (k1 - k0); } return null; };
+    // EM = ราคา straddle ATM ณ เวลาที่เหลือตอนนี้ (Black-76 ด้วย IV ATM) · ตลาดเปิดใช้ราคา straddle จริงถ้ามี
+    const em = T => {
+      if (mode === 'live') { const K = ks.reduce((b, k) => Math.abs(k - F) < Math.abs(b - F) ? k : b, ks[0]), c = px(K, 'C'), p = px(K, 'P'); if (c && p) return c + p; }
+      const iv = ivAt(F); return iv ? 2 * b76(F, F, T, iv, true) : null;
+    };
+    return { mode, F, pts, ivAt, em, settleDate };
+  }
+
   // ---------- คำนวณ ----------
   function compute() {
     const d = st.d, oi = O.oi;
@@ -49,6 +107,13 @@
       const C = r.C || {}, P = r.P || {};
       return { k, c: o.c || 0, p: o.p || 0, ivC: C.iv, ivP: P.iv, dC: C.delta, dP: P.delta, gC: C.g, gP: P.g,
         vc: C.vol || 0, vp: P.vol || 0, bc: C.buy || 0, sc: C.sell || 0, bp: P.buy || 0, sp: P.sell || 0 };
+    });
+    // IV คำนวณเอง → แทน IV/delta/gamma ของ TradingView (ซึ่งเพี้ยนเมื่อราคาค้าง/spread กว้าง)
+    const own = ownIV(d, map, ks, now, S0);
+    if (own) strikes.forEach(s => {
+      const iv = own.ivAt(s.k); if (!(iv > 0)) return;
+      const v = iv * Math.sqrt(T), d1 = (Math.log(own.F / s.k) + v * v / 2) / v, g = pdf(d1) / (own.F * v);
+      s.ivC = s.ivP = iv; s.dC = NCDF(d1); s.dP = NCDF(d1) - 1; s.gC = s.gP = g;
     });
     // gmf itd สด (สมมติฐานมาตรฐาน Call +, Put −) และแบบปรับตามซื้อ/ขายของวันนี้
     let gmf = null, gmfAdj = null, gexAtF = null;
@@ -76,7 +141,8 @@
     // GEX ราย strike (gamma จาก TradingView)
     const F2 = S0 * S0 * 0.01 * 100;
     strikes.forEach(s => { s.gex = ((s.gC || 0) * s.c - (s.gP || 0) * s.p) * F2; });
-    return { match, root: d.root, cfgC, T, S0, gmf, gmfAdj, gexAtF, skew, p25, c25, strikes, em: d.em, emK: d.emK, openF: d.openF, openEM: d.openEM, updated: d.updated, expTs: d.expTs };
+    const emOwn = own ? own.em(T) : null;
+    return { match, root: d.root, cfgC, T, S0, gmf, gmfAdj, gexAtF, skew, p25, c25, strikes, em: emOwn || d.em, emTv: d.em, ivAtm: own ? own.ivAt(own.F) : null, ivMode: own ? own.mode : null, ivF: own ? own.F : null, ivSettle: own ? own.settleDate : null, smile: own ? own.pts : null, emK: d.emK, openF: d.openF, openEM: d.openEM, updated: d.updated, expTs: d.expTs };
   }
 
   // ---------- ดึงข้อมูล ----------

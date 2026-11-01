@@ -1,3 +1,8 @@
+### V4.3.12 — 2026-11-01 — Claude
+- ไฟล์: live.js (ownIV: Black-76, cmeOpen, settleMs, loadCme), ivbadge.js, scripts/cme_oi.mjs (ราคา settlement ใน cme_oi.json), index.html
+- แก้อะไร: คำนวณ IV เองแทนค่า IV ของ TradingView (เพี้ยนสูงเกือบ 3 เท่าตอนราคาค้าง/spread กว้าง) — ตลาดเปิด: ค่ากลาง bid/ask ที่ spread แคบ · ตลาดปิด: ราคา settlement CME · ใช้ IV ฝั่ง OTM ต่อ strike, ฟิวเจอร์สอ้างอิงจาก put-call parity, เวลาถึงหมดอายุแบบปฏิทิน · แทน IV/delta/gamma ทุก strike → Skew, gmf, GEX, EM, Dealer ใช้ค่าใหม่ · EM = straddle ATM (สด) หรือ Black-76 ด้วย IV ATM ณ เวลาที่เหลือ (ตลาดปิด) · ป้าย IV ตลาดปิดแสดง ⏸
+- ระวัง: c.emTv = EM เดิมจาก Worker (เก็บไว้เทียบ) · ถ้าคำนวณไม่ได้ (<3 strike) กลับไปใช้ค่า TradingView
+
 ### V4.3.11 — 2026-11-01 — Claude
 - ไฟล์: ivbadge.js, dealer.js, index.html
 - แก้อะไร: แตะป้าย IV/Dealer แล้วคำอธิบายขึ้นแล้วหายทันที — หัวแอปเตี้ยลง (V4.x) ทำให้กล่องแจ้งเตือนทับแถบป้าย click ของนิ้วเดิมไปโดนกล่องแล้วสั่งปิด → หน่วงการแสดง 120 ms

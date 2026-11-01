@@ -12,9 +12,9 @@
   const DEF = { on: false, auto: true, thr: 5, delta: true, hours: 24, v: 2 };
   const KEY = 'oi_bigtr' + (O.psfx || '');
   let cfg = Object.assign({}, DEF);
-  try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+  let saved0 = {}; try { saved0 = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; Object.assign(cfg, saved0); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
-  if (cfg.v !== 2) { cfg.hours = 24; cfg.v = 2; save(); } // V4.3.3: ค่าเริ่มย้อนหลัง 24 ชม.
+  if (saved0.v !== 2) { cfg.hours = 24; cfg.v = 2; save(); } // V4.3.3: ค่าเริ่มย้อนหลัง 24 ชม.
 
   // ---------- สถานะ ----------
   let src = null;             // 'binance' | 'bitget'

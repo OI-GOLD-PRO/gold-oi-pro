@@ -1,3 +1,8 @@
+### Apps Script oi_backup — 2026-11-01 — Claude
+- ไฟล์: scripts/sync_live.gs (backupOIHourly_, oiBackupOwnAtm_ ใหม่)
+- แก้อะไร: ตรวจการบันทึก Historical OI แล้ว: บันทึกทุกชั่วโมงจริง (oi_backup มีครบตั้งแต่ 31 ต.ค. 17:00) และ OI ราย strike มาจาก CME ตั้งแต่ 1 พ.ย. 04:00 · แก้ 2 จุด: (1) คอลัมน์ atm_iv_pct / em เดิมเป็นค่า TradingView ที่เพี้ยน (49.57% / 96.75) → คำนวณ Black-76 เองจากค่ากลาง bid/ask เฉพาะตอน FRESH และ spread แคบ ไม่เข้าเงื่อนไข = ว่าง (2) คอลัมน์ source บอกแหล่ง OI จริง (CME หรือ TradingView)
+- ระวัง: ข้อมูลดิบทั้งหมดยังอยู่ใน raw_json_chunk (bid/ask ราย strike) คำนวณย้อนหลังได้ · แถวก่อนแก้ยังมี IV/EM ค่าเดิม
+
 ### V4.3.13 — 2026-11-01 — Claude
 - ไฟล์: ivbadge.js, index.html
 - แก้อะไร: ประวัติ IV เดิมเป็นค่า TradingView ที่เพี้ยน ทำให้ "เปลี่ยนใน 1 ชม." ผิด → ล้างและเริ่มเก็บใหม่ (oi_iv_hist2) เฉพาะ IV สดตอนตลาดเปิด · ตลาดปิดไม่แสดงการเปลี่ยนแปลง

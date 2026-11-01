@@ -128,6 +128,22 @@ function removeSyncTrigger() {
 // Missing source values stay null/blank. EM is the Worker's ATM straddle, not IV-derived EM.
 const OI_BACKUP_HEADERS = ["snapshot_id","captured_th","hour_th","contract","expiry_ymd","expiry_th","source_updated_th","oi_asof_th","status","futures_price","oi_call","oi_put","volume_call","volume_put","atm_strike","atm_iv_pct","em","em_method","gamma_flip_itd","gamma_flip_30d","gex_itd","gex_30d","rows_count","oi_missing_rows","source","part","parts","payload_sha256","raw_json_chunk"];
 
+// V4.3.14 (Claude): IV ATM คำนวณเองด้วย Black-76 จากค่ากลาง bid/ask (ค่า iv ของ TradingView เพี้ยนสูงเมื่อราคาค้าง/spread กว้าง)
+// ใช้เฉพาะตอนข้อมูลสด (FRESH) และ spread แคบ · ไม่เข้าเงื่อนไข = เว้นว่าง (ดีกว่าบันทึกค่าผิด)
+function oiBackupOwnAtm_(o, fresh) {
+  if (!fresh || !(o.F > 0) || !o.expTs) return { k: '', iv: '', em: '' };
+  const T = (o.expTs * 1000 - Date.now()) / (365 * 864e5); if (!(T > 0)) return { k: '', iv: '', em: '' };
+  const by = {}; (o.rows || []).forEach(r => { const b = Number(r[5]), a = Number(r[6]); if (b > 0 && a > b) { const m = (a + b) / 2; if (a - b <= Math.max(0.6, m * 0.25)) (by[r[0]] = by[r[0]] || {})[r[1]] = m; } });
+  const ks = Object.keys(by).map(Number).filter(k => by[k].C && by[k].P).sort((a, b) => Math.abs(a - o.F) - Math.abs(b - o.F));
+  if (!ks.length) return { k: '', iv: '', em: '' };
+  const k = ks[0], C = by[k].C, P = by[k].P, F = k + C - P; // put-call parity
+  const N = x => { const z = Math.abs(x) / Math.SQRT2, t = 1 / (1 + 0.3275911 * z), y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z); return x >= 0 ? 0.5 * (1 + y) : 0.5 * (1 - y); };
+  const call = (s) => { const v = s * Math.sqrt(T), d1 = (Math.log(F / k) + v * v / 2) / v; return F * N(d1) - k * N(d1 - v); };
+  const px = k >= F ? C : P + F - k; // ราคา call เทียบเท่า (parity)
+  let lo = 0.01, hi = 3; if (call(hi) < px) return { k: k, iv: '', em: C + P };
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (call(m) > px) hi = m; else lo = m; }
+  return { k: k, iv: Math.round((lo + hi) / 2 * 10000) / 100, em: Math.round((C + P) * 100) / 100 };
+}
 function oiBackupAtm_(o) {
   const rows = o.rows || [], by = {};
   rows.forEach(r => {
@@ -177,7 +193,7 @@ function backupOIHourly_(ss, o, clock) {
       }
       if (own.length) throw new Error('incomplete existing oi_backup snapshot: '+id);
     }
-    const rows = o.rows || [], atm = oiBackupAtm_(o);
+    const rows = o.rows || [];
     const num = v => typeof v === 'number' && isFinite(v) ? v : '';
     const total = (side,index) => {
       const a = rows.filter(r=>r[1]===side && typeof r[index]==='number' && isFinite(r[index]));
@@ -185,7 +201,8 @@ function backupOIHourly_(ss, o, clock) {
     };
     const missing = rows.filter(r=>typeof r[11]!=='number' || !isFinite(r[11])).length;
     const age = o.updated ? now.getTime()/1000-o.updated : Infinity;
-    const status = (age >= -120 && age < 900 ? 'FRESH' : 'STALE') +
+    const fresh = age >= -120 && age < 900, atm = oiBackupOwnAtm_(o, fresh);
+    const status = (fresh ? 'FRESH' : 'STALE') +
       (missing ? '|OI_PARTIAL' : '') + (o.oiFb ? '|BORROWED_OI_AVAILABLE' : '');
     const raw = JSON.stringify({ schema: 1, captured_th:fmt(now), coverage:'Worker /opt: strikes +/-10% F; oiFb separate', payload:o });
     const chunks = [];
@@ -195,8 +212,8 @@ function backupOIHourly_(ss, o, clock) {
     const m = o.gmfM || {}, prefix = [
       id,fmt(now),hour,o.root || '',o.exp || '',stamp(o.expTs),stamp(o.updated),stamp(o.oiT),
       status,num(o.F),total('C',11),total('P',11),total('C',8),total('P',8),
-      num(atm.k),num(atm.iv),num(o.em),'Worker ATM straddle (call mid + put mid)',
-      num(o.itd),num(m.M),num(o.gexItd),num(m.gexM),rows.length,missing,'TradingView via Worker /opt'
+      num(atm.k),num(atm.iv),num(atm.em),'Own Black-76 ATM IV + straddle mid (FRESH & narrow spread only, else blank)',
+      num(o.itd),num(m.M),num(o.gexItd),num(m.gexM),rows.length,missing,o.oiSrc === 'cme' ? 'OI: CME website (cme_oi.json) · quotes: TradingView via Worker /opt' : 'OI+quotes: TradingView via Worker /opt'
     ];
     const out = chunks.map((chunk,i)=>prefix.concat([i+1,chunks.length,hash,chunk]));
     const end = last + out.length;

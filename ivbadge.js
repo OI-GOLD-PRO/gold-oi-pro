@@ -76,7 +76,7 @@
     if (!down) return;
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10; down = null;
     const r = document.querySelector('#badges [data-k="iv"]')?.getBoundingClientRect();
-    if (!moved && r && e.clientX >= r.left - 4 && e.clientX <= r.right + 4 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6) explain();
+    if (!moved && r && e.clientX >= r.left - 4 && e.clientX <= r.right + 4 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6) setTimeout(explain, 120); // หน่วงให้พ้น click ของนิ้วเดิม (ไม่งั้นโดนป้ายแจ้งเตือนที่เพิ่งขึ้นรับ click แล้วปิดทันที)
   }, true);
   window.OI_iv = { get result() { return R; }, atmIV };
 })();

@@ -48,7 +48,7 @@
         if (busyZ.has(z.k) && i - busyZ.get(z.k) < lim.touch) return;
         if (!(b.low <= z.hi && b.high >= z.lo)) return;
         const dir = pc > z.hi ? 1 : pc < z.lo ? -1 : 0; if (!dir) return;
-        if (act.some(s => s.z.k === z.k)) return;
+        if (act.some(s => s.z.k === z.k || (s.dir === dir && Math.abs(s.z.p - z.p) <= 7))) return; // โซนติดกัน (เช่น C3905/P3900) = setup เดียว
         act.push({ z, dir, t: i, st: 1 }); busyZ.set(z.k, i);
       });
       act.forEach(s => {
@@ -70,7 +70,8 @@
             s.ob = ob; s.fvg = fvg; s.ez = ez;
             s.sl = s.dir > 0 ? Math.min(z.lo, ob ? ob.lo : z.lo) - SL_PAD : Math.max(z.hi, ob ? ob.hi : z.hi) + SL_PAD;
             s.entry = s.dir > 0 ? ez.hi : ez.lo;
-            const nxt = s.dir > 0 ? Z.find(q => q.lo > s.entry + 1) : [...Z].reverse().find(q => q.hi < s.entry - 1);
+            const risk = Math.abs(s.entry - s.sl); // TP = โซนถัดไปที่ห่างอย่างน้อย 1R (ใกล้กว่านั้นไม่คุ้มเสี่ยง)
+            const nxt = s.dir > 0 ? Z.find(q => q.lo >= s.entry + risk) : [...Z].reverse().find(q => q.hi <= s.entry - risk);
             s.tp = nxt ? (s.dir > 0 ? nxt.lo : nxt.hi) : s.entry + s.dir * 2 * Math.abs(s.entry - s.sl); s.tpLab = nxt ? nxt.lab : '2R';
           }
         } else if (s.st === 2) {
@@ -134,7 +135,8 @@
     const Y = p => sr.priceToCoordinate(p);
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
     ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'middle';
-    const live = setups.filter(s => s.st === 2 || s.st === 3), done = setups.filter(s => s.st >= 3 && s.ei !== undefined);
+    const fresh = Date.now() / 1000 + 7 * 3600 - bars[bars.length - 1].time < 3 * 3600; // ตลาดปิด/ข้อมูลเก่า → ไม่แสดงเป็นสัญญาณสด
+    const live = fresh ? setups.filter(s => s.st === 2 || s.st === 3) : [], done = setups.filter(s => s.st >= 3 && s.ei !== undefined);
     // ประวัติ: มาร์กเล็ก ๆ ตรงแท่งที่เข้า (✓ ถึง TP / ✗ โดน SL)
     done.forEach(s => {
       const x = X(s.ei), y = Y(s.entry); if (x === null || y === null || x < 0 || x > plotW) return;
@@ -164,6 +166,7 @@
   // ---------- ป้ายสถานะ ----------
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     if (!cfg.on) return null;
+    if (!bars.length || Date.now() / 1000 + 7 * 3600 - bars[bars.length - 1].time > 3 * 3600) return null;
     const P = O.lastClose, cur = setups.filter(s => s.st >= 1 && s.st <= 3);
     if (!cur.length) return null;
     const s = cur.sort((a, b) => b.st - a.st || Math.abs(a.z.p - P) - Math.abs(b.z.p - P))[0], d = s.dir > 0 ? '▲' : '▼';

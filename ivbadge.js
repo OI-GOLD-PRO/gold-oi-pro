@@ -5,7 +5,8 @@
   'use strict';
   const O = window.OI;
   if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
-  const HKEY = 'oi_iv_hist';
+  const HKEY = 'oi_iv_hist2'; // v2: เก็บเฉพาะ IV ที่คำนวณเองตอนตลาดเปิด (ของเดิมเป็น IV TradingView ที่เพี้ยน)
+  try { localStorage.removeItem('oi_iv_hist'); } catch (e) {}
   let hist = {}; // { "G1M20261102": [[ms, iv], ...] }
   try { hist = JSON.parse(localStorage.getItem(HKEY) || '{}') || {}; } catch (e) { hist = {}; }
   const saveH = () => { try { localStorage.setItem(HKEY, JSON.stringify(hist)); } catch (e) {} };
@@ -36,7 +37,8 @@
     const near = ms => { let b = null; H.forEach(h => { if (h[0] <= ms && (!b || h[0] > b[0])) b = h; }); return b; };
     const h1 = near(now - 3600e3), op = H.find(h => h[0] >= sessStart());
     const prev = R && R.iv;
-    R = { iv, d1h: h1 && now - h1[0] < 2 * 3600e3 ? iv - h1[1] : null, dOpen: op && op !== H[H.length - 1] ? iv - op[1] : null, em: c.em, T: c.T, root: c.root, mode: c.ivMode, sd: c.ivSettle, F: c.ivF, smile: c.smile };
+    const liveM = c.ivMode === 'live';
+    R = { iv, d1h: liveM && h1 && now - h1[0] < 2 * 3600e3 ? iv - h1[1] : null, dOpen: liveM && op && op !== H[H.length - 1] ? iv - op[1] : null, em: c.em, T: c.T, root: c.root, mode: c.ivMode, sd: c.ivSettle, F: c.ivF, smile: c.smile };
     if (prev !== R.iv) O.markDirty();
   }
   setInterval(run, 15000);
@@ -62,7 +64,7 @@
   }
   function explain() {
     if (!R) { O.showToast && O.showToast('IV: รอข้อมูลออปชันสดของสัญญาวันนี้…', 5000); return; }
-    const d = R.d1h, mood = d === null ? 'ยังไม่มีประวัติพอเทียบ (เก็บทุก 5 นาที)'
+    const d = R.d1h, mood = R.mode === 'settle' ? 'ตลาดปิด: IV ไม่เปลี่ยน รอดูทิศทาง IV ตอนตลาดเปิด (เก็บทุก 5 นาที)' : d === null ? 'ยังไม่มีประวัติพอเทียบ (เก็บทุก 5 นาที)'
       : d >= 0.005 ? '<b style="color:#ff8a3d">IV กำลังขึ้น</b> → ตลาดเริ่มกลัว / รอข่าว ราคามีโอกาสวิ่งแรง เบรกโซนง่ายขึ้น ระวังสวนเทรนด์ ขยาย SL'
       : d <= -0.005 ? '<b style="color:#22e39a">IV กำลังลง</b> → ตลาดสงบ ราคามักแกว่งในกรอบ โซน OI มักเด้ง เหมาะเทรดกลับตัวที่ขอบโซน'
       : 'IV ทรงตัว → ใช้โซน OI ตามปกติ';

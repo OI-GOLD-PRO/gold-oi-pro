@@ -1,3 +1,7 @@
+### V4.3.13 — 2026-11-01 — Claude
+- ไฟล์: ivbadge.js, index.html
+- แก้อะไร: ประวัติ IV เดิมเป็นค่า TradingView ที่เพี้ยน ทำให้ "เปลี่ยนใน 1 ชม." ผิด → ล้างและเริ่มเก็บใหม่ (oi_iv_hist2) เฉพาะ IV สดตอนตลาดเปิด · ตลาดปิดไม่แสดงการเปลี่ยนแปลง
+
 ### V4.3.12 — 2026-11-01 — Claude
 - ไฟล์: live.js (ownIV: Black-76, cmeOpen, settleMs, loadCme), ivbadge.js, scripts/cme_oi.mjs (ราคา settlement ใน cme_oi.json), index.html
 - แก้อะไร: คำนวณ IV เองแทนค่า IV ของ TradingView (เพี้ยนสูงเกือบ 3 เท่าตอนราคาค้าง/spread กว้าง) — ตลาดเปิด: ค่ากลาง bid/ask ที่ spread แคบ · ตลาดปิด: ราคา settlement CME · ใช้ IV ฝั่ง OTM ต่อ strike, ฟิวเจอร์สอ้างอิงจาก put-call parity, เวลาถึงหมดอายุแบบปฏิทิน · แทน IV/delta/gamma ทุก strike → Skew, gmf, GEX, EM, Dealer ใช้ค่าใหม่ · EM = straddle ATM (สด) หรือ Black-76 ด้วย IV ATM ณ เวลาที่เหลือ (ตลาดปิด) · ป้าย IV ตลาดปิดแสดง ⏸

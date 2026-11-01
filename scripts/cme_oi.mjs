@@ -34,7 +34,7 @@ for (let i = 0; dates.length < 5 && i < 10; i++) {
   dates.push(`${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}`);
 }
 
-const FETCHER = async ({ dates, wantGroup, wantLabel }) => {
+const FETCHER = async ({ dates, wantGroup, wantLabel, root }) => {
     const j = async u => { const r = await fetch(u + (u.includes('?') ? '&' : '?') + 'isProtected&_t=' + Date.now()); if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + u); return r.json(); };
     const n = s => +String(s).replace(/,/g, '') || 0;
     const log = [];
@@ -52,7 +52,16 @@ const FETCHER = async ({ dates, wantGroup, wantLabel }) => {
         (md.strikeData || []).forEach(s => { const v = n(s.atClose); if (v > 0) rows.push([+s.strike, t, v]); });
       });
       if (!rows.length) { log.push(td + ' empty'); continue; }
-      return { tradeDate: td, productId: e.productId, expirationCode: e.expirationCode, totals, rows, log };
+      // ราคา settlement ราย strike (ไว้คำนวณ IV เองตอนตลาดปิด) · contractId เช่น G1MX26, optionExpiration เช่น 10143-X6
+      let settle = null;
+      try {
+        const code = e.expirationCode, ex = code[0] + code.slice(-1), mdY = td.slice(4, 6) + '/' + td.slice(6, 8) + '/' + td.slice(0, 4);
+        const sj = await j(`/CmeWS/mvc/Settlements/Options/Settlements/${e.productId}/OOF?strategy=DEFAULT&optionProductId=${e.productId}&monthYear=${root}${code}&optionExpiration=${e.productId}-${ex}&tradeDate=${mdY}&pageSize=500`);
+        const sr = (sj.settlements || []).map(x => [+x.strike, /^c/i.test(x.type) ? 'C' : 'P', +String(x.settle).replace(/[^0-9.]/g, '')]).filter(x => x[0] > 0 && x[2] > 0);
+        if (sr.length) settle = { tradeDate: String(sj.tradeDate || mdY), reportType: sj.reportType || '', rows: sr };
+        else log.push(td + ' settle empty');
+      } catch (er) { log.push(td + ' settle ' + er.message); }
+      return { tradeDate: td, productId: e.productId, expirationCode: e.expirationCode, totals, rows, settle, log };
     }
     return { error: 'not found', log };
 };
@@ -76,7 +85,7 @@ for (const st of STRATS) {
     const resp = await page.goto(PAGE, { waitUntil: 'domcontentloaded', timeout: 45000 });
     globalThis.__pageStatus = resp && resp.status(); globalThis.__title = await page.title().catch(() => '');
     await page.waitForTimeout(6000);
-    result = await page.evaluate(FETCHER, { dates, wantGroup, wantLabel });
+    result = await page.evaluate(FETCHER, { dates, wantGroup, wantLabel, root });
     tries.push(st.name + ': ' + (result && !result.error ? 'ok' : 'page ' + globalThis.__pageStatus + ' ' + JSON.stringify(result).slice(0, 200)));
   } catch (e) { tries.push(st.name + ': ' + e.message.split('\n')[0]); result = null; }
   try { if (browser) await browser.close(); } catch (e) {}
@@ -86,9 +95,9 @@ err = tries.join(' | ');
 console.log(err);
 
 if (!result || result.error) { console.log('FAILED', err || JSON.stringify(result)); status({ ok: false, root, exp, want: wantGroup + ' / ' + wantLabel, page: globalThis.__pageStatus, title: globalThis.__title, err, result }); process.exit(0); }
-const out = { root, exp, tradeDate: result.tradeDate, productId: result.productId, expirationCode: result.expirationCode, group: wantGroup, label: wantLabel, fetchedAt: Math.floor(Date.now() / 1000), totals: result.totals, rows: result.rows.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1])) };
+const out = { root, exp, tradeDate: result.tradeDate, productId: result.productId, expirationCode: result.expirationCode, group: wantGroup, label: wantLabel, fetchedAt: Math.floor(Date.now() / 1000), totals: result.totals, settle: result.settle || null, rows: result.rows.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1])) };
 let prev = null; try { prev = JSON.parse(fs.readFileSync(OUT, 'utf8')); } catch (e) {}
-const same = prev && prev.root === out.root && prev.exp === out.exp && prev.tradeDate === out.tradeDate && JSON.stringify(prev.rows) === JSON.stringify(out.rows);
+const same = prev && prev.root === out.root && prev.exp === out.exp && prev.tradeDate === out.tradeDate && JSON.stringify(prev.rows) === JSON.stringify(out.rows) && JSON.stringify(prev.settle) === JSON.stringify(out.settle);
 console.log('OK', out.root, out.exp, 'trade', out.tradeDate, 'C', out.totals.C, 'P', out.totals.P, 'strikes', out.rows.length, same ? '(unchanged)' : '(new)');
 if (!same) fs.writeFileSync(OUT, JSON.stringify(out));
-status({ ok: true, root, exp, tradeDate: out.tradeDate, strikes: out.rows.length, page: globalThis.__pageStatus });
+status({ ok: true, root, exp, tradeDate: out.tradeDate, strikes: out.rows.length, settle: out.settle ? out.settle.rows.length : 0, log: result.log, page: globalThis.__pageStatus });

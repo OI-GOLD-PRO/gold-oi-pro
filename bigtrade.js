@@ -68,7 +68,7 @@
   function addTrade(t, p, q, s, keepAll) {
     sizes[sN % RING] = q; sN++;
     if (src === 'bitget') { const bt = barOf(t), d = delta.get(bt) || { b: 0, s: 0 }; if (s > 0) d.b += q; else d.s += q; delta.set(bt, d); }
-    if (keepAll || q >= Math.min(thrCache, 1)) trades.push({ t, p, q, s });
+    if (keepAll || q >= Math.max(1, thrCache * 0.4)) trades.push({ t, p, q, s }); // เก็บเฉพาะไม้ที่มีโอกาสถึงเกณฑ์ (ประหยัดหน่วยความจำ 24 ชม.)
   }
   // V4.3.3: โหลดจากใหม่ไปเก่า (แท่งล่าสุดขึ้นก่อน) · จำไม้ใหญ่ไว้ในเครื่อง (cache) เปิดครั้งถัดไปโหลดเฉพาะช่วงที่ขาด
   //         · ใส่จังหวะไม่เกิน ~90 ครั้ง/นาที (aggTrades weight 20, เพดาน Binance 2400/นาที)
@@ -78,7 +78,7 @@
   function loadCache() { try { const c = JSON.parse(localStorage.getItem(CKEY) || 'null'); return c && c.v === 2 ? c : null; } catch (e) { return null; } }
   function saveCache() {
     try {
-      const keep = Math.min(Date.now() - 25 * 3600e3, sinceT || Infinity), rows = trades.slice().sort((a, b) => a.t - b.t).filter(x => x.t >= keep && x.q >= MINQ).map(x => [x.t, +x.p.toFixed(2), +x.q.toFixed(3), x.s]);
+      const keep = Math.min(Date.now() - 25 * 3600e3, sinceT || Infinity), rows = trades.slice().sort((a, b) => a.t - b.t).filter(x => x.t >= keep && x.q >= Math.max(MINQ, thrCache * 0.4)).map(x => [x.t, +x.p.toFixed(2), +x.q.toFixed(3), x.s]);
       localStorage.setItem(CKEY, JSON.stringify({ v: 2, hiId: covHi, lim: limited, since: sinceT, rows }));
     } catch (e) {}
   }
@@ -94,7 +94,7 @@
     let to = hi, done = 0; const total = Math.max(1, Math.ceil((hi - lo) / 1000));
     while (to > lo) {
       const batch = [];
-      for (let k = 0; k < 3 && to > lo; k++) { const from = Math.max(lo + 1, to - 999); batch.push(page(from)); to = from - 1; }
+      for (let k = 0; k < 4 && to > lo; k++) { const from = Math.max(lo + 1, to - 999); batch.push(page(from)); to = from - 1; }
       const res = (await Promise.all(batch.map(p => p.catch(e => { if (/HTTP 400/.test(e.message)) return null; throw e; })))).filter(Boolean);
       if (!res.length) { limited = true; break; }
       let oldest = Infinity;

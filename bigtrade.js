@@ -82,7 +82,13 @@
       localStorage.setItem(CKEY, JSON.stringify({ v: 2, hiId: covHi, rows }));
     } catch (e) {}
   }
-  const page = fromId => fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&fromId=${fromId}&limit=1000`);
+  // ดึง 1 หน้า: โดนจำกัดความถี่ (429/418) หรือเน็ตสะดุด → รอแล้วลองใหม่ ไม่โยนทิ้งไปใช้ Bitget
+  async function page(fromId, lim) {
+    for (let k = 0; ; k++) {
+      try { return await fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&fromId=${fromId}&limit=${lim || 1000}`); }
+      catch (e) { if (k >= 4) throw e; status = /429|418/.test(e.message) ? 'Binance ขอให้รอสักครู่…' : status; paintInfo(); await sleep(/429|418/.test(e.message) ? 20000 : 3000); }
+    }
+  }
   // ดึงช่วง id (lo..hi] จากใหม่ไปเก่า ครั้งละ 3 หน้าพร้อมกัน
   async function pullRange(lo, hi, since, label) {
     let to = hi, done = 0; const total = Math.max(1, Math.ceil((hi - lo) / 1000));
@@ -95,12 +101,12 @@
       done += res.length;
       status = `${label} ${Math.min(99, Math.round(done / total * 100))}%`; paintInfo(); O.markDirty();
       if (oldest < since) break;
-      await sleep(2000);
+      await sleep(2500);
     }
     trades.sort((a, b) => a.t - b.t);
   }
   // id ของไม้แรกตั้งแต่เวลา ms: ลอง startTime ก่อน (ใช้ได้เฉพาะช่วงใกล้ ๆ) ไม่ได้ → ค้นแบบแบ่งครึ่งตามเลข id
-  const page1 = fromId => fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&fromId=${fromId}&limit=1`);
+  const page1 = fromId => page(fromId, 1);
   async function idAt(ms, topId) {
     try { const f = await fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&startTime=${ms}&endTime=${ms + 3600e3}&limit=1`); if (f.length) return f[0].a; } catch (e) {}
     const T = async id => { const a = await page1(id); return a.length ? a[0].T : Infinity; };

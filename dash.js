@@ -48,6 +48,8 @@
   #dash .slab b { color: var(--fg); font-size: 12px; }
   #dash .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   #dash .tile { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+  #dash .tile.gold { border: 1.5px solid #e0b44c; box-shadow: 0 0 0 1px rgba(224,180,76,.25), 0 0 14px rgba(224,180,76,.18); }
+  #dash .sum.gold { margin-top: 8px; padding: 9px 11px; border: 1.5px solid #e0b44c; border-radius: 10px; background: rgba(224,180,76,.07); font: 12.5px/1.6 var(--sans); color: var(--fg); }
   #dash .tile small { display: block; font: 10.5px var(--sans); color: var(--muted); }
   #dash .tile b { display: block; font: 600 17px var(--mono); font-variant-numeric: tabular-nums; margin-top: 2px; }
   #dash .tile em { display: block; font: normal 10px var(--sans); color: var(--muted); margin-top: 1px; }
@@ -542,6 +544,20 @@
       <div class="tile"><small>Expected Move ถึงหมดอายุ</small><b style="color:#9aa7ff">±${f1(c.em)}</b><em>${c.openEM ? `กรอบวันนี้ ${f1(c.openF - c.openEM)} – ${f1(c.openF + c.openEM)}` : ''}</em></div>
       <div class="tile"><small>Skew (IV Put25Δ − Call25Δ)</small><b class="${c.skew > 1.5 ? 'dn' : c.skew < -1.5 ? 'up' : ''}">${c.skew === null ? '–' : (c.skew > 0 ? '+' : '') + c.skew.toFixed(1) + ' จุด'}</b><em>${skTxt}</em></div>
     </div>`);
+    // สรุปหมวดความกลัวของตลาดเป็นภาษาคน: ตำแหน่งราคาเทียบกำแพง Put/Call สูงสุด + Put/Call รวม
+    const fearSum = (mP, mC, pcr, lvl, px) => {
+      if (px === null || px === undefined) return '';
+      const P = mP.k, Cc = mC.k, lo = Math.min(P, Cc), hi = Math.max(P, Cc), f = v => v.toFixed(0);
+      const pcrTxt = pcr >= 1.2 ? `<span class="dn">Put หนากว่า (${pcr.toFixed(2)}) = ตลาดกลัวขาลง</span>` : pcr <= 0.8 ? `<span class="up">Call หนากว่า (${pcr.toFixed(2)}) = ตลาดมั่นใจขาขึ้น</span>` : `Put/Call รวม ${pcr.toFixed(2)} = <b>ค่อนข้างสมดุล</b>`;
+      let pos;
+      if (px < lo) pos = `ราคา ${px.toFixed(1)} <span class="dn">หลุดลงมาใต้กำแพงใหญ่ทั้งสองฝั่ง</span> (Put ${P} · Call ${Cc}) ห่าง ${f(lo - px)}+ จุด → โซน <b>${lo}–${hi}</b> กลายเป็น<span class="dn">แนวต้านใหญ่</span>ถ้าเด้งกลับ · Put ที่ถือไว้กำลังได้กำไร dealer ที่ขาย Put ต้องเฮจขาย ทำให้ขาลง<span class="dn">เร่งได้</span>`
+        + (lvl === 'greed' ? ` · ที่ Call หนากว่าเป็น Call ที่<b>หมดค่าไปแล้ว</b> ไม่ใช่สัญญาณขาขึ้น` : '');
+      else if (px > hi) pos = `ราคา ${px.toFixed(1)} <span class="up">ยืนเหนือกำแพงใหญ่ทั้งสองฝั่ง</span> (Put ${P} · Call ${Cc}) → โซน <b>${lo}–${hi}</b> เป็น<span class="up">แนวรับใหญ่</span> · Call ที่ถือไว้ได้กำไร dealer ที่ขาย Call ต้องเฮจซื้อ ทำให้ขาขึ้น<span class="up">เร่งได้</span>`
+        + (lvl === 'fear' ? ` · ที่ Put หนากว่าเป็น Put ที่<b>หมดค่าไปแล้ว</b> ไม่ใช่สัญญาณขาลง` : '');
+      else if (P <= px && px <= Cc) pos = `ราคา ${px.toFixed(1)} อยู่<b>ในกรอบ</b> Put ${P} (<span class="up">แนวรับ</span> −${f(px - P)}) ถึง Call ${Cc} (<span class="dn">แนวต้าน</span> +${f(Cc - px)}) → มีแนวโน้มแกว่งในกรอบ เข้าใกล้ขอบไหนให้ดูการเด้งก่อน`;
+      else pos = `ราคา ${px.toFixed(1)} อยู่<b>ระหว่าง</b> Call ${Cc} กับ Put ${P} (กำแพงไขว้กัน) → ตลาดไม่ชัดทาง รอให้ราคาเลือกฝั่งพ้นโซน ${lo}–${hi}`;
+      return `<div class="sum gold"><b>📌 สรุป</b> ${pos}<br>${pcrTxt}</div>`;
+    };
     // ความกลัวของตลาด: จาก OI Put/Call ที่มากที่สุด + สัดส่วน Put/Call OI รวม
     if (c.match) {
       const sk = c.strikes.filter(s => s.c + s.p > 0);
@@ -557,7 +573,8 @@
           <div class="tile"><small>Put OI สูงสุด (กลัวลง)</small><b class="dn">${mP.k}</b><em>${Math.round(mP.p).toLocaleString('en-US')} สัญญา${dist(mP.k)}</em></div>
           <div class="tile"><small>Call OI สูงสุด (หวังขึ้น)</small><b class="up">${mC.k}</b><em>${Math.round(mC.c).toLocaleString('en-US')} สัญญา${dist(mC.k)}</em></div>
           <div class="tile"><small>Put/Call OI รวม</small><b class="${pcr >= 1.2 ? 'dn' : pcr <= 0.8 ? 'up' : ''}">${pcr.toFixed(2)}</b><em>Put ${Math.round(tP).toLocaleString('en-US')} / Call ${Math.round(tC).toLocaleString('en-US')}</em></div>
-          <div class="tile"><small>สรุปอารมณ์ตลาด</small><b class="${col}" style="font-size:13px">${txt}</b><em>Put สูงสุด ÷ Call สูงสุด = ${ratio.toFixed(2)}×</em></div></div>
+          <div class="tile gold"><small>สรุปอารมณ์ตลาด</small><b class="${col}" style="font-size:13px">${txt}</b><em>Put สูงสุด ÷ Call สูงสุด = ${ratio.toFixed(2)}×</em></div></div>
+          ${fearSum(mP, mC, pcr, lvl, px)}
           <div class="note">&gt;1.2 = ตลาดกลัว/ป้องกันความเสี่ยง · &lt;0.8 = ตลาดมั่นใจขาขึ้น · Put OI สูงสุดมักเป็นแนวรับ แต่ถ้าราคาหลุดจะเร่งลงแรง</div>`);
       }
     }

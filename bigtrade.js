@@ -73,13 +73,13 @@
   // V4.3.3: โหลดจากใหม่ไปเก่า (แท่งล่าสุดขึ้นก่อน) · จำไม้ใหญ่ไว้ในเครื่อง (cache) เปิดครั้งถัดไปโหลดเฉพาะช่วงที่ขาด
   //         · ใส่จังหวะไม่เกิน ~90 ครั้ง/นาที (aggTrades weight 20, เพดาน Binance 2400/นาที)
   const CKEY = 'oi_bigtr_cache', MINQ = 0.5;
-  let lastId = 0, lastMsg = 0, filling = false;
+  let lastId = 0, lastMsg = 0, filling = false, covHi = 0, sinceT = 0; // covHi = id สูงสุดที่มีไม้ต่อเนื่องครบ (ใช้กับ cache)
   const sleep = ms => new Promise(r => setTimeout(r, ms));
-  function loadCache() { try { const c = JSON.parse(localStorage.getItem(CKEY) || 'null'); return c && c.v === 1 ? c : null; } catch (e) { return null; } }
+  function loadCache() { try { const c = JSON.parse(localStorage.getItem(CKEY) || 'null'); return c && c.v === 2 ? c : null; } catch (e) { return null; } }
   function saveCache() {
     try {
-      const keep = Date.now() - 25 * 3600e3, rows = trades.slice().sort((a, b) => a.t - b.t).filter(x => x.t >= keep && x.q >= MINQ).map(x => [x.t, +x.p.toFixed(2), +x.q.toFixed(3), x.s]);
-      localStorage.setItem(CKEY, JSON.stringify({ v: 1, lastId, rows }));
+      const keep = Math.min(Date.now() - 25 * 3600e3, sinceT || Infinity), rows = trades.slice().sort((a, b) => a.t - b.t).filter(x => x.t >= keep && x.q >= MINQ).map(x => [x.t, +x.p.toFixed(2), +x.q.toFixed(3), x.s]);
+      localStorage.setItem(CKEY, JSON.stringify({ v: 2, hiId: covHi, rows }));
     } catch (e) {}
   }
   const page = fromId => fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&fromId=${fromId}&limit=1000`);
@@ -99,9 +99,26 @@
     }
     trades.sort((a, b) => a.t - b.t);
   }
+  // id ของไม้แรกตั้งแต่เวลา ms: ลอง startTime ก่อน (ใช้ได้เฉพาะช่วงใกล้ ๆ) ไม่ได้ → ค้นแบบแบ่งครึ่งตามเลข id
+  const page1 = fromId => fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&fromId=${fromId}&limit=1`);
+  async function idAt(ms, topId) {
+    try { const f = await fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&startTime=${ms}&endTime=${ms + 3600e3}&limit=1`); if (f.length) return f[0].a; } catch (e) {}
+    const T = async id => { const a = await page1(id); return a.length ? a[0].T : Infinity; };
+    let hi = topId, lo = topId, step = 200000;
+    for (let k = 0; k < 8; k++) { lo = Math.max(1, hi - step); if (await T(lo) < ms) break; hi = lo; step *= 2; await sleep(300); }
+    while (hi - lo > 500) { const mid = Math.floor((lo + hi) / 2); if (await T(mid) < ms) lo = mid; else hi = mid; await sleep(250); }
+    return lo;
+  }
+  // V4.3.6: ตลาด CME ปิด (เสาร์–อาทิตย์/ช่วงพัก) → นับย้อนหลังจากแท่งสุดท้ายบนกราฟ ไม่ใช่เวลาปัจจุบัน และดึงเฉพาะช่วงที่มีแท่ง
+  function anchorMs() {
+    const B = O.series.data() || []; if (!B.length) return { end: Date.now(), closed: false };
+    const sec = TFS[O.tf] || 60, end = (B[B.length - 1].time - TZ + sec) * 1000;
+    return Date.now() - end > 30 * 60e3 ? { end, closed: true } : { end: Date.now(), closed: false };
+  }
   async function backfill() {
     trades = []; sN = 0; thrAt = 0;
-    const since = Date.now() - cfg.hours * 3600e3;
+    const A = anchorMs(), since = A.end - cfg.hours * 3600e3;
+    sinceT = since;
     if (src !== 'bitget') {
       try {
         const head = await fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&limit=1000`);
@@ -109,19 +126,19 @@
         head.forEach(x => addTrade(x.T, +x.p, +x.q, x.m ? -1 : 1, true));
         const top = head[head.length - 1].a, low = head[0].a;
         lastId = top; lastMsg = Date.now(); thrAt = 0; thr(); O.markDirty();
+        status = 'กำลังหาช่วงเวลา…'; paintInfo();
+        const hiNeed = A.closed ? await idAt(A.end, top) : low - 1;
         const c = loadCache();
-        let stop = 0;
-        if (c && c.lastId && low - c.lastId < 400000) {
+        let loNeed = null;
+        if (c && c.hiId && c.rows.length && c.rows[0][0] <= since + 3600e3 && c.hiId > top - 3000000) {
           c.rows.forEach(([t, p, q, s]) => { if (t >= since && t < head[0].T) trades.push({ t, p, q, s }); });
-          stop = Math.min(c.lastId, low - 1); // มีของเดิมแล้ว ดึงเฉพาะช่วงที่ขาด (ถ้าไม่ขาดก็ไม่ต้องดึง)
-          const oldest = c.rows.length ? c.rows[0][0] : Infinity;
-          if (oldest > since + 3600e3) stop = 0; // ของเดิมย้อนไม่ถึง → โหลดใหม่ทั้งช่วง
+          loNeed = c.hiId; // มีของเดิมแล้ว ดึงเฉพาะช่วงที่ขาด
         }
-        if (!stop) {
-          try { const f = await fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&startTime=${since}&endTime=${since + 3600e3}&limit=1`); if (f.length) stop = f[0].a - 1; } catch (e) {}
-        }
-        await pullRange(stop || Math.max(0, low - 400000), low - 1, since, stop ? 'กำลังโหลดย้อนหลัง' : 'กำลังโหลดย้อนหลัง');
+        if (loNeed === null) loNeed = (await idAt(since, top)) - 1;
+        if (hiNeed > loNeed) await pullRange(loNeed, hiNeed, since, 'กำลังโหลดย้อนหลัง');
+        covHi = A.closed ? Math.max(hiNeed, loNeed) : top;
         trades = trades.filter(x => x.t >= since);
+        trades.sort((a, b) => a.t - b.t);
         saveCache();
         return;
       } catch (e) { src = 'bitget'; await loadKlines(); }
@@ -147,7 +164,7 @@
     try {
       if (src === 'binance') {
         ws = new WebSocket(`wss://fstream.binance.com/ws/${SYM.toLowerCase()}@aggTrade`);
-        ws.onmessage = e => { const x = JSON.parse(e.data); if (x.e === 'aggTrade') { lastMsg = Date.now(); if (lastId && x.a > lastId + 1) gapFill(); if (x.a > lastId) { lastId = x.a; addTrade(x.T, +x.p, +x.q, x.m ? -1 : 1); live(x.T); } } };
+        ws.onmessage = e => { const x = JSON.parse(e.data); if (x.e === 'aggTrade') { lastMsg = Date.now(); if (lastId && x.a > lastId + 1) gapFill(); if (x.a > lastId) { if (covHi === lastId) covHi = x.a; lastId = x.a; addTrade(x.T, +x.p, +x.q, x.m ? -1 : 1); live(x.T); } } };
       } else {
         ws = new WebSocket('wss://ws.bitget.com/v2/ws/public');
         ws.onopen = () => { ws.send(JSON.stringify({ op: 'subscribe', args: [{ instType: 'USDT-FUTURES', channel: 'trade', instId: SYM }] })); wsTimer = setInterval(() => { try { ws.send('ping'); } catch (e) {} }, 25000); };
@@ -170,7 +187,7 @@
     try {
       for (let k = 0; k < 120; k++) {
         const a = await page(lastId + 1); if (!a.length) break;
-        a.forEach(x => { if (x.a > lastId) { lastId = x.a; addTrade(x.T, +x.p, +x.q, x.m ? -1 : 1); } });
+        a.forEach(x => { if (x.a > lastId) { if (covHi === lastId) covHi = x.a; lastId = x.a; addTrade(x.T, +x.p, +x.q, x.m ? -1 : 1); } });
         O.markDirty();
         if (a.length < 1000) break;
         await sleep(700);
@@ -183,7 +200,7 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cfg.on && !busy) { if (!ws || ws.readyState > 1) openWS(); gapFill(); loadKlines().then(() => O.markDirty()); } });
   setInterval(() => { if (cfg.on && !busy) saveCache(); }, 5 * 60e3);
   // ตัดไม้เล็ก/เก่าทิ้งเป็นระยะ ไม่ให้หน่วยความจำโต
-  setInterval(() => { if (!cfg.on) return; const T = thr() * 0.5, since = Date.now() - (cfg.hours + 1) * 3600e3; trades = trades.filter(x => x.q >= Math.min(T, MINQ) && x.t >= since); }, 60000);
+  setInterval(() => { if (!cfg.on) return; const T = thr() * 0.5, since = Math.min(Date.now() - (cfg.hours + 1) * 3600e3, sinceT || Infinity); trades = trades.filter(x => x.q >= Math.min(T, MINQ) && x.t >= since); }, 60000);
 
   async function reload() {
     if (busy || !cfg.on) return; busy = true; curTf = O.tf;
@@ -249,7 +266,7 @@
   function paintInfo() {
     const el = $('btInfo'); if (!el) return;
     if (!cfg.on) { el.textContent = ''; return; }
-    const T = thr(), since = Date.now() - cfg.hours * 3600e3, n = trades.filter(x => x.q >= T && x.t >= since), nb = n.filter(x => x.s > 0).length;
+    const T = thr(), since = sinceT || Date.now() - cfg.hours * 3600e3, n = trades.filter(x => x.q >= T && x.t >= since), nb = n.filter(x => x.s > 0).length;
     const B = O.series.data() || [], lt = B.length ? delta.get(B[B.length - 1].time) : null;
     el.textContent = status || `${src === 'bitget' ? 'Bitget' : 'Binance'} · ไม้ใหญ่ ≥ ${T} oz${cfg.auto ? ' (อัตโนมัติ)' : ''} · ${cfg.hours} ชม.: ซื้อ ${nb} / ขาย ${n.length - nb}` + (lt ? ` · Δ แท่งนี้ ${(lt.b - lt.s) >= 0 ? '+' : ''}${(lt.b - lt.s).toFixed(1)}` : '');
   }

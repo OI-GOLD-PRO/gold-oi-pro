@@ -78,7 +78,7 @@
   function loadCache() { try { const c = JSON.parse(localStorage.getItem(CKEY) || 'null'); return c && c.v === 1 ? c : null; } catch (e) { return null; } }
   function saveCache() {
     try {
-      const keep = Date.now() - 25 * 3600e3, rows = trades.filter(x => x.t >= keep && x.q >= MINQ).map(x => [x.t, +x.p.toFixed(2), +x.q.toFixed(3), x.s]);
+      const keep = Date.now() - 25 * 3600e3, rows = trades.slice().sort((a, b) => a.t - b.t).filter(x => x.t >= keep && x.q >= MINQ).map(x => [x.t, +x.p.toFixed(2), +x.q.toFixed(3), x.s]);
       localStorage.setItem(CKEY, JSON.stringify({ v: 1, lastId, rows }));
     } catch (e) {}
   }
@@ -111,10 +111,11 @@
         lastId = top; lastMsg = Date.now(); thrAt = 0; thr(); O.markDirty();
         const c = loadCache();
         let stop = 0;
-        if (c && c.lastId && c.lastId < low) {
+        if (c && c.lastId && low - c.lastId < 400000) {
           c.rows.forEach(([t, p, q, s]) => { if (t >= since && t < head[0].T) trades.push({ t, p, q, s }); });
-          stop = c.lastId; // มีของเดิมแล้ว ดึงเฉพาะช่วงที่ขาด
-          if (low - stop > 400000) stop = 0;
+          stop = Math.min(c.lastId, low - 1); // มีของเดิมแล้ว ดึงเฉพาะช่วงที่ขาด (ถ้าไม่ขาดก็ไม่ต้องดึง)
+          const oldest = c.rows.length ? c.rows[0][0] : Infinity;
+          if (oldest > since + 3600e3) stop = 0; // ของเดิมย้อนไม่ถึง → โหลดใหม่ทั้งช่วง
         }
         if (!stop) {
           try { const f = await fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&startTime=${since}&endTime=${since + 3600e3}&limit=1`); if (f.length) stop = f[0].a - 1; } catch (e) {}

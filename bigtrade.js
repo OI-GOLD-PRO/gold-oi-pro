@@ -73,20 +73,20 @@
   // V4.3.3: โหลดจากใหม่ไปเก่า (แท่งล่าสุดขึ้นก่อน) · จำไม้ใหญ่ไว้ในเครื่อง (cache) เปิดครั้งถัดไปโหลดเฉพาะช่วงที่ขาด
   //         · ใส่จังหวะไม่เกิน ~90 ครั้ง/นาที (aggTrades weight 20, เพดาน Binance 2400/นาที)
   const CKEY = 'oi_bigtr_cache', MINQ = 0.5;
-  let lastId = 0, lastMsg = 0, filling = false, covHi = 0, sinceT = 0; // covHi = id สูงสุดที่มีไม้ต่อเนื่องครบ (ใช้กับ cache)
+  let lastId = 0, lastMsg = 0, filling = false, covHi = 0, sinceT = 0, limited = false, closedAnchor = false; // covHi = id สูงสุดที่มีไม้ต่อเนื่องครบ (ใช้กับ cache)
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   function loadCache() { try { const c = JSON.parse(localStorage.getItem(CKEY) || 'null'); return c && c.v === 2 ? c : null; } catch (e) { return null; } }
   function saveCache() {
     try {
       const keep = Math.min(Date.now() - 25 * 3600e3, sinceT || Infinity), rows = trades.slice().sort((a, b) => a.t - b.t).filter(x => x.t >= keep && x.q >= MINQ).map(x => [x.t, +x.p.toFixed(2), +x.q.toFixed(3), x.s]);
-      localStorage.setItem(CKEY, JSON.stringify({ v: 2, hiId: covHi, rows }));
+      localStorage.setItem(CKEY, JSON.stringify({ v: 2, hiId: covHi, lim: limited, since: sinceT, rows }));
     } catch (e) {}
   }
   // ดึง 1 หน้า: โดนจำกัดความถี่ (429/418) หรือเน็ตสะดุด → รอแล้วลองใหม่ ไม่โยนทิ้งไปใช้ Bitget
   async function page(fromId, lim) {
     for (let k = 0; ; k++) {
       try { return await fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&fromId=${fromId}&limit=${lim || 1000}`); }
-      catch (e) { if (k >= 4) throw e; status = /429|418/.test(e.message) ? 'Binance ขอให้รอสักครู่…' : status; paintInfo(); await sleep(/429|418/.test(e.message) ? 20000 : 3000); }
+      catch (e) { if (k >= 4 || /HTTP 400/.test(e.message)) throw e; status = /429|418/.test(e.message) ? 'Binance ขอให้รอสักครู่…' : status; paintInfo(); await sleep(/429|418/.test(e.message) ? 20000 : 3000); }
     }
   }
   // ดึงช่วง id (lo..hi] จากใหม่ไปเก่า ครั้งละ 3 หน้าพร้อมกัน
@@ -95,7 +95,8 @@
     while (to > lo) {
       const batch = [];
       for (let k = 0; k < 3 && to > lo; k++) { const from = Math.max(lo + 1, to - 999); batch.push(page(from)); to = from - 1; }
-      const res = await Promise.all(batch);
+      const res = (await Promise.all(batch.map(p => p.catch(e => { if (/HTTP 400/.test(e.message)) return null; throw e; })))).filter(Boolean);
+      if (!res.length) { limited = true; break; }
       let oldest = Infinity;
       res.forEach(a => a.forEach(x => { addTrade(x.T, +x.p, +x.q, x.m ? -1 : 1); if (x.T < oldest) oldest = x.T; }));
       done += res.length;
@@ -109,11 +110,12 @@
   const page1 = fromId => page(fromId, 1);
   async function idAt(ms, topId) {
     try { const f = await fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&startTime=${ms}&endTime=${ms + 3600e3}&limit=1`); if (f.length) return f[0].a; } catch (e) {}
-    const T = async id => { const a = await page1(id); return a.length ? a[0].T : Infinity; };
+    // Binance ให้ย้อนได้แค่ 2 วันล่าสุด (code −4166 → HTTP 400) → นับเป็น "เก่ากว่าที่ต้องการ" จะได้ไปจบที่ขอบที่ดึงได้
+    const T = async id => { try { const a = await page1(id); return a.length ? a[0].T : Infinity; } catch (e) { if (/HTTP 400/.test(e.message)) return -Infinity; throw e; } };
     let hi = topId, lo = topId, step = 200000;
     for (let k = 0; k < 8; k++) { lo = Math.max(1, hi - step); if (await T(lo) < ms) break; hi = lo; step *= 2; await sleep(300); }
     while (hi - lo > 500) { const mid = Math.floor((lo + hi) / 2); if (await T(mid) < ms) lo = mid; else hi = mid; await sleep(250); }
-    return lo;
+    return T(lo).then(t => t === -Infinity ? hi : lo);
   }
   // V4.3.6: ตลาด CME ปิด (เสาร์–อาทิตย์/ช่วงพัก) → นับย้อนหลังจากแท่งสุดท้ายบนกราฟ ไม่ใช่เวลาปัจจุบัน และดึงเฉพาะช่วงที่มีแท่ง
   function anchorMs() {
@@ -122,8 +124,8 @@
     return Date.now() - end > 30 * 60e3 ? { end, closed: true } : { end: Date.now(), closed: false };
   }
   async function backfill() {
-    trades = []; sN = 0; thrAt = 0;
-    const A = anchorMs(), since = A.end - cfg.hours * 3600e3;
+    trades = []; sN = 0; thrAt = 0; limited = false;
+    const A = anchorMs(), since = A.end - cfg.hours * 3600e3; closedAnchor = A.closed;
     sinceT = since;
     if (src !== 'bitget') {
       try {
@@ -136,7 +138,7 @@
         const hiNeed = A.closed ? await idAt(A.end, top) : low - 1;
         const c = loadCache();
         let loNeed = null;
-        if (c && c.hiId && c.rows.length && c.rows[0][0] <= since + 3600e3 && c.hiId > top - 3000000) {
+        if (c && c.hiId && c.rows.length && (c.rows[0][0] <= since + 3600e3 || (c.lim && c.since <= since + 3600e3)) && c.hiId > top - 3000000) {
           c.rows.forEach(([t, p, q, s]) => { if (t >= since && t < head[0].T) trades.push({ t, p, q, s }); });
           loNeed = c.hiId; // มีของเดิมแล้ว ดึงเฉพาะช่วงที่ขาด
         }
@@ -274,7 +276,7 @@
     if (!cfg.on) { el.textContent = ''; return; }
     const T = thr(), since = sinceT || Date.now() - cfg.hours * 3600e3, n = trades.filter(x => x.q >= T && x.t >= since), nb = n.filter(x => x.s > 0).length;
     const B = O.series.data() || [], lt = B.length ? delta.get(B[B.length - 1].time) : null;
-    el.textContent = status || `${src === 'bitget' ? 'Bitget' : 'Binance'} · ไม้ใหญ่ ≥ ${T} oz${cfg.auto ? ' (อัตโนมัติ)' : ''} · ${cfg.hours} ชม.: ซื้อ ${nb} / ขาย ${n.length - nb}` + (lt ? ` · Δ แท่งนี้ ${(lt.b - lt.s) >= 0 ? '+' : ''}${(lt.b - lt.s).toFixed(1)}` : '');
+    el.textContent = status || `${src === 'bitget' ? 'Bitget' : 'Binance'} · ไม้ใหญ่ ≥ ${T} oz${cfg.auto ? ' (อัตโนมัติ)' : ''} · ${cfg.hours} ชม.: ซื้อ ${nb} / ขาย ${n.length - nb}` + (lt ? ` · Δ แท่งนี้ ${(lt.b - lt.s) >= 0 ? '+' : ''}${(lt.b - lt.s).toFixed(1)}` : '') + (closedAnchor ? ' · ตลาดปิด: นับจากแท่งสุดท้าย' : '') + (limited ? ' · Binance ย้อนได้แค่ 2 วัน' : '');
   }
   setInterval(paintInfo, 5000);
   function section() {

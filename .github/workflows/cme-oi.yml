@@ -6,7 +6,7 @@ on:
     - cron: '17 * * * *'
   workflow_dispatch:
   push:
-    paths: ['.github/workflows/cme-oi.yml', 'scripts/cme_oi.mjs']
+    paths: ['scripts/cme_fut.mjs', '.github/workflows/cme-oi.yml', 'scripts/cme_oi.mjs']
 permissions:
   contents: write
 concurrency: cme-oi
@@ -26,11 +26,13 @@ jobs:
           npx playwright install --with-deps chromium >/dev/null
       - name: Fetch CME OI
         run: xvfb-run -a node scripts/cme_oi.mjs cme_oi.json
+      - name: Fetch GC futures total OI (daily)
+        run: xvfb-run -a node scripts/cme_fut.mjs || true
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          for f in cme_oi.json cme_oi_status.json; do [ -f "$f" ] && git add "$f"; done
+          for f in cme_oi.json cme_oi_status.json gc_oi.json; do [ -f "$f" ] && git add "$f"; done
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -m "Update CME OI"
           git pull --rebase -q || true

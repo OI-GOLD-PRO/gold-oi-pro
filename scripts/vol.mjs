@@ -53,7 +53,7 @@ export function cmeOpen(ms) { const p = Object.fromEntries(etFmt.formatToParts(n
 export function settleIV(j) {
   if (!j || !j.settle || !j.settle.rows || !j.exp) return null;
   const [m, d, y] = String(j.settle.tradeDate).split('/').map(Number); if (!y) return null;
-  const e = String(j.exp), t0 = chiMs(y, m, d, 13, 30), tx = chiMs(+e.slice(0, 4), +e.slice(4, 6), +e.slice(6, 8), 12, 30);
+  const e = String(j.exp), t0 = Date.UTC(y, m - 1, d, 17, 0), tx = Date.UTC(+e.slice(0, 4), +e.slice(4, 6) - 1, +e.slice(6, 8), 12, 30); // เวลาแบบ CME/QuikStrike: 17:00 → 12:30 ชิคาโก ตามนาฬิกา
   if (!(tx > t0)) return null;
   const sm = new Map(j.settle.rows.map(([k, t, v]) => [k + t, v])), ks = [...new Set(j.settle.rows.map(r => r[0]))].sort((a, b) => a - b);
   const px = (k, t) => sm.get(k + t) || null;

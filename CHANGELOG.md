@@ -1,3 +1,8 @@
+### V4.4.1 — 2026-11-02 — Claude
+- ไฟล์: live.js (ownIV โหมด settle), scripts/vol.mjs (settleIV), index.html · ลบ scripts/cme_probe.mjs + workflow ทดสอบชั่วคราว
+- แก้อะไร: เทียบ IV ที่คำนวณเองกับเส้น Vol Settle ของ CME (QuikStrike) 3 สัญญา (G1MX6, G1TX6, G2MX6 วันเทรด 30 ต.ค.) พบว่าของเราต่ำกว่า 0.3–0.9 จุดเสมอ เพราะนับเวลาถึงหมดอายุต่างกัน · CME นับจาก 17:00 ชิคาโกของวันเทรด ถึง 12:30 วันหมดอายุ ตามเวลานาฬิกา (ไม่บวกชั่วโมง DST) ส่วนเราเดิมนับจาก 13:30 · แก้ให้ใช้แบบ CME → ATM G1MX6 19.78% เทียบ CME 19.9% (ต่างทั้งเส้น rms ~0.13 จุด จากเดิม 0.69)
+- ระวัง: โหมดสด (ตลาดเปิด) ยังนับเวลาจริงถึงหมดอายุ (ตรงกับ DTE ของ QuikStrike)
+
 ### V4.4.0 — 2026-11-02 — Claude
 - ไฟล์: volreg.js (ใหม่), wallrej.js (ใหม่), scripts/vol.mjs (ใหม่), .github/workflows/vol.yml (ใหม่), dash.js (เรียก window.OIVolCard), index.html
 - แก้อะไร (จากหนังสือ The Invisible Money บท 9–10):

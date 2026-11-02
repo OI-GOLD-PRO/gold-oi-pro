@@ -59,8 +59,10 @@
       mode = 'live'; Tiv = Math.max((d.expTs * 1000 - now) / YEAR, 60e3 / YEAR);
       px = (k, t) => { const o = (map.get(k) || {})[t]; if (!o) return null; const b = +o.bid, a = +o.ask; if (b > 0 && a > b) { const m = (a + b) / 2; if (a - b <= Math.max(0.6, m * 0.25)) return m; } return null; };
     } else if (st.cme && st.cme.settle && st.cme.root === d.root && +st.cme.exp === +d.exp) {
-      const sm = new Map(st.cme.settle.rows.map(([k, t, v]) => [k + t, v])), t0 = settleMs(st.cme.settle.tradeDate);
-      if (t0) { mode = 'settle'; settleDate = st.cme.settle.tradeDate; Tiv = Math.max((d.expTs * 1000 - t0) / YEAR, 60e3 / YEAR); px = (k, t) => sm.get(k + t) || null; }
+      // V4.4.1: เวลาแบบเดียวกับ CME/QuikStrike (เทียบ Vol Settle แล้ว 3 สัญญา): จาก 17:00 ชิคาโกของวันเทรด → 12:30 ชิคาโกวันหมดอายุ นับตามเวลานาฬิกา (ไม่บวกชั่วโมงเปลี่ยน DST)
+      const sm = new Map(st.cme.settle.rows.map(([k, t, v]) => [k + t, v])), [sM, sD, sY] = String(st.cme.settle.tradeDate).split('/').map(Number), e = String(d.exp);
+      const Ts = sY ? (Date.UTC(+e.slice(0, 4), +e.slice(4, 6) - 1, +e.slice(6, 8), 12, 30) - Date.UTC(sY, sM - 1, sD, 17, 0)) / YEAR : null;
+      if (Ts > 0) { mode = 'settle'; settleDate = st.cme.settle.tradeDate; Tiv = Math.max(Ts, 60e3 / YEAR); px = (k, t) => sm.get(k + t) || null; }
       ks = [...new Set([...ks, ...st.cme.settle.rows.map(r => r[0])])].sort((a, b) => a - b);
     }
     if (!mode) return null;

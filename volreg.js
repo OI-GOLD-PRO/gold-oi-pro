@@ -91,17 +91,31 @@
     return { c: P, F, vol, settle, sd: F * vol * Math.sqrt(Tx), dte: Tx * 365, src, root: d.root };
   }
 
+  // V4.5.7: กรอบ SD แบบ "ตรึง" ที่ราคา settle ล่าสุด (เส้นไม่ขยับตามราคา → ราคาวิ่งไปแตะ 1/2/3SD ได้จริง ใช้เป็นแนวสวน/เป้าตามหนังสือหน้า 203)
+  //  กึ่งกลาง = ราคาฟิวเจอร์ส settle (put-call parity ของราคาปิด CME) · Vol = Vol Settle ATM · เวลา = จาก settle (17:00 CT) ถึงหมดอายุ แบบ CME
+  //  คงที่ทั้งรอบจนกว่า CME จะ settle รอบใหม่ (~01:30 ไทย หลังสัญญาหมดอายุจะเปลี่ยนเป็นสัญญาถัดไป)
+  function anchored() {
+    const L = window.OILive; if (!L || !L.d || !L.cme || !L.cme.settle || L.cme.root !== L.d.root || +L.cme.exp !== +L.d.exp) return null;
+    const S = settleSmile(L.cme); if (!S.F || !S.pts.length) return null;
+    const [m, d, y] = String(L.cme.settle.tradeDate).split('/').map(Number), e = String(L.cme.exp);
+    const T = (Date.UTC(+e.slice(0, 4), +e.slice(4, 6) - 1, +e.slice(6, 8), 12, 30) - Date.UTC(y, m - 1, d, 17, 0)) / YEAR; if (!(T > 0)) return null;
+    const vol = atK(S.pts, S.F); if (!vol) return null;
+    const r0 = O.oi && O.oi.rows ? O.oi.rows.find(r => r.price !== null && r.price !== undefined) : null, off = r0 ? r0.price - r0.strike : 0;
+    const sd = S.F * vol * Math.sqrt(T), c = S.F + off, P = O.lastClose;
+    return { c, F: S.F, vol, sd, days: T * 365, date: S.date, root: L.d.root, z: P ? (P - c) / sd : null };
+  }
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   O.hooks.push((ctx, w, h) => {
     if (!cfg.on || !cfg.sd) return;
-    const E = erange(); if (!E || !O.chart || !O.series) return;
+    const E = anchored(); if (!E || !O.chart || !O.series) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height(), sec = TFS[O.tf] || 60;
     if (sec >= 86400) return;
     const bars = O.bars || null; let x0 = plotW * 0.55;
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
     ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'right'; ctx.lineWidth = 1;
     const col = ['#9aa7ff', '#22e39a', '#ff9f1a', '#ff4d6a'];
-    // แถบ 1SD จาง ๆ (เหมือนแถบเทาใน QuikStrike) + เส้น ±1/2/3SD จากราคาตอนนี้ถึงหมดอายุ
+    // แถบ 1SD จาง ๆ + เส้นกึ่งกลาง (settle) + ±1/2/3SD ตรึงทั้งรอบ
+    const yc = sr.priceToCoordinate(E.c); if (yc !== null && yc > 0 && yc < plotH) { ctx.strokeStyle = 'rgba(154,167,255,.5)'; ctx.setLineDash([1, 3]); ctx.beginPath(); ctx.moveTo(x0, yc); ctx.lineTo(plotW, yc); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = '#9aa7ff'; ctx.fillText(`settle ${E.c.toFixed(0)}`, plotW - 4, yc - 6); }
     const yA = sr.priceToCoordinate(E.c + E.sd), yB = sr.priceToCoordinate(E.c - E.sd);
     if (yA !== null && yB !== null) { ctx.fillStyle = 'rgba(154,167,255,.06)'; ctx.fillRect(x0, Math.max(0, yA), plotW - x0, Math.min(plotH, yB) - Math.max(0, yA)); }
     for (let k = 1; k <= 3; k++) [1, -1].forEach(sg => {
@@ -117,18 +131,20 @@
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     if (!cfg.on) return null;
     const r = regime(); if (!r) return null;
-    return [`🌡${r.Z.ico} ${r.Z.name} ${r.pct.toFixed(0)}%`, r.Z.col, 'volreg', null, 'first']; // V4.5.4: เอา ±σ ออก (เส้น SD ใช้แบบ CME ตามราคาปัจจุบันแล้ว) // V4.5.0: ขึ้นหน้าแถบ (เดิมอยู่ท้ายสุด ต้องเลื่อนถึงเห็น)
+    const A = anchored(), z = A && A.z !== null ? A.z : null, zt = z === null ? '' : ` · ${z >= 0 ? '+' : '−'}${Math.abs(z).toFixed(1)}SD`;
+    return [`🌡${r.Z.ico} ${r.Z.name} ${r.pct.toFixed(0)}%${zt}`, r.Z.col, 'volreg', z !== null && Math.abs(z) >= 2 ? r.Z.bg : null, 'first']; // V4.5.7: ตำแหน่งราคาเทียบกรอบ SD ที่ตรึงจาก settle // V4.5.4: เอา ±σ ออก (เส้น SD ใช้แบบ CME ตามราคาปัจจุบันแล้ว) // V4.5.0: ขึ้นหน้าแถบ (เดิมอยู่ท้ายสุด ต้องเลื่อนถึงเห็น)
   });
   function explain() {
     const r = regime(); if (!r) { O.showToast && O.showToast('🌡 โหมดตลาด: กำลังโหลด vol.json…', 4000); return; }
     const g = r.g, sq = window.OI_squeeze && window.OI_squeeze.result;
-    const E = erange(), zLine = E ? `● Expected Range ถึงหมดอายุ (${E.root}, เหลือ ${E.dte.toFixed(2)} วัน) แบบ CME: 1SD = ±${E.sd.toFixed(1)} → ${(E.c - E.sd).toFixed(0)}–${(E.c + E.sd).toFixed(0)} · 2SD ±${(2 * E.sd).toFixed(0)} · 3SD ±${(3 * E.sd).toFixed(0)} (${E.src} ${(E.vol * 100).toFixed(2)}%)<br>` : '';
+    const A = anchored(), aLine = A ? `● กรอบ SD ตรึงจาก settle ${A.date} (${A.root}): กลาง ${A.c.toFixed(1)} · 1SD ±${A.sd.toFixed(1)} · 2SD ${(A.c - 2 * A.sd).toFixed(0)}–${(A.c + 2 * A.sd).toFixed(0)} · 3SD ±${(3 * A.sd).toFixed(0)} (Vol ${(A.vol * 100).toFixed(2)}%, ${A.days.toFixed(2)} วัน)<br>● ราคาตอนนี้ <b>${A.z >= 0 ? '+' : '−'}${Math.abs(A.z).toFixed(2)}SD</b> ${Math.abs(A.z) >= 3 ? '→ ถึง 3SD (หางอ้วน: รอแรงเหวี่ยง/IV ลดก่อนสวน)' : Math.abs(A.z) >= 2 ? '→ เลย 2SD เฝ้าจังหวะกลับตัว' : Math.abs(A.z) >= 1 ? '→ เลย 1SD' : '→ อยู่ในกรอบ 1SD'}<br>` : '';
+    const E = erange(), zLine = E ? `● กรอบจากราคาตอนนี้ (แบบหน้าจอ QuikStrike ขยับตามราคา): ${E.root}, เหลือ ${E.dte.toFixed(2)} วัน) แบบ CME: 1SD = ±${E.sd.toFixed(1)} → ${(E.c - E.sd).toFixed(0)}–${(E.c + E.sd).toFixed(0)} · 2SD ±${(2 * E.sd).toFixed(0)} · 3SD ±${(3 * E.sd).toFixed(0)} (${E.src} ${(E.vol * 100).toFixed(2)}%)<br>` : '';
     O.showToast && O.showToast(
       `<b style="color:${r.Z.col}">${r.Z.ico} โหมดตลาด: ${r.Z.name}</b> · HV 20 วัน ${g.last.toFixed(1)}% = เปอร์เซ็นไทล์ <b>${g.pct.toFixed(0)}</b> (เทียบตั้งแต่ ${g.since.slice(0, 4)})<br>` +
       `● เกณฑ์: 🟢 &lt; ${g.p25}% · 🟠 ${g.p25}–${g.p75}% · 🔴 &gt; ${g.p75}% (มัธยฐาน ${g.p50}%)<br>` +
       `● ${r.Z.how}<br>` +
       `● ขนาดไม้แนะนำ <b>×${r.size.toFixed(2)}</b> ของปกติ · ระยะ SL <b>×${r.sl.toFixed(2)}</b><br>` +
-      zLine +
+      aLine + zLine +
       (r.gvz ? `● IV ทอง (GVZ) ${r.gvz.last.toFixed(1)}% = เปอร์เซ็นไทล์ ${r.gvz.pct.toFixed(0)} (ตั้งแต่ ${r.gvz.since.slice(0, 4)})<br>` : '') +
       `● สถิติรายวัน: Skew ${g.skew} (ปีนี้ ${g.skew1y}) · Kurtosis ${g.kurt} (ปีนี้ ${g.kurt1y}) → ${g.skew < 0 ? 'ขาลงแรงกว่าขาขึ้น' : 'ขาขึ้นแรงกว่า'} · หางอ้วน หลุด 3σ บ่อยกว่าทฤษฎี<br>` +
       (sq && sq.lv >= 2 ? `<b style="color:#ff4d6a">⚠️ ตอนนี้มีป้าย Squeeze → ห้ามสวน</b><br>` : '') +
@@ -148,7 +164,7 @@
   function section() {
     const d = document.createElement('div'); d.id = 'vrBox'; d.className = 'gsbox'; const r = regime();
     d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-vr="on"><i style="background:#ff9f1a"></i>🌡 โหมดตลาด (ความผันผวน)</button><span class="gsinfo">${r ? `${r.Z.ico} ${r.Z.name} · HV ${r.hv.toFixed(1)}% (P${r.pct.toFixed(0)})` : ''}</span></div>` +
-      (cfg.on ? `<div class="row ps"><button class="gsb${cfg.sd ? ' on' : ''}" data-vr="sd">เส้น ±1/2/3SD ถึงหมดอายุ (แบบ CME)</button></div>` : '');
+      (cfg.on ? `<div class="row ps"><button class="gsb${cfg.sd ? ' on' : ''}" data-vr="sd">เส้น ±1/2/3SD (ตรึงจากราคา settle)</button></div>` : '');
     return d;
   }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('vrBox')) return; const box = section(), anchor = $('wrBox') || $('s3Box') || $('dhBox') || $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }
@@ -220,5 +236,5 @@
       `<div class="note">IV ของสัญญาที่หมดอายุวันนั้น คิดเวลาเป็นวันปฏิทิน → วันจันทร์หลังเสาร์-อาทิตย์ค่า settlement จะต่ำ และ IV มักสูงขึ้นช่วงใกล้หมดอายุ เทียบแนวโน้มกับ GVZ จะนิ่งกว่า</div></div>`);
     return parts.join('');
   };
-  window.OI_vol = { get data() { return V; }, get hist() { return IH; }, regime, sigma, zNow, erange, get sess() { return sess; }, load };
+  window.OI_vol = { get data() { return V; }, get hist() { return IH; }, regime, sigma, zNow, erange, anchored, get sess() { return sess; }, load };
 })();

@@ -1,0 +1,14 @@
+name: oidiv-bt
+on:
+  workflow_dispatch:
+  push:
+    paths: ['scripts/oidiv_bt.mjs', '.github/workflows/oidiv-bt.yml']
+jobs:
+  bt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/oidiv_bt.mjs

@@ -134,10 +134,10 @@
   // ---------- การ์ดหน้าแดช: ความผันผวน & ประวัติ IV ----------
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function lineChart(series, opt) { // series: [{pts:[[x(ms),y]], col, w, dash, dot}] → svg
-    const W = 680, H = opt.h || 170, L = 34, R = 8, T = 10, B = 20;
+    const W = 680, H = opt.h || 240, L = 34, R = 8, T = 10, B = 20;
     const all = series.flatMap(s => s.pts); if (all.length < 2) return '<div class="note">ยังมีข้อมูลไม่พอวาดกราฟ</div>';
     const x0 = Math.min(...all.map(p => p[0])), x1 = Math.max(...all.map(p => p[0]));
-    let y0 = Math.min(...all.map(p => p[1]), ...(opt.bands || []).map(b => b[0])), y1 = Math.max(...all.map(p => p[1]), ...(opt.bands || []).map(b => b[1]));
+    let y0 = Math.min(...all.map(p => p[1])), y1 = Math.max(...all.map(p => p[1])); // พื้นโหมดไม่ขยายสเกล (ถูกตัดตามกรอบ)
     const pad = (y1 - y0) * 0.08 || 1; y0 = Math.max(0, y0 - pad); y1 += pad;
     const X = x => L + (x - x0) / ((x1 - x0) || 1) * (W - L - R), Y = y => T + (1 - (y - y0) / ((y1 - y0) || 1)) * (H - T - B);
     const out = [`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opt.label || 'กราฟ')}" style="width:100%;display:block">`];
@@ -184,7 +184,7 @@
     local.sort((a, b) => a[0] - b[0]);
     parts.push(`<h3 style="margin-top:12px">IV ATM รายชั่วโมง (14 วัน)</h3>` + (hr.length + local.length >= 2 ? lineChart([
       { pts: local, col: 'rgba(201,184,255,.45)', w: 1 }, { pts: hr, col: '#c9b8ff', w: 1.8, dot: true }
-    ], { label: 'IV ATM รายชั่วโมง', hourly: true, h: 150 }) : `<div class="note">เริ่มเก็บแล้ว (ทุกชั่วโมงตอนตลาดเปิด) ตอนนี้มี ${hr.length} จุด</div>`) +
+    ], { label: 'IV ATM รายชั่วโมง', hourly: true, h: 200 }) : `<div class="note">เริ่มเก็บแล้ว (ทุกชั่วโมงตอนตลาดเปิด) ตอนนี้มี ${hr.length} จุด</div>`) +
       `<div class="cleg"><span><i style="background:#c9b8ff"></i>บันทึกบนเซิร์ฟเวอร์ ทุกชั่วโมง</span><span><i style="background:rgba(201,184,255,.45)"></i>บันทึกในเครื่องนี้ ทุก 5 นาที</span></div>` +
       `<div class="note">IV ของสัญญาที่หมดอายุวันนั้น คิดเวลาเป็นวันปฏิทิน → วันจันทร์หลังเสาร์-อาทิตย์ค่า settlement จะต่ำ และ IV มักสูงขึ้นช่วงใกล้หมดอายุ เทียบแนวโน้มกับ GVZ จะนิ่งกว่า</div></div>`);
     return parts.join('');

@@ -60,23 +60,55 @@
   }
   const zNow = () => { const S = sigma(), P = O.lastClose; return S && P ? (P - sess.open) / S.s : null; };
 
+  // ---------- Expected Range ถึงหมดอายุ แบบ CME QuikStrike (Vol2Vol) — V4.5.4 ----------
+  // จุดกึ่งกลาง = ราคาตอนนี้ · 1SD = F × Vol Settle (ที่ราคานั้น จากเส้น smile ของ settlement ล่าสุด) × √(เวลาที่เหลือถึงหมดอายุ ÷ 365)
+  // เทียบกับ QuikStrike 2 พ.ย. 16:50: F 3909.3, Vol 19.57%, 0.36 DTE → 1SD 3885–3934 (ตรงกับแถบเทาในกราฟ CME)
+  const YEAR = 365 * 864e5;
+  const NCDF = x => { const z = Math.abs(x) / Math.SQRT2, t = 1 / (1 + 0.3275911 * z), y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z); return x >= 0 ? 0.5 * (1 + y) : 0.5 * (1 - y); };
+  const b76 = (F, K, T, v, c) => { const w = v * Math.sqrt(T), d1 = (Math.log(F / K) + w * w / 2) / w, d2 = d1 - w; return c ? F * NCDF(d1) - K * NCDF(d2) : K * NCDF(-d2) - F * NCDF(-d1); };
+  const implVol = (p, F, K, T, c) => { if (!(p > Math.max(0, c ? F - K : K - F) + 0.02)) return null; let lo = 0.01, hi = 3; if (b76(F, K, T, hi, c) < p) return null; for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (b76(F, K, T, m, c) > p) hi = m; else lo = m; } return (lo + hi) / 2; };
+  let smile = null; // { key, pts:[[K, iv]] }
+  function settleSmile(cme) {
+    const key = cme.root + cme.exp + cme.settle.tradeDate; if (smile && smile.key === key) return smile;
+    const [m, d, y] = String(cme.settle.tradeDate).split('/').map(Number), e = String(cme.exp);
+    const T = (Date.UTC(+e.slice(0, 4), +e.slice(4, 6) - 1, +e.slice(6, 8), 12, 30) - Date.UTC(y, m - 1, d, 17, 0)) / YEAR; // เวลาแบบ CME
+    const sm = new Map(cme.settle.rows.map(([k, t, v]) => [k + t, v])), px = (k, t) => sm.get(k + t) || null;
+    const ks = [...new Set(cme.settle.rows.map(r => r[0]))].sort((a, b) => a - b);
+    const par = ks.filter(k => px(k, 'C') && px(k, 'P')).sort((a, b) => Math.abs(px(a, 'C') - px(a, 'P')) - Math.abs(px(b, 'C') - px(b, 'P'))).slice(0, 3).map(k => k + px(k, 'C') - px(k, 'P')).sort((a, b) => a - b);
+    const F = par.length ? par[Math.floor(par.length / 2)] : null, pts = [];
+    if (F && T > 0) ks.forEach(k => { if (Math.abs(k - F) > F * 0.08) return; const c = k >= F; let v = px(k, c ? 'C' : 'P') ? implVol(px(k, c ? 'C' : 'P'), F, k, T, c) : null; if (v === null && px(k, c ? 'P' : 'C')) v = implVol(px(k, c ? 'P' : 'C'), F, k, T, !c); if (v && v > 0.02 && v < 2.5) pts.push([k, v]); });
+    smile = { key, pts, F, date: cme.settle.tradeDate }; return smile;
+  }
+  const atK = (pts, x) => { if (!pts.length) return null; if (x <= pts[0][0]) return pts[0][1]; if (x >= pts[pts.length - 1][0]) return pts[pts.length - 1][1]; for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) { const [k0, v0] = pts[i - 1], [k1, v1] = pts[i]; return v0 + (v1 - v0) * (x - k0) / (k1 - k0); } return null; };
+  function erange() {
+    const L = window.OILive, P = O.lastClose; if (!L || !L.d || !L.d.expTs || !P) return null;
+    const d = L.d, now = Date.now(), Tx = (d.expTs * 1000 - now) / YEAR; if (!(Tx > 0)) return null;
+    const r0 = O.oi && O.oi.rows ? O.oi.rows.find(r => r.price !== null && r.price !== undefined) : null, off = r0 ? r0.price - r0.strike : 0;
+    const F = P - off; let vol = null, src = '', settle = null;
+    if (L.cme && L.cme.settle && L.cme.root === d.root && +L.cme.exp === +d.exp) { const S = settleSmile(L.cme); vol = atK(S.pts, F); if (vol) { src = `Vol Settle CME (${S.date})`; settle = vol; } }
+    if (!vol) { const R = window.OI_iv && window.OI_iv.result; if (R && R.iv > 0) { vol = R.iv; src = 'IV สด (คำนวณเอง)'; } }
+    if (!vol) return null;
+    return { c: P, F, vol, settle, sd: F * vol * Math.sqrt(Tx), dte: Tx * 365, src, root: d.root };
+  }
+
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   O.hooks.push((ctx, w, h) => {
     if (!cfg.on || !cfg.sd) return;
-    const S = sigma(); if (!S || !O.chart || !O.series) return;
+    const E = erange(); if (!E || !O.chart || !O.series) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height(), sec = TFS[O.tf] || 60;
     if (sec >= 86400) return;
-    let x0 = ts.timeToCoordinate(Math.floor(sess.t / sec) * sec); if (x0 === null || x0 < 0) x0 = 0; if (x0 > plotW - 30) return;
+    const bars = O.bars || null; let x0 = plotW * 0.55;
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
     ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'right'; ctx.lineWidth = 1;
     const col = ['#9aa7ff', '#22e39a', '#ff9f1a', '#ff4d6a'];
-    const y0 = sr.priceToCoordinate(sess.open);
-    if (y0 !== null && y0 > 0 && y0 < plotH) { ctx.strokeStyle = 'rgba(154,167,255,.45)'; ctx.setLineDash([1, 3]); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(plotW, y0); ctx.stroke(); }
+    // แถบ 1SD จาง ๆ (เหมือนแถบเทาใน QuikStrike) + เส้น ±1/2/3SD จากราคาตอนนี้ถึงหมดอายุ
+    const yA = sr.priceToCoordinate(E.c + E.sd), yB = sr.priceToCoordinate(E.c - E.sd);
+    if (yA !== null && yB !== null) { ctx.fillStyle = 'rgba(154,167,255,.06)'; ctx.fillRect(x0, Math.max(0, yA), plotW - x0, Math.min(plotH, yB) - Math.max(0, yA)); }
     for (let k = 1; k <= 3; k++) [1, -1].forEach(sg => {
-      const p = sess.open + sg * k * S.s, y = sr.priceToCoordinate(p); if (y === null || y < 4 || y > plotH - 4) return;
-      ctx.strokeStyle = col[k]; ctx.globalAlpha = k === 1 ? 0.45 : 0.6; ctx.setLineDash(k === 3 ? [6, 3] : [3, 4]);
+      const p = E.c + sg * k * E.sd, y = sr.priceToCoordinate(p); if (y === null || y < 4 || y > plotH - 4) return;
+      ctx.strokeStyle = col[k]; ctx.globalAlpha = k === 1 ? 0.55 : 0.6; ctx.setLineDash(k === 3 ? [6, 3] : [3, 4]);
       ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(plotW, y); ctx.stroke();
-      ctx.globalAlpha = 0.9; ctx.setLineDash([]); ctx.fillStyle = col[k]; ctx.fillText(`${sg > 0 ? '+' : '−'}${k}σ ${p.toFixed(0)}`, plotW - 4, y - 6);
+      ctx.globalAlpha = 0.9; ctx.setLineDash([]); ctx.fillStyle = col[k]; ctx.fillText(`${sg > 0 ? '+' : '−'}${k}SD ${p.toFixed(0)}`, plotW - 4, y - 6);
     });
     ctx.restore();
   });
@@ -85,13 +117,12 @@
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     if (!cfg.on) return null;
     const r = regime(); if (!r) return null;
-    const z = zNow(), zt = z === null ? '' : ` · ${z >= 0 ? '+' : '−'}${Math.abs(z).toFixed(1)}σ`;
-    return [`🌡${r.Z.ico} ${r.Z.name} ${r.pct.toFixed(0)}%${zt}`, r.Z.col, 'volreg', Math.abs(z || 0) >= 2 ? r.Z.bg : null, 'first']; // V4.5.0: ขึ้นหน้าแถบ (เดิมอยู่ท้ายสุด ต้องเลื่อนถึงเห็น)
+    return [`🌡${r.Z.ico} ${r.Z.name} ${r.pct.toFixed(0)}%`, r.Z.col, 'volreg', null, 'first']; // V4.5.4: เอา ±σ ออก (เส้น SD ใช้แบบ CME ตามราคาปัจจุบันแล้ว) // V4.5.0: ขึ้นหน้าแถบ (เดิมอยู่ท้ายสุด ต้องเลื่อนถึงเห็น)
   });
   function explain() {
     const r = regime(); if (!r) { O.showToast && O.showToast('🌡 โหมดตลาด: กำลังโหลด vol.json…', 4000); return; }
-    const g = r.g, S = sigma(), z = zNow(), sq = window.OI_squeeze && window.OI_squeeze.result;
-    const zLine = S ? `● วันนี้ เปิด ${sess.open.toFixed(1)} · 1σ = ±${S.s.toFixed(1)} (${S.src} ${(S.iv * 100).toFixed(1)}%) · 2σ = ±${(2 * S.s).toFixed(0)} · 3σ = ±${(3 * S.s).toFixed(0)}<br>● ราคาตอนนี้ <b>${z >= 0 ? '+' : '−'}${Math.abs(z).toFixed(2)}σ</b> ${Math.abs(z) >= 3 ? '→ ถึงโซน 3σ (หางอ้วน: รอ IV/แรงเหวี่ยงลดก่อนสวน)' : Math.abs(z) >= 2 ? '→ เลย 2σ เฝ้าดูจังหวะกลับตัว (อย่ารีบ)' : '→ ยังอยู่ในกรอบปกติ'}<br>` : '';
+    const g = r.g, sq = window.OI_squeeze && window.OI_squeeze.result;
+    const E = erange(), zLine = E ? `● Expected Range ถึงหมดอายุ (${E.root}, เหลือ ${E.dte.toFixed(2)} วัน) แบบ CME: 1SD = ±${E.sd.toFixed(1)} → ${(E.c - E.sd).toFixed(0)}–${(E.c + E.sd).toFixed(0)} · 2SD ±${(2 * E.sd).toFixed(0)} · 3SD ±${(3 * E.sd).toFixed(0)} (${E.src} ${(E.vol * 100).toFixed(2)}%)<br>` : '';
     O.showToast && O.showToast(
       `<b style="color:${r.Z.col}">${r.Z.ico} โหมดตลาด: ${r.Z.name}</b> · HV 20 วัน ${g.last.toFixed(1)}% = เปอร์เซ็นไทล์ <b>${g.pct.toFixed(0)}</b> (เทียบตั้งแต่ ${g.since.slice(0, 4)})<br>` +
       `● เกณฑ์: 🟢 &lt; ${g.p25}% · 🟠 ${g.p25}–${g.p75}% · 🔴 &gt; ${g.p75}% (มัธยฐาน ${g.p50}%)<br>` +
@@ -117,7 +148,7 @@
   function section() {
     const d = document.createElement('div'); d.id = 'vrBox'; d.className = 'gsbox'; const r = regime();
     d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-vr="on"><i style="background:#ff9f1a"></i>🌡 โหมดตลาด (ความผันผวน)</button><span class="gsinfo">${r ? `${r.Z.ico} ${r.Z.name} · HV ${r.hv.toFixed(1)}% (P${r.pct.toFixed(0)})` : ''}</span></div>` +
-      (cfg.on ? `<div class="row ps"><button class="gsb${cfg.sd ? ' on' : ''}" data-vr="sd">เส้น ±1/2/3σ ของวัน</button></div>` : '');
+      (cfg.on ? `<div class="row ps"><button class="gsb${cfg.sd ? ' on' : ''}" data-vr="sd">เส้น ±1/2/3SD ถึงหมดอายุ (แบบ CME)</button></div>` : '');
     return d;
   }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('vrBox')) return; const box = section(), anchor = $('wrBox') || $('s3Box') || $('dhBox') || $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }
@@ -158,7 +189,7 @@
   const dms = s => Date.parse(s + 'T00:00:00Z');
   window.OIVolCard = function () {
     const r = regime(); if (!r) return '';
-    const g = r.g, gv = r.gvz, S = sigma(), z = zNow();
+    const g = r.g, gv = r.gvz;
     const ivNow = window.OI_iv && window.OI_iv.result;
     const tile = (lab, val, sub, col) => `<div class="tile"><small>${lab}</small><b${col ? ` style="color:${col}"` : ''}>${val}</b><em>${sub}</em></div>`;
     const parts = [`<div class="card"><h3>🌡 ความผันผวน & ประวัติ IV</h3>
@@ -167,7 +198,7 @@
         ${tile('HV 20 วัน (ความผันผวนจริง)', g.last.toFixed(1) + '%', `เปอร์เซ็นไทล์ ${g.pct.toFixed(0)} · 60 วัน ${g.hv60}%<br>เกณฑ์ 🟢 &lt;${g.p25} · 🔴 &gt;${g.p75}`, r.Z.col)}
         ${tile('IV ทอง 30 วัน (GVZ)', gv ? gv.last.toFixed(1) + '%' : '–', gv ? `เปอร์เซ็นไทล์ ${gv.pct.toFixed(0)} (ตั้งแต่ ${gv.since.slice(0, 4)})<br>มัธยฐาน ${gv.p50}%` : '', gv ? (gv.pct > 75 ? '#ff4d6a' : gv.pct < 25 ? '#22e39a' : '#ff9f1a') : null)}
         ${tile('IV ATM สัญญาวันนี้ (คำนวณเอง)', ivNow ? (ivNow.iv * 100).toFixed(1) + '%' : '–', ivNow ? (ivNow.mode === 'settle' ? `ตลาดปิด · จาก settlement ${esc(ivNow.sd || '')}` : `สด · 1 ชม. ${ivNow.d1h === null ? '–' : (ivNow.d1h >= 0 ? '+' : '−') + Math.abs(ivNow.d1h * 100).toFixed(1)} จุด`) : '', '#c9b8ff')}
-        ${tile('กรอบวันนี้ (σ)', S ? '±' + S.s.toFixed(0) : '–', S ? `เปิด ${sess.open.toFixed(1)} · ราคาอยู่ ${z >= 0 ? '+' : '−'}${Math.abs(z).toFixed(1)}σ<br>2σ ${(sess.open - 2 * S.s).toFixed(0)}–${(sess.open + 2 * S.s).toFixed(0)} · 3σ ±${(3 * S.s).toFixed(0)}` : '')}
+        ${(E => tile('Expected Range ถึงหมดอายุ (แบบ CME)', E ? '±' + E.sd.toFixed(1) : '–', E ? `1SD ${(E.c - E.sd).toFixed(0)}–${(E.c + E.sd).toFixed(0)} · เหลือ ${E.dte.toFixed(2)} วัน<br>${E.src} ${(E.vol * 100).toFixed(2)}%` : ''))(erange())}
         ${tile('Skew รายวัน', String(g.skew), `ปีนี้ ${g.skew1y} · ${g.skew < 0 ? 'ขาลงแรงกว่าขาขึ้น' : 'ขาขึ้นแรงกว่า'}`, g.skew < 0 ? '#ff6b82' : '#2fe3a6')}
         ${tile('Kurtosis (หางอ้วน)', String(g.kurt), `ปีนี้ ${g.kurt1y} · ปกติ = 0<br>สูง = หลุด 3σ บ่อย`)}
       </div>`];
@@ -189,5 +220,5 @@
       `<div class="note">IV ของสัญญาที่หมดอายุวันนั้น คิดเวลาเป็นวันปฏิทิน → วันจันทร์หลังเสาร์-อาทิตย์ค่า settlement จะต่ำ และ IV มักสูงขึ้นช่วงใกล้หมดอายุ เทียบแนวโน้มกับ GVZ จะนิ่งกว่า</div></div>`);
     return parts.join('');
   };
-  window.OI_vol = { get data() { return V; }, get hist() { return IH; }, regime, sigma, zNow, get sess() { return sess; }, load };
+  window.OI_vol = { get data() { return V; }, get hist() { return IH; }, regime, sigma, zNow, erange, get sess() { return sess; }, load };
 })();

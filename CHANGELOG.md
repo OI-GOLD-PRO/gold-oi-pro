@@ -1,3 +1,8 @@
+### V4.5.1 — 2026-11-02 — Claude
+- ไฟล์: live.js, index.html
+- แก้อะไร: เรียงป้ายตามที่ผู้ใช้กำหนด: 🛡 Dealer → IV → OI Divergence → 🌡 HV → ที่เหลือ (Squeeze, Skew, EM, 🎯, 🧱 …) · เรียงด้วย key ป้าย (dealer, iv, oidiv, volreg) ใน live.js
+- ระวัง: ป้ายใหม่ที่อยากกำหนดตำแหน่ง ให้เพิ่ม key ใน ORD
+
 ### V4.5.0 — 2026-11-02 — Claude
 - ไฟล์: oidiv.js (ใหม่), scripts/cme_fut.mjs (ใหม่), .github/workflows/cme-oi.yml (ขั้นดึง OI ฟิวเจอร์ส + commit gc_oi.json), live.js, volreg.js, wallrej.js, index.html
 - แก้อะไร:

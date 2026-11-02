@@ -106,6 +106,7 @@
   }
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   O.hooks.push((ctx, w, h) => {
+    return; // V4.5.8: ผู้ใช้ให้ถอดกรอบ SD ออกจากกราฟ (โค้ดเก็บไว้ เปิดใหม่ได้โดยลบบรรทัดนี้)
     if (!cfg.on || !cfg.sd) return;
     const E = anchored(); if (!E || !O.chart || !O.series) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height(), sec = TFS[O.tf] || 60;
@@ -131,7 +132,7 @@
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     if (!cfg.on) return null;
     const r = regime(); if (!r) return null;
-    const A = anchored(), z = A && A.z !== null ? A.z : null, zt = z === null ? '' : ` · ${z >= 0 ? '+' : '−'}${Math.abs(z).toFixed(1)}SD`;
+    const z = null, zt = ''; // V4.5.8: เอา ±SD ออกจากป้าย
     return [`🌡${r.Z.ico} ${r.Z.name} ${r.pct.toFixed(0)}%${zt}`, r.Z.col, 'volreg', z !== null && Math.abs(z) >= 2 ? r.Z.bg : null, 'first']; // V4.5.7: ตำแหน่งราคาเทียบกรอบ SD ที่ตรึงจาก settle // V4.5.4: เอา ±σ ออก (เส้น SD ใช้แบบ CME ตามราคาปัจจุบันแล้ว) // V4.5.0: ขึ้นหน้าแถบ (เดิมอยู่ท้ายสุด ต้องเลื่อนถึงเห็น)
   });
   function explain() {
@@ -164,7 +165,7 @@
   function section() {
     const d = document.createElement('div'); d.id = 'vrBox'; d.className = 'gsbox'; const r = regime();
     d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-vr="on"><i style="background:#ff9f1a"></i>🌡 โหมดตลาด (ความผันผวน)</button><span class="gsinfo">${r ? `${r.Z.ico} ${r.Z.name} · HV ${r.hv.toFixed(1)}% (P${r.pct.toFixed(0)})` : ''}</span></div>` +
-      (cfg.on ? `<div class="row ps"><button class="gsb${cfg.sd ? ' on' : ''}" data-vr="sd">เส้น ±1/2/3SD (ตรึงจากราคา settle)</button></div>` : '');
+      '';
     return d;
   }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('vrBox')) return; const box = section(), anchor = $('wrBox') || $('s3Box') || $('dhBox') || $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }

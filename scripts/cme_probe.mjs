@@ -8,12 +8,10 @@ await p.goto('https://www.cmegroup.com/markets/metals/precious/gold.volume.html'
 await p.waitForTimeout(8000);
 const out = await p.evaluate(async () => {
   const res = {};
-  for (const d of [90, 365, 1000, 3000]) {
-    try { const r = await fetch(`/CmeWS/mvc/Volume/LastTotals/437?days=${d}&isProtected&_t=` + Date.now()); const j = await r.json(); const v = j.vdate || []; res[d] = { n: v.length, first: v[0] && v[0].formattedDate, last: v.length && v[v.length - 1].formattedDate, rows: d === 3000 || v.length < 3000 ? v.map(x => [x.formattedDate, +x.futureOi, +x.futureVolume]) : null }; } catch (e) { res[d] = 'ERR ' + e.message; }
+  for (const d of ['20260915', '20260801', '20260601', '20251103', '20240603']) {
+    try { const r = await fetch(`/CmeWS/mvc/Volume/Details/F/437/${d}/F?tradeDate=${d}&pageSize=500&isProtected&_t=` + Date.now()); const t = await r.text(); res[d] = r.status + ' ' + t.slice(0, 220); } catch (e) { res[d] = 'ERR ' + e.message; }
   }
   return res;
 });
-for (const k in out) console.log('LT_' + k, JSON.stringify(typeof out[k] === 'string' ? out[k] : { n: out[k].n, first: out[k].first, last: out[k].last }));
-const best = Object.values(out).filter(x => x && x.rows).sort((a, b) => b.n - a.n)[0];
-console.log('ROWS ' + JSON.stringify(best ? best.rows : []));
+for (const k in out) console.log('DT_' + k, out[k]);
 await b.close(); process.exit(0);

@@ -5,7 +5,7 @@
 //   🟠 25–75% ปกติ      → สวนกลับที่กำแพง OI (Wall Rejection) ได้ผลดีที่สุด
 //   🔴 > 75%  สติแตก    → ลดไม้ ขยาย SL สวนเฉพาะเลย 2–3σ และ IV เริ่มลง · ห้ามสวน Squeeze
 //  ขนาดไม้แนะนำ = HV มัธยฐาน ÷ HV ตอนนี้ · SL = HV ตอนนี้ ÷ HV มัธยฐาน
-//  เส้น σ: จุดกึ่งกลาง = ราคาเปิดรอบเทรดวันนี้ · 1σ ของวัน = ราคาเปิด × IV ATM ตอนเปิดวัน ÷ √365 (IV เราคำนวณเอง) · ไม่มี IV สด → GVZ ÷ √252
+//  เส้น σ: จุดกึ่งกลาง = ราคาเปิดรอบเทรดวันนี้ · 1σ ของวัน = ราคาเปิด × IV ATM วันนี้ (มัธยฐาน) ÷ √365 (IV เราคำนวณเอง) · ไม่มี IV สด → GVZ ÷ √252
 (() => {
   'use strict';
   const O = window.OI;
@@ -49,8 +49,11 @@
   setTimeout(loadSess, 4000); setInterval(loadSess, 5 * 60e3);
   function sigma() { // → { s (1σ เป็นดอลลาร์), src }
     if (!sess) return null;
-    const R = window.OI_iv && window.OI_iv.result;
-    if (R && R.mode === 'live' && R.iv > 0) { const ivOpen = R.dOpen !== null && R.dOpen !== undefined ? R.iv - R.dOpen : R.iv; return { s: sess.open * ivOpen / Math.sqrt(365), iv: ivOpen, src: 'IV ATM ตอนเปิดวัน (คำนวณเอง)' }; }
+    // IV ATM ของเรา: มัธยฐานของค่าที่บันทึกบนเซิร์ฟเวอร์ตั้งแต่เปิดรอบนี้ + ค่าสดตอนนี้ (ช่วงเปิดตลาด spread กว้าง IV เพี้ยนสูง จึงไม่ใช้ค่าแรกค่าเดียว)
+    const R = window.OI_iv && window.OI_iv.result, t0 = sess.t - 7 * 3600;
+    const xs = (IH && IH.hourly ? IH.hourly.filter(h => h[0] >= t0 + 1800).map(h => h[1] / 100) : []);
+    if (R && R.mode === 'live' && R.iv > 0) xs.push(R.iv);
+    if (xs.length) { const a = xs.sort((x, y) => x - y), iv = a[Math.floor(a.length / 2)]; return { s: sess.open * iv / Math.sqrt(365), iv, src: `IV ATM วันนี้ (คำนวณเอง, มัธยฐาน ${a.length} ค่า)` }; }
     if (V && V.gvz) return { s: sess.open * V.gvz.last / 100 / Math.sqrt(252), iv: V.gvz.last / 100, src: 'GVZ (IV 30 วันของทอง)' };
     if (V && V.gc) return { s: sess.open * V.gc.last / 100 / Math.sqrt(252), iv: V.gc.last / 100, src: 'HV 20 วัน' };
     return null;

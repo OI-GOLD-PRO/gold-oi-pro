@@ -1,8 +1,7 @@
+# Backtest OI Divergence รายสัปดาห์ (COT + Yahoo) — กด Run workflow เองเมื่ออยากทดสอบซ้ำ ผลอยู่ใน log
 name: oidiv-bt
 on:
   workflow_dispatch:
-  push:
-    paths: ['scripts/oidiv_bt.mjs', '.github/workflows/oidiv-bt.yml']
 jobs:
   bt:
     runs-on: ubuntu-latest

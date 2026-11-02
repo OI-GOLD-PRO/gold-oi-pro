@@ -1,0 +1,31 @@
+# ความผันผวนทอง (HV20 + เปอร์เซ็นไทล์, GVZ) → vol.json และประวัติ IV ATM (settlement CME + สดจาก Worker) → iv_hist.json
+# รันทุกชั่วโมงนาทีที่ 37 (หลัง cme-oi นาทีที่ 17 อัปเดต settlement แล้ว)
+name: vol
+on:
+  schedule:
+    - cron: '37 * * * *'
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/vol.yml', 'scripts/vol.mjs']
+permissions:
+  contents: write
+concurrency: vol
+jobs:
+  vol:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Compute vol + IV history
+        run: node scripts/vol.mjs
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for f in vol.json iv_hist.json; do [ -f "$f" ] && git add "$f"; done
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "Update vol + IV history"
+          git pull --rebase -q || true
+          git push

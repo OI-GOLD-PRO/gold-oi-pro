@@ -27,7 +27,7 @@ const out = await p.evaluate(async () => {
   return res;
 });
 fs.writeFileSync('probe_out.json', JSON.stringify(out));
-console.log('PROBE', JSON.stringify(out).slice(0, 600));
+for (const k in out) console.log('PROBE_' + k, JSON.stringify(out[k]));
 await b.close(); process.exit(0);
 for (const u of ['https://www.cmegroup.com/markets/cme-group-benchmark-administration/cme-group-volatility-indexes.html', 'https://www.cmegroup.com/market-data/cme-group-benchmark-administration/cme-group-volatility-indexes.html', 'https://www.cmegroup.com/tools-information/quikstrike/options-volatility.html']) {
   try { const r = await p.goto(u, { waitUntil: 'domcontentloaded', timeout: 45000 }); console.log('PAGE', r && r.status(), u); await p.waitForTimeout(9000); } catch (e) { console.log('PAGE ERR', u, e.message); }

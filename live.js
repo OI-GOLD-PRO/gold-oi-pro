@@ -301,9 +301,11 @@
     // 3) ป้ายสถานะมุมซ้ายบน
     const badges = [];
     const gm = oi && oi.gmf ? oi.gmf.find(g => g.lab === 'gmf M') : null;
-    if (gm && O.lastClose !== null) badges.push(O.lastClose >= gm.p ? ['γ+ เหนือFlip', C('--call')] : ['γ− ใต้Flip', C('--put')]);
+    // V4.4.3: ผู้ใช้ขอเอาป้ายนี้ออก
+    if (false && gm && O.lastClose !== null) badges.push(O.lastClose >= gm.p ? ['γ+ เหนือFlip', C('--call')] : ['γ− ใต้Flip', C('--put')]);
     const cot = window.OICot;
-    if (cot && cot.bias !== undefined) badges.push(cot.bias > 0 ? ['COT↑', C('--call')] : cot.bias < 0 ? ['COT↓', C('--put')] : ['COT→', C('--gold')]);
+    // V4.4.3: ผู้ใช้ขอเอาป้ายนี้ออก
+    if (false && cot && cot.bias !== undefined) badges.push(cot.bias > 0 ? ['COT↑', C('--call')] : cot.bias < 0 ? ['COT↓', C('--put')] : ['COT→', C('--gold')]);
     if (c && c.skew !== null) badges.push(c.skew > 1.5 ? ['😨Put skew', C('--put')] : c.skew < -1.5 ? ['🤑Call skew', C('--call')] : ['⚖️Skew กลาง', C('--muted')]);
     if (c && c.em) badges.push([`EM ±${c.em.toFixed(1)}`, '#9aa7ff']);
     if (st.err && !c) badges.push(['ข้อมูลสดไม่ได้', C('--muted')]);

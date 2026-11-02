@@ -11,13 +11,24 @@ p.on('response', async r => { const u = r.url(); if (/CmeWS|cvol|Cvol|CVOL|quiks
 await p.goto('https://www.cmegroup.com/markets/metals/precious/gold.volume.options.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
 await p.waitForTimeout(8000);
 const [m, d, y] = j0.settle.tradeDate.split('/');
-const out = await p.evaluate(async ({ pid, code, mdY }) => {
-  const g = async u => { try { const r = await fetch(u); return [r.status, (await r.text()).slice(0, 3000)]; } catch (e) { return ['ERR', e.message]; } };
-  return {
-    settle: await g(`/CmeWS/mvc/Settlements/Options/Settlements/${pid}/OOF?strategy=DEFAULT&optionProductId=${pid}&monthYear=G1M${code}&optionExpiration=${pid}-X6&tradeDate=${mdY}&pageSize=5`),
-  };
-}, { pid: j0.productId, code: 'X26', mdY: j0.settle.tradeDate });
-console.log('SETTLE', JSON.stringify(out).slice(0, 3500));
+const out = await p.evaluate(async () => {
+  const g = async u => { const r = await fetch(u + (u.includes('?') ? '&' : '?') + 'isProtected&_t=' + Date.now()); return r.json(); };
+  const groups = await g('/CmeWS/mvc/Volume/Options/Expirations?productid=437&tradedate=20261030');
+  const res = {};
+  for (const [grp, lab, root] of [['Weekly Tuesday Option', 'Week 1 - NOV 2026', 'G1T'], ['Weekly Monday Option', 'Week 2 - NOV 2026', 'G2M'], ['American Options', 'DEC 2026', 'OG']]) {
+    const gg = groups.find(x => x.label === grp), e = gg && gg.expirations.find(x => x.label === lab);
+    if (!e) { res[root] = 'not found ' + (gg ? gg.expirations.map(x => x.label).join(',') : Object.keys(groups.map(x=>x.label))); continue; }
+    const code = e.expirationCode, ex = code[0] + code.slice(-1);
+    try {
+      const sj = await g(`/CmeWS/mvc/Settlements/Options/Settlements/${e.productId}/OOF?strategy=DEFAULT&optionProductId=${e.productId}&monthYear=${root}${code}&optionExpiration=${e.productId}-${ex}&tradeDate=10/30/2026&pageSize=500`);
+      res[root] = { pid: e.productId, code, rows: (sj.settlements || []).map(x => [+x.strike, /^c/i.test(x.type) ? 'C' : 'P', +String(x.settle).replace(/[^0-9.]/g, '')]).filter(x => x[0] > 0 && x[2] > 0) };
+    } catch (er) { res[root] = 'ERR ' + er.message; }
+  }
+  return res;
+});
+fs.writeFileSync('probe_out.json', JSON.stringify(out));
+console.log('PROBE', JSON.stringify(out).slice(0, 600));
+await b.close(); process.exit(0);
 for (const u of ['https://www.cmegroup.com/markets/cme-group-benchmark-administration/cme-group-volatility-indexes.html', 'https://www.cmegroup.com/market-data/cme-group-benchmark-administration/cme-group-volatility-indexes.html', 'https://www.cmegroup.com/tools-information/quikstrike/options-volatility.html']) {
   try { const r = await p.goto(u, { waitUntil: 'domcontentloaded', timeout: 45000 }); console.log('PAGE', r && r.status(), u); await p.waitForTimeout(9000); } catch (e) { console.log('PAGE ERR', u, e.message); }
 }

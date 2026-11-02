@@ -16,3 +16,7 @@ jobs:
           npm i playwright@1.48.2 >/dev/null
           npx playwright install --with-deps chromium >/dev/null
       - run: xvfb-run -a node scripts/cme_probe.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe
+          path: probe_out.json

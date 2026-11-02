@@ -41,8 +41,8 @@ if (!res || !res.out.length) { console.log('no data', log.join(' | ')); process.
 const m = new Map((old.days || []).map(r => [r[0], r]));
 // LastTotals (ถ้ามี) = ย้อนหลัง 30 วัน ใช้เติมวันที่ยังไม่มี
 const lt = res.lt;
-const ltRows = Array.isArray(lt) ? lt : lt && Array.isArray(lt.items) ? lt.items : [];
-ltRows.forEach(x => { const td = String(x.tradeDate || x.date || ''), oi = +String(x.openInterest || x.atClose || x.oi || '').replace(/,/g, ''); if (/^\d{8}$/.test(td) && oi > 0) { const k = `${td.slice(0, 4)}-${td.slice(4, 6)}-${td.slice(6, 8)}`; if (!m.has(k)) m.set(k, [k, oi, null, +String(x.totalVolume || x.volume || '').replace(/,/g, '') || null, 'F']); } });
+const ltRows = lt && Array.isArray(lt.vdate) ? lt.vdate : [];
+ltRows.forEach(x => { const td = String(x.formattedDate || ''), oi = +String(x.futureOi || '').replace(/,/g, ''); if (/^\d{8}$/.test(td) && oi > 0) { const k = `${td.slice(0, 4)}-${td.slice(4, 6)}-${td.slice(6, 8)}`; if (!m.has(k)) m.set(k, [k, oi, null, +String(x.futureVolume || '').replace(/,/g, '') || null, 'F']); } });
 res.out.forEach(r => { const o = m.get(r[0]); if (!o || o[4] !== 'F' || r[4] === 'F') m.set(r[0], r); });
 const days = [...m.values()].sort((a, b) => a[0].localeCompare(b[0])).slice(-400);
 for (let i = 1; i < days.length; i++) if (days[i][2] === null) days[i][2] = days[i][1] - days[i - 1][1];

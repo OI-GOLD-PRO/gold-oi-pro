@@ -7,7 +7,9 @@
       "i": "M",
       "title": "ISM Manufacturing PMI",
       "forecast": "54.5",
-      "previous": "54.5"
+      "previous": "54.5",
+      "actual": "55.5",
+      "better": true
     },
     {
       "date": "2026-11-03T10:00:00-05:00",

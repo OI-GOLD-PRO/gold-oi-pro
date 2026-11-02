@@ -1,3 +1,7 @@
+### V4.5.2 — 2026-11-02 — Claude
+- ไฟล์: live.js, index.html
+- แก้อะไร: ⚠️ Squeeze กลับไปอยู่หน้าสุดของแถบป้าย (ตอนมีสัญญาณ) ตามด้วย Dealer → IV → OI Divergence → 🌡 HV → ที่เหลือ
+
 ### V4.5.1 — 2026-11-02 — Claude
 - ไฟล์: live.js, index.html
 - แก้อะไร: เรียงป้ายตามที่ผู้ใช้กำหนด: 🛡 Dealer → IV → OI Divergence → 🌡 HV → ที่เหลือ (Squeeze, Skew, EM, 🎯, 🧱 …) · เรียงด้วย key ป้าย (dealer, iv, oidiv, volreg) ใน live.js

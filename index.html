@@ -489,7 +489,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.5.5';
+  const APP_VER = '4.5.6';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -1603,15 +1603,22 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   // จึงเก็บ offset รายชั่วโมงย้อนหลังจาก Yahoo GC=F (H1, 60 วัน) เทียบ perp ชั่วโมงเดียวกัน แล้วใช้ค่าของช่วงเวลานั้นกับแท่งเก่า
   // ช่วงหลังจุดล่าสุดของ Yahoo ไล่ค่าต่อเนื่องไปหา offset สด (Gold.F) ของตอนนี้ ไม่ให้กราฟกระตุก
   let histAdj = []; // [[วินาที, adj]] เรียงเวลา
+  // V4.5.6: ใช้ offset ค่าเดียวทั้งรอบเทรด (18:00–17:00 นิวยอร์ก) แทนการไล่ค่าทีละแท่ง
+  // เดิมแต่ละแท่งได้ offset ไม่เท่ากัน (ไล่จากค่าย้อนหลังไปหาค่าสด) → ราคาเปิดแท่งใหม่ไม่ต่อจากราคาปิดแท่งก่อน (กราฟกระโดด 1–3$)
+  // รอบปัจจุบัน = offset สด · รอบก่อน ๆ = ค่ากลางของ offset รายชั่วโมงในรอบนั้น (เปลี่ยนเฉพาะรอยต่อรอบ ซึ่งมีช่วงพักตลาดอยู่แล้ว)
+  const usDst = t => { const d = new Date(t * 1000), y = d.getUTCFullYear(), sun = (m, n) => { const f = new Date(Date.UTC(y, m, 1)).getUTCDay(); return 1 + ((7 - f) % 7) + (n - 1) * 7; }; return t >= Date.UTC(y, 2, sun(2, 2), 7) / 1000 && t < Date.UTC(y, 10, sun(10, 1), 6) / 1000; };
+  const sessKey = t => Math.floor((t - (usDst(t) ? 22 : 23) * 3600) / 86400); // รอบเทรดเริ่ม 18:00 NY = 22:00/23:00 UTC
+  let sessAdj = new Map();
+  function buildSessAdj() {
+    const g = new Map(); histAdj.forEach(([t, a]) => { const k = sessKey(t - 1); (g.get(k) || g.set(k, []).get(k)).push(a); });
+    sessAdj = new Map([...g].map(([k, v]) => { v.sort((x, y) => x - y); return [k, v[v.length >> 1]]; }));
+  }
   function adjFor(ms) {
-    const n = histAdj.length; if (!n) return adj;
-    const t = ms / 1000;
-    if (t <= histAdj[0][0]) return histAdj[0][1];
-    const [tl, al] = histAdj[n - 1];
-    if (t >= tl) { const nowS = Date.now() / 1000; if (nowS <= tl) return adj; const w = Math.min(1, (t - tl) / (nowS - tl)); return al + (adj - al) * w; }
-    let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (histAdj[m][0] <= t) lo = m; else hi = m; }
-    const [t0, a0] = histAdj[lo], [t1, a1] = histAdj[hi];
-    return a0 + (a1 - a0) * (t - t0) / Math.max(1, t1 - t0);
+    const t = ms / 1000, k = sessKey(t);
+    if (k >= sessKey(Date.now() / 1000) || !histAdj.length) return adj;
+    if (sessAdj.has(k)) return sessAdj.get(k);
+    // ไม่มีข้อมูลรอบนั้น: ใช้ค่าของจุดย้อนหลังที่ใกล้ที่สุด
+    let b = histAdj[0]; for (const x of histAdj) { if (Math.abs(x[0] - t) < Math.abs(b[0] - t)) b = x; } return b[1];
   }
   async function loadHistBasis() {
     if (SYM !== 'gold' || SC.yahoo || !prov) return;
@@ -1622,7 +1629,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       ys.forEach(b => { const t = Math.floor(b[0] / 3600) * 3600; if (pm.has(t) && isFinite(b[4])) { const d = pm.get(t) - b[4]; if (Math.abs(d) <= 40) raw.push([t + 3600, d]); } }); // ใช้ราคาปิดของชั่วโมง = เวลาปลายแท่ง
       if (raw.length < 10) return;
       // กรองสัญญาณรบกวน: ค่ากลางของ 5 ชั่วโมงรอบข้าง
-      histAdj = raw.map((x, i) => { const w = raw.slice(Math.max(0, i - 2), i + 3).map(y => y[1]).sort((a, b) => a - b); return [x[0], Math.round(w[w.length >> 1] * 100) / 100]; });
+      histAdj = raw.map((x, i) => { const w = raw.slice(Math.max(0, i - 2), i + 3).map(y => y[1]).sort((a, b) => a - b); return [x[0], Math.round(w[w.length >> 1] * 100) / 100]; }); buildSessAdj();
       if (rawBars.length) { try { series.setData(rawBars.map(toBar)); } catch (e) {} refreshQuarterPriceGrid(); indRefresh(); dirty = true; }
     } catch (e) {}
   }

@@ -38,7 +38,7 @@
     status.textContent='สัญญา '+(data.contract||'—')+'  ·  Call OI '+sumC.toLocaleString()+'  ·  Put OI '+sumP.toLocaleString();
     const max=Math.max(1,...rows.flatMap(r=>[+r.c||0,+r.p||0]));
     rows.forEach(r=>{
-      const row=document.createElement('div');row.className='v34strike';
+      const row=document.createElement('div');row.className='v34strike';row.dataset.k=r.strike;
       const c=document.createElement('div');c.className='v34side call';
       const cn=document.createElement('span');cn.textContent=(+r.c||0).toLocaleString();
       const cb=document.createElement('i');cb.style.width=(Math.max(0,+r.c||0)/max*100)+'%';
@@ -49,7 +49,21 @@
       const pn=document.createElement('span');pn.textContent=(+r.p||0).toLocaleString();
       p.append(pb,pn);row.append(c,strike,p);host.appendChild(row);
     });
+    placeNow(true);
   }
+  // V4.5.5 (Claude): ขีดราคาปัจจุบันระหว่าง strike ในแถบ OI · อัปเดตทุก 3 วินาที · เปิดแถบแล้วเลื่อนไปที่ราคาอัตโนมัติ
+  function nowPrice(){const O=window.OI;if(!O||O.lastClose==null||!isFinite(O.lastClose))return null;const r0=O.oi&&O.oi.rows?O.oi.rows.find(r=>r.price!=null):null;return O.lastClose-(r0?r0.price-r0.strike:0);}
+  function placeNow(scroll){
+    const host=sheet.querySelector('#v34oiChart');if(!host)return;const P=nowPrice();let m=host.querySelector('.v34now');
+    if(P==null){if(m)m.remove();return;}
+    if(!m){m=document.createElement('div');m.className='v34now';m.innerHTML='<span></span>';}
+    m.firstChild.textContent='ราคา '+P.toFixed(1);
+    const rowsEl=[...host.querySelectorAll('.v34strike')],nxt=rowsEl.find(el=>+el.dataset.k<P);
+    if(nxt){if(m.nextSibling!==nxt)host.insertBefore(m,nxt);}else if(host.lastChild!==m)host.appendChild(m);
+    if(scroll&&!sheet.hidden)m.scrollIntoView({block:'center'});
+  }
+  setInterval(()=>{if(!sheet.hidden)placeNow(false);},3000);
+  new MutationObserver(()=>{if(!sheet.hidden)setTimeout(()=>placeNow(true),50);}).observe(sheet,{attributes:true,attributeFilter:['hidden']});
   window.addEventListener('oi-gold-data',e=>renderOI(e.detail));
   if(window.__oiGoldLatest)renderOI(window.__oiGoldLatest);
   const nav=document.createElement('nav');nav.id='v33nav';nav.setAttribute('aria-label','เมนูหลัก');

@@ -228,3 +228,7 @@ body{padding-bottom:0!important}
 #oiHistPanel button{border:1px solid #6d7890;border-radius:7px;padding:6px;background:#24354d;color:#fff}
 #oiHistPanel small{color:#aebbd0;line-height:1.45}
 #oihStatus{font-size:11px;color:#e6bd68;overflow-wrap:anywhere}
+/* V4.5.5 (Claude): ขีดราคาปัจจุบันในแถบ OI */
+#v34oiChart .v34now{position:relative;height:18px;margin:2px 0;display:flex;align-items:center;justify-content:center}
+#v34oiChart .v34now::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:2px solid #e0b44c;box-shadow:0 0 6px rgba(224,180,76,.6)}
+#v34oiChart .v34now span{position:relative;background:#e0b44c;color:#111;font:700 11px ui-monospace,SFMono-Regular,monospace;padding:1px 8px;border-radius:9px}

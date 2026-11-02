@@ -1,3 +1,8 @@
+### V4.5.5 — 2026-11-02 — Claude
+- ไฟล์: v33-luxury.js (renderOI + placeNow), v33-luxury.css (.v34now), index.html
+- แก้อะไร: แถบ OI / Gamma มีขีดทอง "ราคา xxxx.x" คั่นระหว่าง strike ตามราคาปัจจุบัน (สเกลฟิวเจอร์ส) อัปเดตทุก 3 วินาที · เปิดแถบแล้วเลื่อนไปที่ราคาอัตโนมัติ
+- ระวัง (ChatGPT): ไฟล์ของ ChatGPT — ถ้าแก้ renderOI ต้องคง row.dataset.k และเรียก placeNow(true) ท้ายฟังก์ชัน
+
 ### V4.5.4 — 2026-11-02 — Claude
 - ไฟล์: volreg.js (erange, settleSmile, เส้น SD, ป้าย 🌡, การ์ดแดช), ivbadge.js, index.html
 - แก้อะไร: เส้น SD และค่า vol ไม่ตรง QuikStrike เพราะคนละวิธี (เดิม: σ รายวันจากราคาเปิดรอบ × IV สด) → เปลี่ยนเป็นแบบ CME Vol2Vol: กึ่งกลาง = ราคาตอนนี้ · 1SD = F × Vol Settle (smile จาก settlement ล่าสุด ที่ราคานั้น) × √(เวลาถึงหมดอายุ/365) · ทดสอบกับ QuikStrike 16:50: 3909.3, 19.57%, 0.36 DTE → 1SD 3885–3934 ตรงกับแถบเทาของ CME · ป้าย IV แสดง "· CME xx.x" (Vol Settle ที่ราคาเดียวกัน) ไว้เทียบกับค่าสด · ป้าย 🌡 ไม่แสดง ±σ แล้ว

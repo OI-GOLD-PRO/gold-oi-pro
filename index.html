@@ -315,7 +315,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 }
 </style>
 <link rel="stylesheet" href="v3-premium.css?v=30201">
-<link rel="stylesheet" href="v33-luxury.css?v=35600">
+<link rel="stylesheet" href="v33-luxury.css?v=40505">
 </head>
 <body>
   <div id="splash" aria-label="OI Gold Pro กำลังเปิด">
@@ -489,7 +489,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.5.4';
+  const APP_VER = '4.5.5';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -2486,7 +2486,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <script src="oidiv.js?v=40503"></script>
 <script src="quant.js?v=20031"></script>
 <script src="aitray.js?v=20032"></script>
-<script src="v33-luxury.js?v=35000"></script>
+<script src="v33-luxury.js?v=40505"></script>
 <script src="historical-oi.js?v=4200"></script>
 </body>
 </html>

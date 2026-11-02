@@ -86,7 +86,7 @@
     if (!cfg.on) return null;
     const r = regime(); if (!r) return null;
     const z = zNow(), zt = z === null ? '' : ` · ${z >= 0 ? '+' : '−'}${Math.abs(z).toFixed(1)}σ`;
-    return [`${r.Z.ico} Vol ${r.Z.name} ${r.pct.toFixed(0)}%${zt}`, r.Z.col, 'volreg', Math.abs(z || 0) >= 2 ? r.Z.bg : null];
+    return [`🌡${r.Z.ico} ${r.Z.name} ${r.pct.toFixed(0)}%${zt}`, r.Z.col, 'volreg', Math.abs(z || 0) >= 2 ? r.Z.bg : null, 'first']; // V4.5.0: ขึ้นหน้าแถบ (เดิมอยู่ท้ายสุด ต้องเลื่อนถึงเห็น)
   });
   function explain() {
     const r = regime(); if (!r) { O.showToast && O.showToast('🌡 โหมดตลาด: กำลังโหลด vol.json…', 4000); return; }

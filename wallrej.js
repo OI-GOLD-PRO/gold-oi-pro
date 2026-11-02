@@ -87,6 +87,9 @@
     if (sq && sq.lv >= 2 && sq.dir === -s.dir) out.push('<b style="color:#ff4d6a">⚠️ Squeeze ไปทางที่แหย่ → อาจเป็นเบรกจริง ห้ามสวน</b>');
     if (vr && vr.z === 'r') out.push(`🔴 โหมดแกว่งแรง: ไม้ ×${vr.size.toFixed(2)}`);
     if (vr && vr.z === 'g') out.push('🟢 โหมดสงบ: ท่าสวนได้เปรียบน้อย');
+    const dv = window.OI_oidiv && window.OI_oidiv.latest && window.OI_oidiv.latest();
+    if (dv && dv.sig && dv.sig.block === -s.dir) out.push(`<b style="color:#ff4d6a">${dv.sig.ico} ${dv.sig.t} (วันเทรดล่าสุด) → เงินใหม่ไหลตามทางที่แหย่ ระวังสวน</b>`);
+    if (dv && dv.sig && dv.sig.fade && ((dv.sig.k === 'hD' && s.dir < 0) || (dv.sig.k === 'lD' && s.dir > 0))) out.push(`${dv.sig.ico} ${dv.sig.t} หนุนท่าสวนนี้`);
     return out;
   }
   const told = new Set();

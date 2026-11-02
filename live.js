@@ -311,7 +311,7 @@
     if (st.err && !c) badges.push(['ข้อมูลสดไม่ได้', C('--muted')]);
     else if (c && !c.match) badges.push([`สด ${c.root} ≠ ชีต ${c.cfgC || '–'}`, C('--muted')]);
     // ป้ายจากอินดี้อื่น (เช่น dealer.js) → [ข้อความ, สี, key สำหรับแตะ]
-    (window.OIBadgeExtra || []).forEach(f => { try { const x = f(); if (x) { if (x[4] === 'first') badges.unshift(x); else badges.push(x); } } catch (e) {} }); // [ข้อความ, สี, key, พื้นหลัง, 'first' = ขึ้นหน้าสุด]
+    { const first = []; (window.OIBadgeExtra || []).forEach(f => { try { const x = f(); if (x) { if (x[4] === 'first') first.push(x); else badges.push(x); } } catch (e) {} }); badges.unshift(...first); } // V4.5.0: ป้าย 'first' หลายอันเรียงตามลำดับโหลด // [ข้อความ, สี, key, พื้นหลัง, 'first' = ขึ้นหน้าสุด]
     // V3.5.7: ป้ายสถานะอยู่ในแถบของตัวเองเหนือกราฟ (เดิมวาดทับกราฟ ทำให้ซ้อนกับป้ายราคา/OI มุมซ้ายบน)
     const wrap = document.getElementById('wrap');
     if (wrap) {

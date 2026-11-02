@@ -1,3 +1,12 @@
+### V4.5.0 — 2026-11-02 — Claude
+- ไฟล์: oidiv.js (ใหม่), scripts/cme_fut.mjs (ใหม่), .github/workflows/cme-oi.yml (ขั้นดึง OI ฟิวเจอร์ส + commit gc_oi.json), live.js, volreg.js, wallrej.js, index.html
+- แก้อะไร:
+  - 📊 OI Divergence รายวัน (หนังสือหน้า 165): gc_oi.json = OI รวมฟิวเจอร์ส GC จาก CME (Volume/Details + LastTotals ย้อน 30 วัน) ทุกชั่วโมง · เทียบกับแท่งรายวัน gcy.json: High/Low ใหม่ (เลย 10 วัน) + OI ลด ≥0.3% / พุ่ง ≥0.5% → ป้าย 📉/🚀/📈/🩸 หน้าแถบ (ใช้ได้ 4 วัน) · แตะป้าย = ตาราง 8 วัน
+  - 🧱 Wall Rejection เตือนเมื่อ Divergence สวนทาง/หนุนท่าเข้า
+  - ป้าย 🌡 โหมดตลาด ย้ายมาหน้าแถบ (เดิมอยู่ท้ายสุด ผู้ใช้มองไม่เห็น) และใส่ 🌡 ในข้อความ
+  - live.js: ป้าย 'first' หลายอันเรียงตามลำดับโหลด (Squeeze → 🌡 → Divergence)
+- ระวัง: OI ประกาศหลังปิดตลาด สัญญาณช้า 1 วัน · ห้ามลบ gc_oi.json (ประวัติสะสม)
+
 ### V4.4.3 — 2026-11-02 — Claude
 - ไฟล์: live.js, index.html
 - แก้อะไร: เอาป้าย γ± Flip และ COT ออกจากแถบป้ายตามที่ผู้ใช้ขอ (ข้อมูลยังคำนวณอยู่ ใช้ใน Squeeze/Dealer/แดชบอร์ดตามเดิม)

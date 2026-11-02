@@ -26,10 +26,10 @@
         const hh = Math.max(...prev.map(p => p[2])), ll = Math.min(...prev.map(p => p[3])), pct = chg / (oi - chg);
         const nh = b[2] > hh, nl = b[3] < ll, oiD = pct <= DN, oiU = pct >= UP;
         let sig = null;
-        if (nh && oiD) sig = { k: 'hD', ico: '📉', col: '#ff9f1a', t: 'High ใหม่ + OI ลด', m: 'ขาขึ้นจากคนปิดสถานะ ไม่ใช่เงินใหม่ → <b>ระวังกลับตัวลง</b> (สวนที่กำแพง Call ได้)', fade: 1 };
-        else if (nh && oiU) sig = { k: 'hU', ico: '🚀', col: '#22e39a', t: 'High ใหม่ + OI พุ่ง', m: 'เงินใหม่ไหลเข้าจริง = เบรกจริง → <b>ห้าม Short สวน</b>', block: -1 };
-        else if (nl && oiD) sig = { k: 'lD', ico: '📈', col: '#ff9f1a', t: 'Low ใหม่ + OI ลด', m: 'ขาลงจากคนปิด Long ไม่ใช่ Short ใหม่ → <b>ระวังเด้ง</b> (สวนที่กำแพง Put ได้)', fade: 1 };
-        else if (nl && oiU) sig = { k: 'lU', ico: '🩸', col: '#ff4d6a', t: 'Low ใหม่ + OI พุ่ง', m: 'Short ใหม่เข้าจริง = ขาลงจริง → <b>ห้ามดักซื้อ</b>', block: 1 };
+        if (nh && oiD) sig = { k: 'hD', ico: '📉', b: 'ขึ้นหลอก ระวังกลับลง', col: '#ff9f1a', t: 'High ใหม่ + OI ลด', m: 'ขาขึ้นจากคนปิดสถานะ ไม่ใช่เงินใหม่ → <b>ระวังกลับตัวลง</b> (สวนที่กำแพง Call ได้)', fade: 1 };
+        else if (nh && oiU) sig = { k: 'hU', ico: '🚀', b: 'ขึ้นจริง ห้าม Short', col: '#22e39a', t: 'High ใหม่ + OI พุ่ง', m: 'เงินใหม่ไหลเข้าจริง = เบรกจริง → <b>ห้าม Short สวน</b>', block: -1 };
+        else if (nl && oiD) sig = { k: 'lD', ico: '📈', b: 'ลงหลอก ระวังเด้ง', col: '#ff9f1a', t: 'Low ใหม่ + OI ลด', m: 'ขาลงจากคนปิด Long ไม่ใช่ Short ใหม่ → <b>ระวังเด้ง</b> (สวนที่กำแพง Put ได้)', fade: 1 };
+        else if (nl && oiU) sig = { k: 'lU', ico: '🩸', b: 'ลงจริง ห้ามดักซื้อ', col: '#ff4d6a', t: 'Low ใหม่ + OI พุ่ง', m: 'Short ใหม่เข้าจริง = ขาลงจริง → <b>ห้ามดักซื้อ</b>', block: 1 };
         return { d, oi, chg, pct, vol, rt, o: b[1], h: b[2], l: b[3], c: b[4], nh, nl, hh, ll, sig };
       }).filter(Boolean);
       O.markDirty();
@@ -48,12 +48,12 @@
 
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     const r = latest(); if (!r || !r.sig) return null;
-    return [`${r.sig.ico} ${r.sig.t} (${fd(r.d)})`, r.sig.col, 'oidiv', null, 'first'];
+    return [`${r.sig.ico} ${r.sig.b}`, r.sig.col, 'oidiv', null, 'first']; // V4.5.3: ป้ายบอกความหมายสั้น ๆ (รายละเอียด/วันที่ แตะป้าย)
   });
 
   function explain() {
     const r = latest();
-    const head = r && r.sig ? `<b style="color:${r.sig.col}">${r.sig.ico} ${r.sig.t}</b> วันเทรด ${fd(r.d)}${r.rt === 'P' ? ' (OI เบื้องต้น)' : ''}<br>${r.sig.m}<br>`
+    const head = r && r.sig ? `<b style="color:${r.sig.col}">${r.sig.ico} ${r.sig.b}: ${r.sig.t}</b> วันเทรด ${fd(r.d)}${r.rt === 'P' ? ' (OI เบื้องต้น)' : ''}<br>${r.sig.m}<br>`
       : r ? `<b>📊 OI Divergence วันเทรด ${fd(r.d)}: ไม่มีสัญญาณ</b><br>${r.nh ? 'ทำ High ใหม่' : r.nl ? 'ทำ Low ใหม่' : 'ไม่ได้ทำ High/Low ใหม่ (10 วัน)'} · OI ${sp(r.pct)}<br>` : '📊 OI Divergence: รอข้อมูล OI รวมจาก CME<br>';
     const tb = rows.slice(-8).reverse().map(x => `${fd(x.d)} ${(x.c - x.o >= 0 ? '+' : '−') + Math.abs(x.c - x.o).toFixed(0)}$ ${x.nh ? '▲H' : x.nl ? '▼L' : '··'} OI ${sp(x.pct)}${x.sig ? ' ' + x.sig.ico : ''}`).join('<br>');
     O.showToast && O.showToast(head +

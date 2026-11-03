@@ -10,8 +10,9 @@
   if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
   const $ = id => document.getElementById(id);
   const KEY = 'oi_retail' + (O.psfx || ''), SKEY = 'oi_retail_store_v1';
-  const cfg = { on: true, res: 1 }; // V4.9.22: res = ความละเอียดแถว ($)
-  const RES = [0.1, 0.25, 0.5, 1, 2];
+  const cfg = { on: true, res: 1, win: 8 }; // V4.9.22: res = ความละเอียดแถว ($) · V4.9.25: win = ย้อนหลัง (ชม.)
+  const RES = [0.1, 0.25, 0.5, 1, 2], WINS = [1, 2, 4, 8, 12, 24];
+  const winH = () => WINS.includes(+cfg.win) ? +cfg.win : 8;
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
   const saveCfg = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   const BK = 15 * 60e3, NC = 16, KEEP = 26 * 3600e3;
@@ -109,7 +110,7 @@
   let SZ = null, SZat = 0;
   async function loadSrv() {
     if (!cfg.on || !O.worker) return;
-    try { const j = await (await fetch(O.worker + '/retail', { cache: 'no-store' })).json(); if (j && j.ready && j.zones) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
+    try { const j = await (await fetch(O.worker + '/retail?win=' + winH(), { cache: 'no-store' })).json(); if (j && j.ready && j.zones) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
   }
   setTimeout(loadSrv, 1500); setInterval(() => { if (document.visibilityState === 'visible') loadSrv(); }, 30000);
   const srvOk = () => SZ && Date.now() - SZat < 5 * 60e3; // V4.9.17: ใช้โซนเซิร์ฟเวอร์ทันที (ไม่รอ 3 ชม.) ทุกเครื่องตรงกัน
@@ -137,6 +138,7 @@
   }
   // V4.9.19: แถวละเอียดทีละ $1 [ราคากราฟ, ซื้อ, ขาย] (เซิร์ฟเวอร์ ถ้าไม่มีใช้ของเครื่อง)
   // V4.9.22: รวมแถวตามความละเอียดที่ตั้ง (0.1–2$) จากแถวละเอียด $0.1 ของเซิร์ฟเวอร์ (fine) · ไม่มี fine ใช้แถว $1
+  let ZW = null;
   function rows() {
     if (!cfg.on) return [];
     const res = RES.includes(+cfg.res) ? +cfg.res : 1;
@@ -144,8 +146,8 @@
     if (srvOk()) { const d = O.sym === 'gcy' ? off() : (O.adj || 0);
       if (SZ.fine && SZ.fine.length) return agg(SZ.fine, d, res);
       return SZ.rows ? agg(SZ.rows, d, Math.max(1, res)) : []; }
-    if (!Z || Date.now() - zAt > 20000) { Z = compute(); zAt = Date.now(); }
-    const d = off(); return Z && Z.rows ? agg(Z.rows, d, Math.max(1, res)) : [];
+    const h = winH(); if (!ZW || ZW.h !== h || Date.now() - ZW.at > 20000) ZW = { h, at: Date.now(), z: compute(Object.assign({}, FAST, { WIN: h * 3600e3, HALF: h * 900e3, MIN: 50 })) };
+    const d = off(); return ZW.z && ZW.z.rows ? agg(ZW.z.rows, d, Math.max(1, res)) : [];
   }
   const live = () => { const bt = window.OI_bigtr; return srvOk() || !!(bt && bt.cfg && bt.cfg.on); };
 
@@ -217,10 +219,11 @@
     return `ไม้ ≤ ${Z.maxSz < 1 ? Z.maxSz.toFixed(3) : Z.maxSz} oz · ${fmt(Z.n)} ไม้ · ย้อน ${Z.hrs.toFixed(0)} ชม.`;
   }
   function section() { const d = document.createElement('div'); d.id = 'rtBox'; d.className = 'gsbox'; d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-rt="on"><i style="background:linear-gradient(90deg,#38bdf8 50%,#ff9f43 50%)"></i>👥 โซนรายย่อยเข้าออเดอร์</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>` +
-    (cfg.on ? `<div class="row ps"><span class="gsinfo">ความละเอียดแถว</span>${RES.map(r => `<button class="gsb${+cfg.res === r ? ' on' : ''}" data-rtres="${r}">$${r}</button>`).join('')}</div>` : ''); return d; }
+    (cfg.on ? `<div class="row ps"><span class="gsinfo">ความละเอียดแถว</span>${RES.map(r => `<button class="gsb${+cfg.res === r ? ' on' : ''}" data-rtres="${r}">$${r}</button>`).join('')}</div>` +
+      `<div class="row ps"><span class="gsinfo">ย้อนหลัง</span>${WINS.map(h => `<button class="gsb${winH() === h ? ' on' : ''}" data-rtwin="${h}">${h} ชม.</button>`).join('')}</div>` : ''); return d; }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('rtBox')) return; const box = section(), anchor = $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }
   const menu = $('indMenu');
-  if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { const rb = e.target.closest('[data-rtres]'); if (rb) { cfg.res = +rb.dataset.rtres; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); return; } if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }
+  if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { const wb = e.target.closest('[data-rtwin]'); if (wb) { cfg.win = +wb.dataset.rtwin; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); loadSrv(); O.markDirty(); return; } const rb = e.target.closest('[data-rtres]'); if (rb) { cfg.res = +rb.dataset.rtres; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); return; } if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }
   setInterval(() => { if (cfg.on && live()) O.markDirty(); }, 30000);
 
   window.OI_retail = { zones, rows, trapZones, freshZones, compute, get server() { return srvOk() ? SZ : null; }, save, needFull, get bins() { return bins; }, get cfg() { return cfg; } };

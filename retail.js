@@ -1,7 +1,7 @@
 // 👥 โซนคนส่วนมาก (รายย่อย) เข้าออเดอร์ — จากการซื้อขายจริงของ XAUUSDT perp (Binance aggTrades ที่ 🐋 Big Traders ดึงอยู่แล้ว)
 //  - ทุกไม้รู้ฝั่ง (ไล่ซื้อ/ไล่ขาย) และขนาด → "ไม้เล็ก" = ขนาดไม่เกินมัธยฐานของจำนวนไม้ ถือเป็นรายย่อย
 //  - รวมจำนวนไม้รายย่อยตามราคา ช่องละ $1 ย้อนหลัง 24 ชม. (ไม้ใหม่น้ำหนักมากกว่า: ครึ่งชีวิต ~8 ชม.)
-//  - โซน = ราคาที่ไม้รายย่อยหนาแน่นสุด 4 โซน · เอียงซื้อมีนัย (z ≥ 2) = 🟩 คนส่วนมากเข้า Buy · เอียงขาย = 🟥 Sell · ไม่ชัด = 🟨 สองฝั่ง
+//  - V4.9.19: บนกราฟวาดเป็นโปรไฟล์ทีละ $1 (ฟ้าซื้อ/ส้มขาย) · โซน (ใช้กับ 💀) = ราคาที่ไม้รายย่อยหนาแน่นสุด 4 โซน · เอียงซื้อมีนัย (z ≥ 2) = 🟩 คนส่วนมากเข้า Buy · เอียงขาย = 🟥 Sell · ไม่ชัด = 🟨 สองฝั่ง
 //  - ส่งให้ 💀 กับดัก: SL ของคนกลุ่มนี้ = ใต้โซน Buy / เหนือโซน Sell
 //  ข้อจำกัด: ตลาดคริปโต (perp) ไม่ใช่โบรก CFD · ไม้เล็กไม่ใช่รายย่อย 100% (บอท/รายใหญ่หั่นไม้ได้) · ต้องเปิด 🐋 Big Traders
 (() => {
@@ -90,7 +90,7 @@
       const z = (cb - cs) / Math.sqrt(Math.max(1, cb + cs)), pr = Math.round(cb / Math.max(1, cb + cs) * 100) / 100, side = (pr >= 0.49 && pr <= 0.51) ? 0 : z >= opt.Z ? 1 : z <= -opt.Z ? -1 : 0; // V4.9.15: 49–51% = สองฝั่ง
       return { side, rank: r, lo: arr[a].p - 0.5, hi: arr[b].p + 0.5, avg: q ? pq / q : arr[x.i].p, n: cb + cs, pct: cb / Math.max(1, cb + cs), z };
     });
-    return { zones, mc, maxSz: Math.pow(2, mc + 1) / 1000, n, hrs: (() => { let mn = Infinity; bins.forEach((a, k) => { mn = Math.min(mn, +k.split('|')[0]); }); return Math.min(opt.WIN / 3600e3, (now - mn) / 3600e3); })() };
+    return { zones, rows: arr.filter(o => o.b + o.s > 0).map(o => [o.p, o.b, o.s]), mc, maxSz: Math.pow(2, mc + 1) / 1000, n, hrs: (() => { let mn = Infinity; bins.forEach((a, k) => { mn = Math.min(mn, +k.split('|')[0]); }); return Math.min(opt.WIN / 3600e3, (now - mn) / 3600e3); })() };
   }
   function off() { try { const bt = window.OI_bigtr, B = O.series.data() || []; return bt && B.length ? bt.offAt(B[B.length - 1].time) : 0; } catch (e) { return 0; } }
   // V4.9.15: โซนคำนวณที่เซิร์ฟเวอร์ (ไม้จริง Binance + Bybit + Bitget) → ทุกเครื่องได้โซนเดียวกัน ไม่ต้องเปิด 🐋
@@ -124,26 +124,52 @@
     if (!cfg.on || !srvOk() || !SZ.fresh) return [];
     return shift(SZ.fresh, O.sym === 'gcy' ? off() : (O.adj || 0));
   }
+  // V4.9.19: แถวละเอียดทีละ $1 [ราคากราฟ, ซื้อ, ขาย] (เซิร์ฟเวอร์ ถ้าไม่มีใช้ของเครื่อง)
+  function rows() {
+    if (!cfg.on) return [];
+    if (srvOk() && SZ.rows) { const d = O.sym === 'gcy' ? off() : (O.adj || 0); return SZ.rows.map(r => [r[0] - d, r[1], r[2]]); }
+    if (srvOk()) return [];
+    if (!Z || Date.now() - zAt > 20000) { Z = compute(); zAt = Date.now(); }
+    const d = off(); return Z && Z.rows ? Z.rows.map(r => [r[0] - d, r[1], r[2]]) : [];
+  }
   const live = () => { const bt = window.OI_bigtr; return srvOk() || !!(bt && bt.cfg && bt.cfg.on); };
 
   // ---------- วาด: แถบแนวนอนชิดขวา (ยาว = จำนวนไม้รายย่อย) ----------
   const fmt = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v) + '';
   O.hooks.push((ctx, w, h) => {
     if (!cfg.on || !live() || (TFS[O.tf] || 60) >= 86400) return;
-    const Zs = zones(); if (!Zs.length && !freshZones().length) return;
+    const R = rows(), Zs = R.length ? [] : zones(); if (!R.length && !Zs.length && !freshZones().length) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height(), px = O.lastClose;
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
-    const mx = Zs.length ? Math.max(...Zs.map(z => z.n)) : 1; hit = [];
+    hit = [];
     ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'middle';
-    Zs.forEach(z => { // V4.9.17: แถบสีไม่มีตัวหนังสือ แตะแถบดูรายละเอียด · Buy ฟ้า / Sell ส้ม (ไม่ซ้ำแดง/เขียวของ OI) · สองฝั่ง = เทาจาง
+    // V4.9.19: โปรไฟล์ละเอียดทีละ $1 (ไม่รวมเป็นโซนใหญ่ ซึ่งส่วนมากออกสองฝั่ง/เทา) — แต่ละแถว ฟ้า = ไม้รายย่อยไล่ซื้อ ต่อด้วย ส้ม = ไล่ขาย ตามสัดส่วน · ยาว = จำนวนไม้
+    //   แถวที่เอียงชัด (z ≥ 1.5 และไม่ใช่ 49–51%) สีเข้ม + ขอบ · แถวไม่เอียง สีจาง · ไม่มีตัวหนังสือ แตะแถวดูรายละเอียด
+    if (R.length) {
+      const V = R.map(r => ({ p: r[0], b: r[1], s: r[2], y1: sr.priceToCoordinate(r[0] + 0.5), y2: sr.priceToCoordinate(r[0] - 0.5) })).filter(r => r.y1 !== null && r.y2 !== null && r.y2 > 0 && r.y1 < plotH);
+      const mx = V.length ? Math.max(...V.map(r => r.b + r.s)) : 1, W = plotW * 0.3;
+      V.forEach(r => {
+        const t = r.b + r.s; if (!(t > 0)) return;
+        const pct = r.b / t, z = (r.b - r.s) / Math.sqrt(Math.max(1, t)), pr = Math.round(pct * 100) / 100, side = pr >= 0.49 && pr <= 0.51 ? 0 : z >= 1.5 ? 1 : z <= -1.5 ? -1 : 0;
+        const y = Math.round(r.y1) + 0.5, hh = Math.max(1, r.y2 - r.y1 - 1), len = Math.max(2, W * t / mx), x0 = plotW - len, lb = len * pct;
+        ctx.globalAlpha = side ? 0.8 : 0.3;
+        ctx.fillStyle = '#38bdf8'; ctx.fillRect(x0, y, lb, hh);
+        ctx.fillStyle = '#ff9f43'; ctx.fillRect(x0 + lb, y, len - lb, hh);
+        if (side) { ctx.globalAlpha = 1; ctx.strokeStyle = side > 0 ? '#38bdf8' : '#ff9f43'; ctx.lineWidth = 1; ctx.strokeRect(x0 - 0.5, y - 0.5, len + 1, hh + 1); }
+        const st = side > 0 ? (px < r.p - 0.5 ? ' · คนกลุ่มนี้ติดลบ' : px > r.p + 0.5 ? ' · คนกลุ่มนี้กำไร' : '') : side < 0 ? (px > r.p + 0.5 ? ' · คนกลุ่มนี้ติดลบ' : px < r.p - 0.5 ? ' · คนกลุ่มนี้กำไร' : '') : '';
+        const lab = side > 0 ? `<b style="color:#38bdf8">Buy ${Math.round(pct * 100)}%</b>` : side < 0 ? `<b style="color:#ff9f43">Sell ${Math.round((1 - pct) * 100)}%</b>` : `สองฝั่ง (ซื้อ ${Math.round(pct * 100)}%)`;
+        hit.push({ x0: Math.min(x0, plotW - 40), x1: plotW, y1: r.y1 - 1, y2: r.y2 + 1, txt: `👥 ${r.p.toFixed(0)} ± 0.5 · ${lab} · ไล่ซื้อ ${fmt(r.b)} / ไล่ขาย ${fmt(r.s)} ไม้${st}` });
+      });
+    }
+    const mx = Zs.length ? Math.max(...Zs.map(z => z.n)) : 1;
+    Zs.forEach(z => { // (สำรอง: ยังไม่มีแถวละเอียด) แถบโซนแบบเดิม
       let y1 = sr.priceToCoordinate(z.hi), y2 = sr.priceToCoordinate(z.lo); if (y1 === null || y2 === null || y2 < 0 || y1 > plotH) return;
       if (y2 - y1 < 3) { const m = (y1 + y2) / 2; y1 = m - 1.5; y2 = m + 1.5; }
       const len = Math.max(24, plotW * 0.3 * z.n / mx), x0 = plotW - len, col = z.side > 0 ? '#38bdf8' : z.side < 0 ? '#ff9f43' : '#9aa3b8';
       ctx.globalAlpha = z.side ? 0.24 : 0.1; ctx.fillStyle = col; ctx.fillRect(x0, y1, len, y2 - y1);
       ctx.globalAlpha = z.side ? 0.9 : 0.35; ctx.fillRect(x0, y1, 2, y2 - y1);
-      const under = z.side > 0 ? px < z.lo : z.side < 0 ? px > z.hi : false, prof = z.side > 0 ? px > z.hi : z.side < 0 ? px < z.lo : false;
       const lab = z.side > 0 ? `Buy ${Math.round(z.pct * 100)}%` : z.side < 0 ? `Sell ${Math.round((1 - z.pct) * 100)}%` : 'สองฝั่ง';
-      hit.push({ x0, x1: plotW, y1: y1 - 4, y2: y2 + 4, txt: `👥 <b style="color:${col}">${lab}</b> · ${fmt(z.n)} ไม้ · ${z.lo.toFixed(1)}–${z.hi.toFixed(1)} (เฉลี่ย ${z.avg.toFixed(1)})${under ? ' · คนกลุ่มนี้ติดลบ' : prof ? ' · คนกลุ่มนี้กำไร' : ''}` });
+      hit.push({ x0, x1: plotW, y1: y1 - 4, y2: y2 + 4, txt: `👥 <b style="color:${col}">${lab}</b> · ${fmt(z.n)} ไม้ · ${z.lo.toFixed(1)}–${z.hi.toFixed(1)}` });
     });
     // V4.9.18: ⚡ ไม้สด 1 ชม. = เส้นประบาง ที่ราคาเฉลี่ย (ไม่มีตัวหนังสือ แตะดูรายละเอียด)
     const Fz = freshZones(), fm = Fz.length ? Math.max(...Fz.map(z => z.n)) : 1;
@@ -181,5 +207,5 @@
   if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }
   setInterval(() => { if (cfg.on && live()) O.markDirty(); }, 30000);
 
-  window.OI_retail = { zones, trapZones, freshZones, compute, get server() { return srvOk() ? SZ : null; }, save, needFull, get bins() { return bins; }, get cfg() { return cfg; } };
+  window.OI_retail = { zones, rows, trapZones, freshZones, compute, get server() { return srvOk() ? SZ : null; }, save, needFull, get bins() { return bins; }, get cfg() { return cfg; } };
 })();

@@ -1,3 +1,7 @@
+### V4.9.24 — 2026-11-04 — Claude
+- ไฟล์: retail.js, index.html + Worker gc-yahoo (`POST /rtpush`) + repo gold-oi-trade/relay (ใหม่)
+- แก้อะไร: 👥 เซิร์ฟเวอร์ดึงไม้ Binance/Bitget ไม่ได้ (HTTP 403 บล็อก Cloudflare) → (1) มือถือ/คอมที่เปิด 🐋 Big Traders ช่วยส่งไม้ Binance (ไม่เกิน 14 นาทีล่าสุด) ให้เซิร์ฟเวอร์ทุก 1 นาที (2) relay สำหรับเครื่องที่บ้าน ส่ง Binance + Bitget ทุก 1 นาที · เซิร์ฟเวอร์กันนับซ้ำด้วย id ไม้ · เมนู ƒx 👥 บอกแหล่งไม้ เช่น bybit+binance(มือถือ)+bitget(คอมบ้าน)
+
 ### V4.9.23 — 2026-11-04 — Claude
 - ไฟล์: index.html (zoneBanner)
 - แก้อะไร: ป้าย "⏳ รอดู PA เด้ง หรือ ทะลุ" ขึ้นเฉพาะตอนราคาอยู่ในโซน OI (Call/Put ที่มีอันดับ) · เส้น Vol ไม่ขึ้นป้ายแล้ว (การแจ้งเตือนเสียงของเส้น Vol ยังเหมือนเดิม)

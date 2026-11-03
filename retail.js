@@ -36,11 +36,21 @@
   function sink(t, p, q, s, id) {
     if (id !== undefined && mark(id)) return;
     if (!(q > 0) || !(p > 0) || t < Date.now() - KEEP) return;
+    if (id !== undefined && t > Date.now() - 14 * 60e3 && PQ.length < 20000) PQ.push([id, t, p, q, s]); // V4.9.24 ส่งไม้ Binance ให้เซิร์ฟเวอร์
     const c = Math.max(0, Math.min(NC - 1, Math.floor(Math.log2(q * 1000)))), k = Math.floor(t / BK) * BK + '|' + Math.round(p);
     let a = bins.get(k); if (!a) { a = new Float32Array(NC * 4); bins.set(k, a); }
     const i = (s > 0 ? 0 : NC) + c; a[i] += 1; a[2 * NC + i] += q; dirty = true;
   }
   window.OIRetailSink = sink;
+  // V4.9.24: เซิร์ฟเวอร์ดึง Binance ไม่ได้ (บล็อก Cloudflare) → เครื่องที่เปิด 🐋 ช่วยส่งไม้ Binance ทุก 1 นาที (เซิร์ฟเวอร์กันนับซ้ำด้วย id)
+  const PQ = []; let pushInfo = '';
+  async function pushTrades() {
+    if (!PQ.length || !O.worker || !cfg.on) return;
+    const tr = PQ.splice(0, PQ.length);
+    try { const j = await (await fetch(O.worker + '/rtpush', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ src: 'binance', via: 'phone', tr }) })).json(); pushInfo = `ส่ง Binance ${tr.length} ไม้ (ใหม่ ${j.added ?? 0})`; }
+    catch (e) { if (PQ.length + tr.length <= 20000) PQ.unshift(...tr); pushInfo = 'ส่งไม้ไม่สำเร็จ จะลองใหม่'; }
+  }
+  setInterval(pushTrades, 60e3);
 
   // ---------- เก็บในเครื่อง ----------
   function save() {
@@ -201,7 +211,7 @@
 
   // ---------- เมนู ƒx ----------
   function info() {
-    if (srvOk()) return `เซิร์ฟเวอร์ · ${Object.keys(SZ.src || {}).join('+') || '-'} · ${fmt(SZ.n)} ไม้ · ย้อน ${(SZ.hrs || 0).toFixed(0)} ชม.`;
+    if (srvOk()) return `เซิร์ฟเวอร์ · ${Object.entries(SZ.src || {}).filter(([k]) => !/_via$/.test(k)).map(([k, v]) => k + (SZ.src[k + '_via'] ? '(' + (SZ.src[k + '_via'] === 'phone' ? 'มือถือ' : 'คอมบ้าน') + ')' : '')).join('+') || '-'}${pushInfo ? ' · ' + pushInfo : ''} · ${fmt(SZ.n)} ไม้ · ย้อน ${(SZ.hrs || 0).toFixed(0)} ชม.`;
     if (!live()) return 'รอข้อมูลจากเซิร์ฟเวอร์… (หรือเปิด 🐋 Big Traders ให้เครื่องนี้เก็บเอง)';
     if (!Z) Z = compute(); if (!Z) return 'กำลังเก็บไม้รายย่อย…';
     return `ไม้ ≤ ${Z.maxSz < 1 ? Z.maxSz.toFixed(3) : Z.maxSz} oz · ${fmt(Z.n)} ไม้ · ย้อน ${Z.hrs.toFixed(0)} ชม.`;

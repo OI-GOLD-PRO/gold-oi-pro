@@ -713,7 +713,7 @@
     }
 
     // 1.5) COT + Gamma (เฉพาะทองคำ)
-    if (cur === 'gold') { parts.push(cotCard(price, cfg)); parts.push(cotGroupsCard()); if (window.OICrowdCard) { try { parts.push(window.OICrowdCard()); } catch (e) {} } { const gref = isFinite(gcSheet) && gcSheet > 0 ? gcSheet : price; parts.push(oiBarsCard(gref, cfg)); parts.push(oiCompareCard(d, cfg, m, gref, A)); } parts.push(liveCard(price)); if (window.OIVolCard) { try { parts.push(window.OIVolCard()); } catch (e) {} } }
+    if (cur === 'gold') { if (window.OIOIStatCard) { try { parts.push(window.OIOIStatCard()); } catch (e) {} } parts.push(cotCard(price, cfg)); parts.push(cotGroupsCard()); if (window.OICrowdCard) { try { parts.push(window.OICrowdCard()); } catch (e) {} } { const gref = isFinite(gcSheet) && gcSheet > 0 ? gcSheet : price; parts.push(oiBarsCard(gref, cfg)); parts.push(oiCompareCard(d, cfg, m, gref, A)); } parts.push(liveCard(price)); if (window.OIVolCard) { try { parts.push(window.OIVolCard()); } catch (e) {} } }
 
     // 2) ป้ายเตือนราคาใกล้แนว
     if (price !== null) {

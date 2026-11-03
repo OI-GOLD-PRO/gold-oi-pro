@@ -133,7 +133,8 @@
     if (!cfg.on) return null;
     const r = regime(); if (!r) return null;
     const z = null, zt = ''; // V4.5.8: เอา ±SD ออกจากป้าย
-    return [`🌡${r.Z.ico} ${r.Z.name} ${r.pct.toFixed(0)}%${zt}`, r.Z.col, 'volreg', z !== null && Math.abs(z) >= 2 ? r.Z.bg : null, 'first']; // V4.5.7: ตำแหน่งราคาเทียบกรอบ SD ที่ตรึงจาก settle // V4.5.4: เอา ±σ ออก (เส้น SD ใช้แบบ CME ตามราคาปัจจุบันแล้ว) // V4.5.0: ขึ้นหน้าแถบ (เดิมอยู่ท้ายสุด ต้องเลื่อนถึงเห็น)
+    const px = O.lastClose, dd = px ? px * r.hv / 100 / Math.sqrt(252) : 0; // V4.9.8: HV 20 วัน + ระยะวิ่งเฉลี่ยต่อวัน ($)
+    return [`🌡${r.Z.ico} ${r.Z.name} ${r.pct.toFixed(0)}% · HV ${r.hv.toFixed(1)}%${dd ? ` ±$${dd.toFixed(0)}/วัน` : ''}${zt}`, r.Z.col, 'volreg', z !== null && Math.abs(z) >= 2 ? r.Z.bg : null, 'first']; // V4.5.7: ตำแหน่งราคาเทียบกรอบ SD ที่ตรึงจาก settle // V4.5.4: เอา ±σ ออก (เส้น SD ใช้แบบ CME ตามราคาปัจจุบันแล้ว) // V4.5.0: ขึ้นหน้าแถบ (เดิมอยู่ท้ายสุด ต้องเลื่อนถึงเห็น)
   });
   function explain() {
     const r = regime(); if (!r) { O.showToast && O.showToast('🌡 โหมดตลาด: กำลังโหลด vol.json…', 4000); return; }
@@ -142,6 +143,7 @@
     const E = erange(), zLine = E ? `● กรอบจากราคาตอนนี้ (แบบหน้าจอ QuikStrike ขยับตามราคา): ${E.root}, เหลือ ${E.dte.toFixed(2)} วัน) แบบ CME: 1SD = ±${E.sd.toFixed(1)} → ${(E.c - E.sd).toFixed(0)}–${(E.c + E.sd).toFixed(0)} · 2SD ±${(2 * E.sd).toFixed(0)} · 3SD ±${(3 * E.sd).toFixed(0)} (${E.src} ${(E.vol * 100).toFixed(2)}%)<br>` : '';
     O.showToast && O.showToast(
       `<b style="color:${r.Z.col}">${r.Z.ico} โหมดตลาด: ${r.Z.name}</b> · HV 20 วัน ${g.last.toFixed(1)}% = เปอร์เซ็นไทล์ <b>${g.pct.toFixed(0)}</b> (เทียบตั้งแต่ ${g.since.slice(0, 4)})<br>` +
+      (O.lastClose ? `● HV ต่อวัน = ${g.last.toFixed(1)}% ÷ √252 = <b>±${(g.last / Math.sqrt(252)).toFixed(2)}%</b> ≈ <b>±$${(O.lastClose * g.last / 100 / Math.sqrt(252)).toFixed(1)}</b> ต่อวัน (1SD ของการวิ่งปิด-ปิด 20 วันหลัง · 2 ใน 3 ของวันวิ่งไม่เกินนี้)<br>` : '') +
       `● เกณฑ์: 🟢 &lt; ${g.p25}% · 🟠 ${g.p25}–${g.p75}% · 🔴 &gt; ${g.p75}% (มัธยฐาน ${g.p50}%)<br>` +
       `● ${r.Z.how}<br>` +
       `● ขนาดไม้แนะนำ <b>×${r.size.toFixed(2)}</b> ของปกติ · ระยะ SL <b>×${r.sl.toFixed(2)}</b><br>` +

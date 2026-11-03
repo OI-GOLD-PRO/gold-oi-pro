@@ -178,7 +178,7 @@
     const px = O.lastClose || B[B.length - 1].close;
     ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'middle';
     // แถบ SL ใกล้ราคา (±3 ATR) · หนา = SL กองมาก
-    if (cfg.pools) pools.filter(p => !p.swept && (p.side > 0 ? p.p > px : p.p < px) && Math.abs(p.p - px) <= atr * 3).forEach(p => {
+    if (cfg.pools) pools.filter(p => !p.swept && (p.side > 0 ? p.p > px : p.p < px) && Math.abs(p.p - px) <= atr * 6).sort((a, b) => Math.abs(a.p - px) - Math.abs(b.p - px)).slice(0, 6).forEach(p => {
       const y = Y(p.p); if (y === null || y < 6 || y > plotH - 6) return;
       const th = Math.min(7, 2 + p.w * 0.6);
       ctx.globalAlpha = 0.18; ctx.fillStyle = '#ffb347'; ctx.fillRect(plotW * 0.62, y - th / 2, plotW * 0.38, th);

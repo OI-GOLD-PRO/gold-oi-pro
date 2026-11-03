@@ -154,8 +154,7 @@
         if (!side) return; // V4.9.20: ไม่แสดงแถวที่ซื้อ≈ขาย (เดิมเป็นแถบจางสีเทา) เหลือเฉพาะแถวที่เอียงชัด
         const y = Math.round(r.y1) + 0.5, hh = Math.max(1, r.y2 - r.y1 - 1), len = Math.max(2, W * t / mx), x0 = plotW - len, lb = len * pct;
         ctx.globalAlpha = side ? 0.8 : 0.3;
-        ctx.fillStyle = '#38bdf8'; ctx.fillRect(x0, y, lb, hh);
-        ctx.fillStyle = '#ff9f43'; ctx.fillRect(x0 + lb, y, len - lb, hh);
+        ctx.fillStyle = side > 0 ? '#38bdf8' : '#ff9f43'; ctx.fillRect(x0, y, len, hh); // V4.9.21: ทั้งแถวเป็นสีฝั่งที่มากกว่า (ไม่ใส่สีอีกฝั่ง)
         if (side) { ctx.globalAlpha = 1; ctx.strokeStyle = side > 0 ? '#38bdf8' : '#ff9f43'; ctx.lineWidth = 1; ctx.strokeRect(x0 - 0.5, y - 0.5, len + 1, hh + 1); }
         const st = side > 0 ? (px < r.p - 0.5 ? ' · คนกลุ่มนี้ติดลบ' : px > r.p + 0.5 ? ' · คนกลุ่มนี้กำไร' : '') : side < 0 ? (px > r.p + 0.5 ? ' · คนกลุ่มนี้ติดลบ' : px < r.p - 0.5 ? ' · คนกลุ่มนี้กำไร' : '') : '';
         const lab = side > 0 ? `<b style="color:#38bdf8">Buy ${Math.round(pct * 100)}%</b>` : side < 0 ? `<b style="color:#ff9f43">Sell ${Math.round((1 - pct) * 100)}%</b>` : `สองฝั่ง (ซื้อ ${Math.round(pct * 100)}%)`;

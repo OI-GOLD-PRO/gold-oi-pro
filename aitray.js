@@ -409,10 +409,10 @@
     const li = a => a && a.length ? `<ul>${a.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
     const sc = { BUY: '#2fe3a6', SELL: '#ff6b82', WAIT: '#c9d1ea' }[m.bias] || '#c9d1ea';
     return `<div style="font:700 14px var(--sans);color:#b18cff">👥 ทฤษฎีคนส่วนน้อย · ${esc((m.time_th || '').slice(11))} น. · ราคา ${f2(m.price)}</div>
-      <div class="act"><span class="badge ${m.bias}" style="font-size:20px">${m.bias === 'WAIT' ? 'รอ' : m.bias}</span><div class="conf"><small>ฝั่งคนส่วนน้อยวันนี้ · ความมั่นใจ ${m.confidence}%</small><div class="bar"><i style="width:${m.confidence}%;background:${sc}"></i></div></div></div>
+      <div class="act"><span class="badge ${m.bias}" style="font-size:20px">${m.bias === 'WAIT' ? 'รอ' : m.bias}</span><div class="conf"><small>${m.bias === 'WAIT' ? 'ยังไม่ใช่จังหวะ · รอให้ราคาไปถึงจุดที่คนส่วนมากติดกับ' : 'ฝั่งที่คนส่วนน้อยได้เปรียบวันนี้ · ความมั่นใจ ' + m.confidence + '%'}</small>${m.bias === 'WAIT' ? '' : `<div class="bar"><i style="width:${m.confidence}%;background:${sc}"></i></div>`}</div></div>
       ${m.summary ? `<p>${esc(m.summary)}</p>` : ''}
-      <div class="pc"><div><b style="color:#ffd97a">👥 คนส่วนมาก: ${esc(m.majority.side)}</b><p style="margin:2px 0">${esc(m.majority.who)}</p><p style="margin:2px 0;color:#a9b4d6">${esc(m.majority.view)}</p></div>
-        <div><b style="color:#b18cff">🎯 คนส่วนน้อย: ${esc(m.minority.side)}</b><p style="margin:2px 0">${esc(m.minority.who)}</p><p style="margin:2px 0;color:#a9b4d6">${esc(m.minority.view)}</p></div></div>
+      <div style="border:1px solid #6b5a2a;border-radius:10px;padding:8px 10px;margin-top:8px"><b style="color:#ffd97a">👥 คนส่วนมาก: ${esc(m.majority.side)}</b><p style="margin:3px 0">${esc(m.majority.who)}</p><p style="margin:3px 0;color:#a9b4d6">มองว่า: ${esc(m.majority.view)}</p></div>
+      <div style="border:1px solid #4d3d8a;border-radius:10px;padding:8px 10px;margin-top:8px"><b style="color:#b18cff">🎯 คนส่วนน้อย: ${esc(m.minority.side)}</b><p style="margin:3px 0">${esc(m.minority.who)}</p><p style="margin:3px 0;color:#a9b4d6">มองว่า: ${esc(m.minority.view)}</p></div>
       ${m.traps && m.traps.length ? `<b style="color:#ff9f1a">🪤 จุดที่คนส่วนมากติดกับ / SL กองอยู่</b>${li(m.traps)}` : ''}
       ${m.entry || m.sl || m.tp1 ? `<div class="plan"><div><small>${m.bias === 'WAIT' ? 'รอเข้า' : 'Entry'}</small>${f2(m.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(m.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(m.tp1)}</span></div><div><small>TP2</small><span style="color:#2fe3a6">${f2(m.tp2)}</span></div></div>` : ''}
       ${m.trigger ? `<p>⏳ จังหวะเข้า: ${esc(m.trigger)}</p>` : ''}

@@ -397,11 +397,11 @@ function aiMinor_(snap) {
     'COT เป็นข้อมูลรายสัปดาห์ (ภาพใหญ่) · OI/Flow/Dealer/Big Traders เป็นข้อมูลวันนี้ (จังหวะ) ให้ใช้คู่กัน · oi_divergence = ป้าย OI รายวัน (ทดสอบย้อนหลังแล้วความแม่นต่ำ ใช้ประกอบเท่านั้น)',
     'levels = แนว OI/Wall/EM/gmf/Max Pain ของเรา · tfs = สรุปหลาย TF (trend, structure, smc) · ใช้ตัวเลขในข้อมูลเท่านั้น ห้ามแต่งราคา ห้ามอ้าง EMA/VWAP',
     'แผน: bias = ฝั่งที่คนส่วนน้อยน่าจะได้เปรียบวันนี้ ("BUY"|"SELL"|"WAIT") · entry ต้องอยู่ที่จุดที่คนส่วนมากติดกับ (ไม่ใช่ไล่ราคาตอนนี้) ห่างราคาปัจจุบันไม่เกิน 1.5% · SL เลยจุดเก็บ SL ของคนส่วนมากไปอีกเล็กน้อย · TP1/TP2 = แนว OI ถัดไป · ถ้าข้อมูลขัดกันหรือใกล้ข่าวแดงให้ WAIT',
-    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ เข้าใจง่าย ฟิลด์: summary (สรุป 2 ประโยค), majority {side ("LONG"/"SHORT"/"ไม่ชัด"), who (ใคร + ตัวเลขยืนยัน 1 ประโยค), view (มองยังไง 1 ประโยค)}, minority {side, who, view}, traps (array 2-4 ข้อ: ราคา + ทำไมเป็นจุดที่คนส่วนมากติดกับ/SL กอง), bias, confidence (0-100 ประเมินแบบระมัดระวัง), entry, sl, tp1, tp2 (ตัวเลข; WAIT ใส่ราคาที่ควรรอได้), trigger (ต้องเห็น Price Action อะไรก่อนเข้า 1 ประโยค), scenarios (array 2 ข้อ "ถ้า...→..."), avoid (array 2-3 ข้อ สิ่งที่คนส่วนมากทำผิดวันนี้), invalid (เงื่อนไขที่แผนผิด 1 ประโยค)',
+    'ตอบ JSON เท่านั้น ภาษาไทยที่คนทั่วไปเข้าใจ (เลี่ยงศัพท์อังกฤษ/ชื่อฟิลด์ เช่น pctile, S<0, dir) ต้องครบทุกฟิลด์ แต่ละข้อสั้น ฟิลด์: summary (สรุป 2 ประโยค), majority {side ("LONG"/"SHORT"/"ไม่ชัด"), who (ใคร + ตัวเลขยืนยัน 1 ประโยค), view (มองยังไง 1 ประโยค)}, minority {side, who, view}, traps (array 2-4 ข้อ: ราคา + ทำไมเป็นจุดที่คนส่วนมากติดกับ/SL กอง), bias, confidence (0-100 ประเมินแบบระมัดระวัง), entry, sl, tp1, tp2 (ตัวเลข; WAIT ใส่ราคาที่ควรรอได้), trigger (ต้องเห็น Price Action อะไรก่อนเข้า 1 ประโยค), scenarios (array 2 ข้อ "ถ้า...→..."), avoid (array 2-3 ข้อ สิ่งที่คนส่วนมากทำผิดวันนี้), invalid (เงื่อนไขที่แผนผิด 1 ประโยค)',
   ].join('\n');
   let heads = []; try { heads = aiNews_().slice(0, 8); } catch (e) {}
   snap.headlines = heads.map(h => ({ t: h.t, src: h.src, ago_min: h.ago_min }));
-  const body = { model: AI_MODEL, temperature: 0.25, response_format: { type: 'json_object' }, max_tokens: 1800,
+  const body = { model: AI_MODEL, temperature: 0.25, response_format: { type: 'json_object' }, max_tokens: 3500,
     messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(snap) }] };
   const res = aiFetchJson_('https://api.deepseek.com/chat/completions', { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + key }, payload: JSON.stringify(body) });
   const A = aiParseJson_(res.choices[0].message.content);

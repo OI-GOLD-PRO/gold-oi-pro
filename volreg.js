@@ -143,7 +143,8 @@
     const E = erange(), zLine = E ? `● กรอบจากราคาตอนนี้ (แบบหน้าจอ QuikStrike ขยับตามราคา): ${E.root}, เหลือ ${E.dte.toFixed(2)} วัน) แบบ CME: 1SD = ±${E.sd.toFixed(1)} → ${(E.c - E.sd).toFixed(0)}–${(E.c + E.sd).toFixed(0)} · 2SD ±${(2 * E.sd).toFixed(0)} · 3SD ±${(3 * E.sd).toFixed(0)} (${E.src} ${(E.vol * 100).toFixed(2)}%)<br>` : '';
     O.showToast && O.showToast(
       `<b style="color:${r.Z.col}">${r.Z.ico} โหมดตลาด: ${r.Z.name}</b> · HV 20 วัน ${g.last.toFixed(1)}% = เปอร์เซ็นไทล์ <b>${g.pct.toFixed(0)}</b> (เทียบตั้งแต่ ${g.since.slice(0, 4)})<br>` +
-      (O.lastClose ? `● HV ต่อวัน = ${g.last.toFixed(1)}% ÷ √252 = <b>±${(g.last / Math.sqrt(252)).toFixed(2)}%</b> ≈ <b>±$${(O.lastClose * g.last / 100 / Math.sqrt(252)).toFixed(1)}</b> ต่อวัน (1SD ของการวิ่งปิด-ปิด 20 วันหลัง · 2 ใน 3 ของวันวิ่งไม่เกินนี้)<br>` : '') +
+      (O.lastClose ? `● HV ต่อวัน = ${g.last.toFixed(1)}% ÷ √252 = <b>±${(g.last / Math.sqrt(252)).toFixed(2)}%</b> ≈ <b>±$${(O.lastClose * g.last / 100 / Math.sqrt(252)).toFixed(1)}</b> ต่อวัน — ราคาปิดวันนี้ห่างจากปิดเมื่อวานไม่เกินนี้ ~71% ของวัน (backtest GC 2000–2026) · เกิน 3 เท่า ~2% (เดือนละครั้ง)<br>` +
+        `● กรอบระหว่างวัน (สูง−ต่ำ) ≈ ×1.5 = <b>~$${(O.lastClose * g.last / 100 / Math.sqrt(252) * 1.5).toFixed(0)}</b> · ไส้แตะเกิน ±1 เท่าจากปิดเมื่อวาน ~60% ของวัน → อย่าวาง SL ที่ขอบ ±$ พอดี · 🟢 ผันผวนต่ำ ตัวเลขมักต่ำไป (ระวังระเบิด) / 🔴 สูง มักสูงไปนิด<br>` : '') +
       `● เกณฑ์: 🟢 &lt; ${g.p25}% · 🟠 ${g.p25}–${g.p75}% · 🔴 &gt; ${g.p75}% (มัธยฐาน ${g.p50}%)<br>` +
       `● ${r.Z.how}<br>` +
       `● ขนาดไม้แนะนำ <b>×${r.size.toFixed(2)}</b> ของปกติ · ระยะ SL <b>×${r.sl.toFixed(2)}</b><br>` +

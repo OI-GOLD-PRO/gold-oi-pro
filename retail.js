@@ -10,7 +10,8 @@
   if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
   const $ = id => document.getElementById(id);
   const KEY = 'oi_retail' + (O.psfx || ''), SKEY = 'oi_retail_store_v1';
-  const cfg = { on: true };
+  const cfg = { on: true, res: 1 }; // V4.9.22: res = ความละเอียดแถว ($)
+  const RES = [0.1, 0.25, 0.5, 1, 2];
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
   const saveCfg = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   const BK = 15 * 60e3, NC = 16, KEEP = 26 * 3600e3;
@@ -125,12 +126,16 @@
     return shift(SZ.fresh, O.sym === 'gcy' ? off() : (O.adj || 0));
   }
   // V4.9.19: แถวละเอียดทีละ $1 [ราคากราฟ, ซื้อ, ขาย] (เซิร์ฟเวอร์ ถ้าไม่มีใช้ของเครื่อง)
+  // V4.9.22: รวมแถวตามความละเอียดที่ตั้ง (0.1–2$) จากแถวละเอียด $0.1 ของเซิร์ฟเวอร์ (fine) · ไม่มี fine ใช้แถว $1
   function rows() {
     if (!cfg.on) return [];
-    if (srvOk() && SZ.rows) { const d = O.sym === 'gcy' ? off() : (O.adj || 0); return SZ.rows.map(r => [r[0] - d, r[1], r[2]]); }
-    if (srvOk()) return [];
+    const res = RES.includes(+cfg.res) ? +cfg.res : 1;
+    const agg = (L, d, r) => { const m = new Map(); L.forEach(x => { const k = Math.round(x[0] / r); const o = m.get(k) || [0, 0]; o[0] += x[1]; o[1] += x[2]; m.set(k, o); }); return [...m.entries()].map(([k, o]) => [k * r - d, o[0], o[1], r]); };
+    if (srvOk()) { const d = O.sym === 'gcy' ? off() : (O.adj || 0);
+      if (SZ.fine && SZ.fine.length) return agg(SZ.fine, d, res);
+      return SZ.rows ? agg(SZ.rows, d, Math.max(1, res)) : []; }
     if (!Z || Date.now() - zAt > 20000) { Z = compute(); zAt = Date.now(); }
-    const d = off(); return Z && Z.rows ? Z.rows.map(r => [r[0] - d, r[1], r[2]]) : [];
+    const d = off(); return Z && Z.rows ? agg(Z.rows, d, Math.max(1, res)) : [];
   }
   const live = () => { const bt = window.OI_bigtr; return srvOk() || !!(bt && bt.cfg && bt.cfg.on); };
 
@@ -146,7 +151,7 @@
     // V4.9.19: โปรไฟล์ละเอียดทีละ $1 (ไม่รวมเป็นโซนใหญ่ ซึ่งส่วนมากออกสองฝั่ง/เทา) — แต่ละแถว ฟ้า = ไม้รายย่อยไล่ซื้อ ต่อด้วย ส้ม = ไล่ขาย ตามสัดส่วน · ยาว = จำนวนไม้
     //   แถวที่เอียงชัด (z ≥ 1.5 และไม่ใช่ 49–51%) สีเข้ม + ขอบ · แถวไม่เอียง สีจาง · ไม่มีตัวหนังสือ แตะแถวดูรายละเอียด
     if (R.length) {
-      const V = R.map(r => ({ p: r[0], b: r[1], s: r[2], y1: sr.priceToCoordinate(r[0] + 0.5), y2: sr.priceToCoordinate(r[0] - 0.5) })).filter(r => r.y1 !== null && r.y2 !== null && r.y2 > 0 && r.y1 < plotH);
+      const V = R.map(r => ({ p: r[0], b: r[1], s: r[2], y1: sr.priceToCoordinate(r[0] + r[3] / 2), y2: sr.priceToCoordinate(r[0] - r[3] / 2), hw: r[3] / 2 })).filter(r => r.y1 !== null && r.y2 !== null && r.y2 > 0 && r.y1 < plotH);
       const mx = V.length ? Math.max(...V.map(r => r.b + r.s)) : 1, W = plotW * 0.3;
       V.forEach(r => {
         const t = r.b + r.s; if (!(t > 0)) return;
@@ -156,9 +161,9 @@
         ctx.globalAlpha = side ? 0.8 : 0.3;
         ctx.fillStyle = side > 0 ? '#38bdf8' : '#ff9f43'; ctx.fillRect(x0, y, len, hh); // V4.9.21: ทั้งแถวเป็นสีฝั่งที่มากกว่า (ไม่ใส่สีอีกฝั่ง)
         if (side) { ctx.globalAlpha = 1; ctx.strokeStyle = side > 0 ? '#38bdf8' : '#ff9f43'; ctx.lineWidth = 1; ctx.strokeRect(x0 - 0.5, y - 0.5, len + 1, hh + 1); }
-        const st = side > 0 ? (px < r.p - 0.5 ? ' · คนกลุ่มนี้ติดลบ' : px > r.p + 0.5 ? ' · คนกลุ่มนี้กำไร' : '') : side < 0 ? (px > r.p + 0.5 ? ' · คนกลุ่มนี้ติดลบ' : px < r.p - 0.5 ? ' · คนกลุ่มนี้กำไร' : '') : '';
+        const st = side > 0 ? (px < r.p - r.hw ? ' · คนกลุ่มนี้ติดลบ' : px > r.p + r.hw ? ' · คนกลุ่มนี้กำไร' : '') : side < 0 ? (px > r.p + r.hw ? ' · คนกลุ่มนี้ติดลบ' : px < r.p - r.hw ? ' · คนกลุ่มนี้กำไร' : '') : '';
         const lab = side > 0 ? `<b style="color:#38bdf8">Buy ${Math.round(pct * 100)}%</b>` : side < 0 ? `<b style="color:#ff9f43">Sell ${Math.round((1 - pct) * 100)}%</b>` : `สองฝั่ง (ซื้อ ${Math.round(pct * 100)}%)`;
-        hit.push({ x0: Math.min(x0, plotW - 40), x1: plotW, y1: r.y1 - 1, y2: r.y2 + 1, txt: `👥 ${r.p.toFixed(0)} ± 0.5 · ${lab} · ไล่ซื้อ ${fmt(r.b)} / ไล่ขาย ${fmt(r.s)} ไม้${st}` });
+        hit.push({ x0: Math.min(x0, plotW - 40), x1: plotW, y1: r.y1 - 1, y2: r.y2 + 1, txt: `👥 ${r.p.toFixed(r.hw < 0.5 ? 2 : r.hw < 1 ? 1 : 0)} ± ${r.hw} · ${lab} · ไล่ซื้อ ${fmt(r.b)} / ไล่ขาย ${fmt(r.s)} ไม้${st}` });
       });
     }
     const mx = Zs.length ? Math.max(...Zs.map(z => z.n)) : 1;
@@ -201,10 +206,11 @@
     if (!Z) Z = compute(); if (!Z) return 'กำลังเก็บไม้รายย่อย…';
     return `ไม้ ≤ ${Z.maxSz < 1 ? Z.maxSz.toFixed(3) : Z.maxSz} oz · ${fmt(Z.n)} ไม้ · ย้อน ${Z.hrs.toFixed(0)} ชม.`;
   }
-  function section() { const d = document.createElement('div'); d.id = 'rtBox'; d.className = 'gsbox'; d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-rt="on"><i style="background:linear-gradient(90deg,#38bdf8 50%,#ff9f43 50%)"></i>👥 โซนรายย่อยเข้าออเดอร์</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>`; return d; }
+  function section() { const d = document.createElement('div'); d.id = 'rtBox'; d.className = 'gsbox'; d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-rt="on"><i style="background:linear-gradient(90deg,#38bdf8 50%,#ff9f43 50%)"></i>👥 โซนรายย่อยเข้าออเดอร์</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>` +
+    (cfg.on ? `<div class="row ps"><span class="gsinfo">ความละเอียดแถว</span>${RES.map(r => `<button class="gsb${+cfg.res === r ? ' on' : ''}" data-rtres="${r}">$${r}</button>`).join('')}</div>` : ''); return d; }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('rtBox')) return; const box = section(), anchor = $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }
   const menu = $('indMenu');
-  if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }
+  if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { const rb = e.target.closest('[data-rtres]'); if (rb) { cfg.res = +rb.dataset.rtres; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); return; } if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }
   setInterval(() => { if (cfg.on && live()) O.markDirty(); }, 30000);
 
   window.OI_retail = { zones, rows, trapZones, freshZones, compute, get server() { return srvOk() ? SZ : null; }, save, needFull, get bins() { return bins; }, get cfg() { return cfg; } };

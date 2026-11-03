@@ -1530,7 +1530,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const MIX_PROV = {
     id: 'mix', name: 'รวม Bybit+Bitget+Binance', pollMs: 2000, pollN: 5,
     fetchRows: async (t, n) => {
-      const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 9000);
+      const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 12000);
       try {
         const r = await fetch(`${GC_WORKER}/mix?tf=${t}&n=${n}`, { cache: 'no-store', signal: ac.signal });
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1777,6 +1777,11 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     return c;
   }
 
+  // V4.9.16: ถ้าเปิดแอปแล้วแท่งรวมไม่ตอบ (ตกไปแหล่งเดี่ยว) ลองกลับมาใช้แท่งรวมทุก 1 นาที ให้ทุกเครื่องกลับมาตรงกัน
+  setInterval(async () => {
+    if (!prov || prov.id === 'mix' || !PROVIDERS.includes(MIX_PROV) || document.visibilityState === 'hidden') return;
+    try { await MIX_PROV.fetchRows(tf, 5); prov = MIX_PROV; loadTF(tf); } catch (e) {}
+  }, 60000);
   async function fetchBars(p, t, n) {
     if (p.fetchRows) return p.fetchRows(t, n);
     const ac = new AbortController(); const timer = setTimeout(() => ac.abort(), 7000);

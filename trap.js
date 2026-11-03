@@ -1,6 +1,6 @@
-// 🪤 กับดักคนส่วนน้อย (Liquidity Sweep) — M5
+// 💀 กับดักคนส่วนน้อย (ไอคอนเดิม 🪤 → 💀 ตามที่ผู้ใช้เลือก V4.8.5) (Liquidity Sweep) — M5
 // แนวคิด: รายย่อยวาง SL ที่จุดชัด ๆ → รายใหญ่ดันราคาไปกวาด SL (ได้สภาพคล่องเปิดฝั่งตรงข้าม) → ราคาเด้งกลับ
-//  ขั้น 1 จุดที่ SL กอง (แถบ 🪤): swing high/low ที่ยังไม่ถูกกวาด (ยอดเท่ากัน = หนักขึ้น) · High/Low รอบเทรดก่อน
+//  ขั้น 1 จุดที่ SL กอง (แถบ 💀): swing high/low ที่ยังไม่ถูกกวาด (ยอดเท่ากัน = หนักขึ้น) · High/Low รอบเทรดก่อน
 //         · เลขกลมฟิวเจอร์ส · เลขกลม "ราคาสปอต" (รายย่อย CFD เห็นราคาสปอตจาก gold-api ซึ่งต่างจากราคากราฟ → บวก basis แปลงเป็นสเกลกราฟ) · เลยกำแพง OI อันดับ 1–5
 //         · น้ำหนัก COT: รายย่อยถือ Long มาก → SL ฝั่งล่างหนักกว่า
 //  ขั้น 2 การกวาด: ไส้แท่ง M5 แทงเลยแถบ ≥ 0.3 ATR (≥ $1) แล้วปิดกลับเข้าภายใน 3 แท่ง
@@ -151,10 +151,10 @@
     const n = B.length;
     setups.forEach(s => {
       const key = s.P.p.toFixed(1) + '|' + B[s.si].time, d = s.side > 0 ? 'BUY' : 'SELL', where = s.side > 0 ? 'ใต้' : 'เหนือ';
-      if (n - 1 - s.si <= 1 && !told.has('w' + key)) { told.add('w' + key); alertMsg(`🪤 <b>กำลังกวาด SL ${where} ${s.P.p.toFixed(1)}</b> (${s.P.why.join(' + ')})<br>รอแท่ง M5 ปิดกลับ${s.side > 0 ? 'เหนือ' : 'ใต้'}แถบ → ${d}`, false); }
+      if (n - 1 - s.si <= 1 && !told.has('w' + key)) { told.add('w' + key); alertMsg(`💀 <b>กำลังกวาด SL ${where} ${s.P.p.toFixed(1)}</b> (${s.P.why.join(' + ')})<br>รอแท่ง M5 ปิดกลับ${s.side > 0 ? 'เหนือ' : 'ใต้'}แถบ → ${d}`, false); }
       if (s.ri !== undefined && n - 1 - s.ri <= 1 && !told.has('e' + key)) {
         told.add('e' + key); const f = filters(s);
-        alertMsg(`🪤 <b>${f.block ? '⛔ กวาดแล้วเด้ง แต่ห้ามสวนตอนนี้' : '✅ รายใหญ่รับ → ' + d}</b> ${s.entry.toFixed(2)} · คะแนน ${s.score}/100<br>SL ${s.sl.toFixed(2)} (เลยไส้) · TP1 ${s.tp1.toFixed(2)} (${s.tpLab}) · TP2 ${s.tp2.toFixed(2)}${s.ev.length ? '<br>หลักฐาน: ' + s.ev.join(' · ') : ''}${f.w.length ? '<br>' + f.w.join('<br>') : ''}`, !f.block);
+        alertMsg(`💀 <b>${f.block ? '⛔ กวาดแล้วเด้ง แต่ห้ามสวนตอนนี้' : '✅ รายใหญ่รับ → ' + d}</b> ${s.entry.toFixed(2)} · คะแนน ${s.score}/100<br>SL ${s.sl.toFixed(2)} (เลยไส้) · TP1 ${s.tp1.toFixed(2)} (${s.tpLab}) · TP2 ${s.tp2.toFixed(2)}${s.ev.length ? '<br>หลักฐาน: ' + s.ev.join(' · ') : ''}${f.w.length ? '<br>' + f.w.join('<br>') : ''}`, !f.block);
       }
     });
   }
@@ -183,11 +183,11 @@
       const th = Math.min(7, 2 + p.w * 0.6);
       ctx.globalAlpha = 0.18; ctx.fillStyle = '#ffb347'; ctx.fillRect(plotW * 0.62, y - th / 2, plotW * 0.38, th);
       ctx.globalAlpha = 0.85; ctx.fillStyle = '#ffb347'; ctx.textAlign = 'left';
-      ctx.fillText(`🪤 SL ${p.side < 0 ? 'Long' : 'Short'} · ${p.why.slice(0, 2).join('+')}`, plotW * 0.62 + 2, y + (p.side < 0 ? 8 : -8));
+      ctx.fillText(`💀 SL ${p.side < 0 ? 'Long' : 'Short'} · ${p.why.slice(0, 2).join('+')}`, plotW * 0.62 + 2, y + (p.side < 0 ? 8 : -8));
     });
     ctx.globalAlpha = 1;
     // V4.8.4: วาดเฉพาะสัญญาณที่ "ครบ" (กวาดแล้วปิดกลับ = มีจุดเข้า) หรือที่กำลังเกิดตอนนี้ · การกวาดที่ไม่กลับเข้า (เบรกจริง) ไม่วาด
-    // ใช้จุดเล็ก + ✓/✗ แทนไอคอน 🪤 ทุกจุด (เดิมรกมาก โดยเฉพาะ TF ใหญ่ที่หลายสัญญาณ M5 ซ้อนในแท่งเดียว)
+    // ใช้จุดเล็ก + ✓/✗ แทนไอคอน 💀 ทุกจุด (เดิมรกมาก โดยเฉพาะ TF ใหญ่ที่หลายสัญญาณ M5 ซ้อนในแท่งเดียว)
     const seen = new Set();
     setups.filter(s => s.ri !== undefined || s.st === 1).slice(-12).forEach(s => {
       const x = X(s.ri !== undefined ? s.ri : s.si); if (x === null || x < 0 || x > plotW) return;
@@ -195,14 +195,14 @@
       const y = Y(s.ri !== undefined ? s.entry : s.ext); if (y === null) return;
       const col = s.st === 4 ? '#22e39a' : s.st === 5 ? '#ff4d6a' : '#ffb347';
       ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, 7); ctx.fill();
-      ctx.textAlign = 'left'; ctx.fillText(s.st === 4 ? '✓' : s.st === 5 ? '✗' : s.st === 1 ? '🪤' : '', x + 4, y);
+      ctx.textAlign = 'left'; ctx.fillText(s.st === 4 ? '✓' : s.st === 5 ? '✗' : s.st === 1 ? '💀' : '', x + 4, y);
     });
     // แผนที่ยังทำงาน
     if (fresh()) setups.filter(s => s.st === 3 || s.st === 1).forEach(s => {
       const x0 = X(s.ri !== undefined ? s.ri : s.si); if (x0 === null) return; const xr = plotW - 2;
       const line = (p, col, dash, lab) => { const y = Y(p); if (y === null || y < 0 || y > plotH) return; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(xr, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = col; ctx.textAlign = 'right'; ctx.fillText(lab, xr - 2, y - 6); };
-      if (s.st === 1) line(s.P.p, '#ffb347', [2, 2], `🪤 รอปิดกลับ ${s.P.p.toFixed(1)}`);
-      else { line(s.entry, '#e0b44c', [], `🪤 ${s.side > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(1)} · ${s.score}`); line(s.sl, '#ff4d6a', [4, 3], `SL ${s.sl.toFixed(1)}`); line(s.tp1, '#22e39a', [4, 3], `TP1 ${s.tp1.toFixed(1)}`); line(s.tp2, '#22e39a', [2, 4], `TP2 ${s.tp2.toFixed(1)}`); }
+      if (s.st === 1) line(s.P.p, '#ffb347', [2, 2], `💀 รอปิดกลับ ${s.P.p.toFixed(1)}`);
+      else { line(s.entry, '#e0b44c', [], `💀 ${s.side > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(1)} · ${s.score}`); line(s.sl, '#ff4d6a', [4, 3], `SL ${s.sl.toFixed(1)}`); line(s.tp1, '#22e39a', [4, 3], `TP1 ${s.tp1.toFixed(1)}`); line(s.tp2, '#22e39a', [2, 4], `TP2 ${s.tp2.toFixed(1)}`); }
     });
     ctx.restore();
   });
@@ -211,16 +211,16 @@
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     if (!cfg.on || !fresh()) return null;
     const cur = setups.filter(s => s.st === 1 || s.st === 3).sort((a, b) => b.si - a.si)[0]; if (!cur) return null;
-    if (cur.st === 1) return [`🪤 กวาด SL ${cur.side > 0 ? 'ใต้' : 'เหนือ'} ${cur.P.p.toFixed(0)} รอยืนยัน`, '#ffb347', 'trap'];
+    if (cur.st === 1) return [`💀 กวาด SL ${cur.side > 0 ? 'ใต้' : 'เหนือ'} ${cur.P.p.toFixed(0)} รอยืนยัน`, '#ffb347', 'trap'];
     const f = filters(cur);
-    return [`🪤 ${cur.side > 0 ? 'BUY' : 'SELL'} ${cur.entry.toFixed(1)} · ${cur.score}${f.block ? ' ⛔' : ''}`, f.block ? '#8a93ad' : cur.side > 0 ? '#22e39a' : '#ff8a3d', 'trap'];
+    return [`💀 ${cur.side > 0 ? 'BUY' : 'SELL'} ${cur.entry.toFixed(1)} · ${cur.score}${f.block ? ' ⛔' : ''}`, f.block ? '#8a93ad' : cur.side > 0 ? '#22e39a' : '#ff8a3d', 'trap'];
   });
 
   // ---------- เมนู ƒx ----------
   function stats() { const d = setups.filter(s => s.st === 4 || s.st === 5), w = d.filter(s => s.st === 4).length; return d.length ? `ย้อนหลัง 2 วัน: เข้า ${d.length} · TP1 ${w} · SL ${d.length - w} (${Math.round(w / d.length * 100)}%)` : 'ยังไม่มีสัญญาณครบในช่วงนี้'; }
   function section() {
     const d = document.createElement('div'); d.id = 'trBox'; d.className = 'gsbox';
-    d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-tr="on"><i style="background:#ffb347"></i>🪤 กับดักคนส่วนน้อย (กวาด SL แล้วเด้ง · M5)</button><span class="gsinfo">${cfg.on ? stats() + (basis !== null ? ` · สปอตต่างจากกราฟ ${basis >= 0 ? '−' : '+'}${Math.abs(basis).toFixed(1)}` : '') : ''}</span></div>` +
+    d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-tr="on"><i style="background:#ffb347"></i>💀 กับดักคนส่วนน้อย (กวาด SL แล้วเด้ง · M5)</button><span class="gsinfo">${cfg.on ? stats() + (basis !== null ? ` · สปอตต่างจากกราฟ ${basis >= 0 ? '−' : '+'}${Math.abs(basis).toFixed(1)}` : '') : ''}</span></div>` +
       (cfg.on ? `<div class="row ps"><button class="gsb${cfg.pools ? ' on' : ''}" data-tr="pools">แสดงแถบ SL กอง</button></div>` : '');
     return d;
   }
@@ -230,6 +230,6 @@
     new MutationObserver(() => mount()).observe(menu, { childList: true });
     menu.addEventListener('click', e => { const a = e.target.closest('[data-tr]'); if (!a) return; if (a.dataset.tr === 'on') cfg.on = !cfg.on; else cfg.pools = !cfg.pools; save(); O.markDirty(); const b = $('trBox'); if (b) b.remove(); mount(); run(true); });
   }
-  if (window.OIAlerts) OIAlerts.reg('trap', '🪤 กับดักคนส่วนน้อย (กวาด SL แล้วเด้ง)', { desc: 'เตือนตอนราคากวาด SL ที่แถบ และตอนแท่ง M5 ปิดกลับ = จุดเข้า (บอกคะแนน/หลักฐาน/คำเตือนห้ามสวน)', active: () => cfg.on });
+  if (window.OIAlerts) OIAlerts.reg('trap', '💀 กับดักคนส่วนน้อย (กวาด SL แล้วเด้ง)', { desc: 'เตือนตอนราคากวาด SL ที่แถบ และตอนแท่ง M5 ปิดกลับ = จุดเข้า (บอกคะแนน/หลักฐาน/คำเตือนห้ามสวน)', active: () => cfg.on });
   window.OI_trap = { get basis() { return basis; }, get pools() { return pools; }, get setups() { return setups; }, get atr() { return atr; }, run, stats, filters };
 })();

@@ -60,8 +60,9 @@
     if (oi && oi.rows) oi.rows.forEach(r => { if (r.price == null) return; const rc = r.c > 0 && oi.rankC ? oi.rankC.get(r.strike) || 0 : 0, rp = r.p > 0 && oi.rankP ? oi.rankP.get(r.strike) || 0 : 0, rk = Math.min(rc || 99, rp || 99); if (rk > 5 || Math.abs(r.price - px) > rng) return; const up = r.price > px; add(r.price + (up ? 1.5 : -1.5), up ? 1 : -1, 1.5, `เลยกำแพง ${rc && rc === rk ? 'C' : 'P'}${r.strike}`, null); });
     // V4.9.12: 👥 โซนที่รายย่อยเข้าออเดอร์จริง (ไม้เล็ก perp) → SL ของพวกเขา: ใต้โซน Buy / เหนือโซน Sell
     try { (window.OI_retail ? OI_retail.zones() : []).forEach(z => { const w = [3, 2, 1.5][z.rank] || 1.5;
-      if (z.side > 0 && z.lo - 0.5 < px) add(z.lo - 0.5, -1, w, `SL รายย่อย Buy ~${z.avg.toFixed(0)}`, null);
-      if (z.side < 0 && z.hi + 0.5 > px) add(z.hi + 0.5, 1, w, `SL รายย่อย Sell ~${z.avg.toFixed(0)}`, null); }); } catch (e) {}
+      const wb = z.side > 0 ? w : z.side < 0 ? 0 : w * 0.5, ws = z.side < 0 ? w : z.side > 0 ? 0 : w * 0.5; // สองฝั่ง = SL ทั้งบนและล่าง น้ำหนักครึ่ง
+      if (wb && z.lo - 0.5 < px) add(z.lo - 0.5, -1, wb, `SL รายย่อย Buy ~${z.avg.toFixed(0)}`, null);
+      if (ws && z.hi + 0.5 > px) add(z.hi + 0.5, 1, ws, `SL รายย่อย Sell ~${z.avg.toFixed(0)}`, null); }); } catch (e) {}
     // COT: รายย่อยถือ Long มาก → SL ฝั่งล่าง (ของคนถือ Long) หนักขึ้น
     let tilt = 0; try { const s = window.OICrowd && window.OICrowd.summary(); if (s) tilt = (s.retail_nonreportable.long_pct - 50) / 50; } catch (e) {}
     c.forEach(x => { x.w *= 1 + 0.4 * (x.side < 0 ? tilt : -tilt); });

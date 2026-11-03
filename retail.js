@@ -1,7 +1,7 @@
 // 👥 โซนคนส่วนมาก (รายย่อย) เข้าออเดอร์ — จากการซื้อขายจริงของ XAUUSDT perp (Binance aggTrades ที่ 🐋 Big Traders ดึงอยู่แล้ว)
 //  - ทุกไม้รู้ฝั่ง (ไล่ซื้อ/ไล่ขาย) และขนาด → "ไม้เล็ก" = ขนาดไม่เกินมัธยฐานของจำนวนไม้ ถือเป็นรายย่อย
 //  - รวมจำนวนไม้รายย่อยตามราคา ช่องละ $1 ย้อนหลัง 24 ชม. (ไม้ใหม่น้ำหนักมากกว่า: ครึ่งชีวิต ~8 ชม.)
-//  - โซนที่รายย่อยไล่ซื้อหนาแน่น (ฝั่งซื้อ ≥ 55%) = 🟩 คนส่วนมากเข้า Buy · ไล่ขายหนาแน่น = 🟥 เข้า Sell · แสดงฝั่งละ 3 โซน
+//  - โซน = ราคาที่ไม้รายย่อยหนาแน่นสุด 4 โซน · เอียงซื้อมีนัย (z ≥ 2) = 🟩 คนส่วนมากเข้า Buy · เอียงขาย = 🟥 Sell · ไม่ชัด = 🟨 สองฝั่ง
 //  - ส่งให้ 💀 กับดัก: SL ของคนกลุ่มนี้ = ใต้โซน Buy / เหนือโซน Sell
 //  ข้อจำกัด: ตลาดคริปโต (perp) ไม่ใช่โบรก CFD · ไม้เล็กไม่ใช่รายย่อย 100% (บอท/รายใหญ่หั่นไม้ได้) · ต้องเปิด 🐋 Big Traders
 (() => {
@@ -77,17 +77,15 @@
     const ks = [...P.keys()].sort((x, y) => x - y); if (ks.length < 5) return null;
     const lo = ks[0], arr = []; for (let p = lo; p <= ks[ks.length - 1]; p++) arr.push(Object.assign({ p }, P.get(p) || { b: 0, s: 0, qb: 0, qs: 0 }));
     const mean = arr.reduce((x, o) => x + o.b + o.s, 0) / arr.filter(o => o.b + o.s > 0).length;
-    const zones = [];
-    [1, -1].forEach(side => {
-      const sc = arr.map(o => { const v = side > 0 ? o.b : o.s, t = o.b + o.s; return t > 0 && v / t >= 0.55 ? v : 0; });
-      const sm = sc.map((v, i) => v + 0.5 * ((sc[i - 1] || 0) + (sc[i + 1] || 0)));
-      const peaks = sm.map((v, i) => ({ v, i })).filter(x => x.v > 0 && x.v >= (sm[x.i - 1] || 0) && x.v >= (sm[x.i + 1] || 0) && x.v >= mean * 1.5).sort((a, b) => b.v - a.v);
-      const pick = []; peaks.forEach(x => { if (pick.length < 3 && pick.every(y => Math.abs(y.i - x.i) >= 3)) pick.push(x); });
-      pick.forEach((x, r) => {
-        let a = x.i, b = x.i; while (a > 0 && x.i - a < 2 && sc[a - 1] >= sc[x.i] * 0.5) a--; while (b < arr.length - 1 && b - x.i < 2 && sc[b + 1] >= sc[x.i] * 0.5) b++;
-        let c = 0, cb = 0, cs = 0, pq = 0, q = 0; for (let i = a; i <= b; i++) { const o = arr[i]; cb += o.b; cs += o.s; const qq = side > 0 ? o.qb : o.qs; pq += o.p * qq; q += qq; } c = side > 0 ? cb : cs;
-        zones.push({ side, rank: r, lo: arr[a].p - 0.5, hi: arr[b].p + 0.5, avg: q ? pq / q : arr[x.i].p, n: c, pct: c / Math.max(1, cb + cs) });
-      });
+    // V4.9.12b: ไม้เล็กซื้อ/ขายแทบ 50/50 ทุกราคา → หาโซนจาก "ความหนาแน่น" (คนเข้าเยอะสุด) แล้วดูว่าเอียงฝั่งไหนแบบมีนัยสถิติ (z ≥ 2)
+    const den = arr.map(o => o.b + o.s), sm = den.map((v, i) => v + 0.5 * ((den[i - 1] || 0) + (den[i + 1] || 0)));
+    const peaks = sm.map((v, i) => ({ v, i })).filter(x => x.v > 0 && x.v >= (sm[x.i - 1] || 0) && x.v >= (sm[x.i + 1] || 0) && den[x.i] >= mean * 1.3).sort((a, b) => b.v - a.v);
+    const pick = []; peaks.forEach(x => { if (pick.length < 4 && pick.every(y => Math.abs(y.i - x.i) >= 3)) pick.push(x); });
+    const zones = pick.map((x, r) => {
+      let a = x.i, b = x.i; while (a > 0 && x.i - a < 2 && den[a - 1] >= den[x.i] * 0.6) a--; while (b < arr.length - 1 && b - x.i < 2 && den[b + 1] >= den[x.i] * 0.6) b++;
+      let cb = 0, cs = 0, pq = 0, q = 0; for (let i = a; i <= b; i++) { const o = arr[i]; cb += o.b; cs += o.s; pq += o.p * (o.qb + o.qs); q += o.qb + o.qs; }
+      const z = (cb - cs) / Math.sqrt(Math.max(1, cb + cs)), side = z >= 2 ? 1 : z <= -2 ? -1 : 0;
+      return { side, rank: r, lo: arr[a].p - 0.5, hi: arr[b].p + 0.5, avg: q ? pq / q : arr[x.i].p, n: cb + cs, pct: cb / Math.max(1, cb + cs), z };
     });
     return { zones, mc, maxSz: Math.pow(2, mc + 1) / 1000, n, hrs: (() => { let mn = Infinity; bins.forEach((a, k) => { mn = Math.min(mn, +k.split('|')[0]); }); return Math.min(24, (now - mn) / 3600e3); })() };
   }
@@ -113,12 +111,13 @@
     Zs.forEach(z => {
       let y1 = sr.priceToCoordinate(z.hi), y2 = sr.priceToCoordinate(z.lo); if (y1 === null || y2 === null || y2 < 0 || y1 > plotH) return;
       if (y2 - y1 < 3) { const m = (y1 + y2) / 2; y1 = m - 1.5; y2 = m + 1.5; }
-      const len = Math.max(24, plotW * 0.3 * z.n / mx), x0 = plotW - len, col = z.side > 0 ? '#22e39a' : '#ff4d6a';
+      const len = Math.max(24, plotW * 0.3 * z.n / mx), x0 = plotW - len, col = z.side > 0 ? '#22e39a' : z.side < 0 ? '#ff4d6a' : '#e0b44c';
       ctx.globalAlpha = 0.22; ctx.fillStyle = col; ctx.fillRect(x0, y1, len, y2 - y1);
       ctx.globalAlpha = 0.9; ctx.fillRect(x0, y1, 2, y2 - y1);
-      const under = z.side > 0 ? px < z.lo : px > z.hi, prof = z.side > 0 ? px > z.hi : px < z.lo;
+      const under = z.side > 0 ? px < z.lo : z.side < 0 ? px > z.hi : false, prof = z.side > 0 ? px > z.hi : z.side < 0 ? px < z.lo : false;
+      const lab = z.side > 0 ? `Buy ${Math.round(z.pct * 100)}%` : z.side < 0 ? `Sell ${Math.round((1 - z.pct) * 100)}%` : 'สองฝั่ง';
       ctx.textAlign = 'right'; ctx.fillStyle = col;
-      ctx.fillText(`👥 ${z.side > 0 ? 'Buy' : 'Sell'} ${fmt(z.n)}${under ? ' · ติดลบ' : prof ? ' · กำไร' : ' · ในโซน'}`, x0 - 3, (y1 + y2) / 2);
+      ctx.fillText(`👥 ${lab} · ${fmt(z.n)} ไม้${under ? ' · ติดลบ' : prof ? ' · กำไร' : ''}`, x0 - 3, (y1 + y2) / 2);
     });
     ctx.restore();
   });

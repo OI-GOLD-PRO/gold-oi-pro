@@ -98,7 +98,7 @@
     try { const j = await (await fetch(O.worker + '/retail', { cache: 'no-store' })).json(); if (j && j.ready && j.zones) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
   }
   setTimeout(loadSrv, 1500); setInterval(() => { if (document.visibilityState === 'visible') loadSrv(); }, 30000);
-  const srvOk = () => SZ && Date.now() - SZat < 5 * 60e3 && (SZ.hrs >= 3 || !(window.OI_bigtr && OI_bigtr.cfg && OI_bigtr.cfg.on)); // เซิร์ฟเวอร์เก็บยังไม่ถึง 3 ชม. และเครื่องนี้เปิด 🐋 อยู่ → ใช้ของเครื่องก่อน
+  const srvOk = () => SZ && Date.now() - SZat < 5 * 60e3; // V4.9.17: ใช้โซนเซิร์ฟเวอร์ทันที (ไม่รอ 3 ชม.) ทุกเครื่องตรงกัน
   // โซนในสเกลราคากราฟ
   function zones() {
     if (!cfg.on) return [];
@@ -118,12 +118,12 @@
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
     const mx = Math.max(...Zs.map(z => z.n)); hit = [];
     ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'middle';
-    Zs.filter(z => z.side !== 0).forEach(z => { // V4.9.16: ซ่อนโซนสองฝั่ง (ไม่บอกทิศ) · เหลือแถบสีไม่มีตัวหนังสือ แตะแถบดูรายละเอียด
+    Zs.forEach(z => { // V4.9.17: แถบสีไม่มีตัวหนังสือ แตะแถบดูรายละเอียด · Buy ฟ้า / Sell ส้ม (ไม่ซ้ำแดง/เขียวของ OI) · สองฝั่ง = เทาจาง
       let y1 = sr.priceToCoordinate(z.hi), y2 = sr.priceToCoordinate(z.lo); if (y1 === null || y2 === null || y2 < 0 || y1 > plotH) return;
       if (y2 - y1 < 3) { const m = (y1 + y2) / 2; y1 = m - 1.5; y2 = m + 1.5; }
-      const len = Math.max(24, plotW * 0.3 * z.n / mx), x0 = plotW - len, col = z.side > 0 ? '#22e39a' : z.side < 0 ? '#ff4d6a' : '#e0b44c';
-      ctx.globalAlpha = 0.22; ctx.fillStyle = col; ctx.fillRect(x0, y1, len, y2 - y1);
-      ctx.globalAlpha = 0.9; ctx.fillRect(x0, y1, 2, y2 - y1);
+      const len = Math.max(24, plotW * 0.3 * z.n / mx), x0 = plotW - len, col = z.side > 0 ? '#38bdf8' : z.side < 0 ? '#ff9f43' : '#9aa3b8';
+      ctx.globalAlpha = z.side ? 0.24 : 0.1; ctx.fillStyle = col; ctx.fillRect(x0, y1, len, y2 - y1);
+      ctx.globalAlpha = z.side ? 0.9 : 0.35; ctx.fillRect(x0, y1, 2, y2 - y1);
       const under = z.side > 0 ? px < z.lo : z.side < 0 ? px > z.hi : false, prof = z.side > 0 ? px > z.hi : z.side < 0 ? px < z.lo : false;
       const lab = z.side > 0 ? `Buy ${Math.round(z.pct * 100)}%` : z.side < 0 ? `Sell ${Math.round((1 - z.pct) * 100)}%` : 'สองฝั่ง';
       hit.push({ x0, x1: plotW, y1: y1 - 4, y2: y2 + 4, txt: `👥 <b style="color:${col}">${lab}</b> · ${fmt(z.n)} ไม้ · ${z.lo.toFixed(1)}–${z.hi.toFixed(1)} (เฉลี่ย ${z.avg.toFixed(1)})${under ? ' · คนกลุ่มนี้ติดลบ' : prof ? ' · คนกลุ่มนี้กำไร' : ''}` });
@@ -148,7 +148,7 @@
     if (!Z) Z = compute(); if (!Z) return 'กำลังเก็บไม้รายย่อย…';
     return `ไม้ ≤ ${Z.maxSz < 1 ? Z.maxSz.toFixed(3) : Z.maxSz} oz · ${fmt(Z.n)} ไม้ · ย้อน ${Z.hrs.toFixed(0)} ชม.`;
   }
-  function section() { const d = document.createElement('div'); d.id = 'rtBox'; d.className = 'gsbox'; d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-rt="on"><i style="background:linear-gradient(90deg,#22e39a 50%,#ff4d6a 50%)"></i>👥 โซนรายย่อยเข้าออเดอร์</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>`; return d; }
+  function section() { const d = document.createElement('div'); d.id = 'rtBox'; d.className = 'gsbox'; d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-rt="on"><i style="background:linear-gradient(90deg,#38bdf8 50%,#ff9f43 50%)"></i>👥 โซนรายย่อยเข้าออเดอร์</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>`; return d; }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('rtBox')) return; const box = section(), anchor = $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }
   const menu = $('indMenu');
   if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }

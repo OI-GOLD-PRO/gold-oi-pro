@@ -397,11 +397,59 @@
   // ---------- สถานะถาด ----------
   let snap = null, result = null, busy = false, anim = 0, showPlan = true, sideRes = null, sideBusy = false, sidePick = null;
   const bd = () => $('paBd');
+  // ---------- 👥 ทฤษฎีคนส่วนน้อย (V4.6.2): ds วิเคราะห์ว่าคนส่วนมากอยู่ฝั่งไหน ติดกับตรงไหน และคนส่วนน้อยทำอะไร → แผนทองคำวันนี้ ----------
+  let minor = null, minorBusy = false;
+  function minorBlock() {
+    return `<div class="mn" id="paMinor" style="margin-top:12px;border-top:1px solid #1d2547;padding-top:10px">${minorBusy ? minorWaitHTML() : minor ? minorHTML(minor) : ''}
+      ${minorBusy ? '' : `<button class="go" id="paMn" style="background:linear-gradient(90deg,#7c5cff,#b18cff,#7c5cff);background-size:200% 100%;color:#fff;margin-top:${minor ? 10 : 0}px">👥 ${minor ? 'วิเคราะห์ใหม่' : 'วิเคราะห์แบบ "คนส่วนน้อย" วันนี้'}</button>
+      <div class="info">ds หาว่าคนส่วนมาก (รายย่อย/คนไล่ราคา) ถือฝั่งไหน วาง SL ตรงไหน และคนส่วนน้อย (ธนาคาร/กองทุน/ดีลเลอร์ออปชัน) ทำอะไร จาก COT · OI วันนี้/สัปดาห์นี้ · Flow · Dealer · กราฟหลาย TF</div>`}</div>`;
+  }
+  function minorWaitHTML() { return `<div class="think" style="color:#b18cff">ds กำลังวิเคราะห์ฝั่งคนส่วนมาก vs คนส่วนน้อย<i></i><i></i><i></i></div><div class="steps"><div class="on">▸ COT: ใครถือฝั่งไหน</div><div class="on">▸ OI วันนี้ / สัปดาห์นี้ · Flow ออปชัน</div><div class="on">▸ Dealer / Squeeze / Big Traders</div><div class="on">▸ หาจุดที่คนส่วนมากติดกับ</div></div>`; }
+  function minorHTML(m) {
+    const li = a => a && a.length ? `<ul>${a.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
+    const sc = { BUY: '#2fe3a6', SELL: '#ff6b82', WAIT: '#c9d1ea' }[m.bias] || '#c9d1ea';
+    return `<div style="font:700 14px var(--sans);color:#b18cff">👥 ทฤษฎีคนส่วนน้อย · ${esc((m.time_th || '').slice(11))} น. · ราคา ${f2(m.price)}</div>
+      <div class="act"><span class="badge ${m.bias}" style="font-size:20px">${m.bias === 'WAIT' ? 'รอ' : m.bias}</span><div class="conf"><small>ฝั่งคนส่วนน้อยวันนี้ · ความมั่นใจ ${m.confidence}%</small><div class="bar"><i style="width:${m.confidence}%;background:${sc}"></i></div></div></div>
+      ${m.summary ? `<p>${esc(m.summary)}</p>` : ''}
+      <div class="pc"><div><b style="color:#ffd97a">👥 คนส่วนมาก: ${esc(m.majority.side)}</b><p style="margin:2px 0">${esc(m.majority.who)}</p><p style="margin:2px 0;color:#a9b4d6">${esc(m.majority.view)}</p></div>
+        <div><b style="color:#b18cff">🎯 คนส่วนน้อย: ${esc(m.minority.side)}</b><p style="margin:2px 0">${esc(m.minority.who)}</p><p style="margin:2px 0;color:#a9b4d6">${esc(m.minority.view)}</p></div></div>
+      ${m.traps && m.traps.length ? `<b style="color:#ff9f1a">🪤 จุดที่คนส่วนมากติดกับ / SL กองอยู่</b>${li(m.traps)}` : ''}
+      ${m.entry || m.sl || m.tp1 ? `<div class="plan"><div><small>${m.bias === 'WAIT' ? 'รอเข้า' : 'Entry'}</small>${f2(m.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(m.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(m.tp1)}</span></div><div><small>TP2</small><span style="color:#2fe3a6">${f2(m.tp2)}</span></div></div>` : ''}
+      ${m.trigger ? `<p>⏳ จังหวะเข้า: ${esc(m.trigger)}</p>` : ''}
+      ${m.scenarios && m.scenarios.length ? `<b>🔀 ฉากทัศน์</b>${li(m.scenarios)}` : ''}
+      ${m.avoid && m.avoid.length ? `<b style="color:#ff6b82">⛔ อย่าทำแบบคนส่วนมาก</b>${li(m.avoid)}` : ''}
+      ${m.invalid ? `<p class="warn">⚠️ ${esc(m.invalid)}</p>` : ''}${m.checked ? `<p class="warn">${esc(m.checked)}</p>` : ''}
+      <div class="muted">ds วิเคราะห์จาก COT (รายสัปดาห์) + OI/Flow/Dealer สด ณ ตอนกด · ใช้ประกอบการตัดสินใจ ไม่ใช่คำแนะนำการลงทุน</div>`;
+  }
+  function bindMinor() { const b = $('paMn'); if (b) b.onclick = askMinor; }
+  async function askMinor() {
+    if (minorBusy) return;
+    const s2 = snapshot(); if (!s2) { O.showToast && O.showToast('ข้อมูลกราฟยังไม่พอ รอกราฟโหลดก่อน'); return; }
+    minorBusy = true; const box = $('paMinor'); if (box) { box.innerHTML = minorWaitHTML(); box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    const p = Object.assign({}, s2); delete p._draw; p.bars = p.bars.slice(-24);
+    try { p.tfs = await multiTF(s2); Object.values(p.tfs).forEach(t => { delete t.bars; }); } catch (e) { p.tfs = {}; }
+    try { p.options = optionsNow(p.price); } catch (e) { p.options = null; }
+    const g = (f, d) => { try { return f(); } catch (e) { return d === undefined ? null : d; } };
+    p.cot_crowd = g(() => window.OICrowd.summary());
+    p.oi_cme = g(() => { const J = window.OIOIStat.data; return J ? { trade_date: J.tradeDate, today: { root: J.root, call: J.totals.C, put: J.totals.P }, week: (J.week || []).map(w => ({ exp: w.ymd, call: w.C, put: w.P })) } : null; });
+    p.dealer = g(() => { const r = window.OI_dealer.result; return r ? { mode: r.mode, score: +r.S.toFixed(2), conf_pct: r.conf, note: 'S > 0 = dealer รับ (ดูดซับ/ตรึงราคา) · S < 0 = dealer ไล่ตามราคา (เร่ง)', parts: (r.parts || []).map(x => x.name + ': ' + x.txt) } : null; });
+    p.squeeze = g(() => { const r = window.OI_squeeze.result; return r ? { level: r.lv, dir: r.dir, score: r.score } : null; });
+    p.iv = g(() => { const r = window.OI_iv.result, E = window.OI_vol.erange && window.OI_vol.erange(); return r ? { live_pct: +(r.iv * 100).toFixed(1), chg_1h_pts: r.d1h === null ? null : +(r.d1h * 100).toFixed(1), cme_vol_settle_pct: E && E.settle ? +(E.settle * 100).toFixed(1) : null } : null; });
+    p.vol_regime = g(() => { const r = window.OI_vol.regime(); return r ? { zone: r.Z.name, hv20_pct: r.hv, pctile: r.pct } : null; });
+    p.oi_divergence = g(() => { const r = window.OI_oidiv.latest(); return r && r.sig ? { date: r.d, signal: r.sig.t, meaning: r.sig.b } : null; });
+    p.big_traders = g(() => { const b = window.OI_bigtr; if (!b || !b.cfg || !b.cfg.on) return null; const t = (b.trades || []).filter(x => Date.now() - x.t < 3600e3); const T = b.thr ? b.thr() : 0, big = t.filter(x => x.q >= T), buy = big.filter(x => x.s > 0).reduce((a, x) => a + x.q, 0), sell = big.filter(x => x.s < 0).reduce((a, x) => a + x.q, 0); return { last_60m_buy_oz: Math.round(buy), last_60m_sell_oz: Math.round(sell) }; });
+    const [res] = await Promise.all([O.aiCall('ai_minor', p, 90000), new Promise(r => setTimeout(r, 1500))]);
+    minorBusy = false;
+    const b2 = $('paMinor'); if (!b2) return;
+    if (!res || !res.ok || !res.minor) { b2.innerHTML = `<div class="err">วิเคราะห์ไม่สำเร็จ: ${esc(res && res.error === 'auth' ? 'รหัสเข้าแอปหมดอายุ' : (res && res.error) || 'ไม่ทราบสาเหตุ')}</div>`; b2.insertAdjacentHTML('beforeend', '<button class="go" id="paMn">ลองใหม่</button>'); bindMinor(); return; }
+    minor = res.minor; b2.outerHTML = minorBlock(); bindMinor();
+    const nb = $('paMinor'); if (nb) { window.OIColorize && OIColorize(nb); nb.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }
   function paintIdle() {
     $('paSub').textContent = `${(O.cfg && O.cfg.name) || ''} · ${TFN[O.tf] || O.tf}`;
     bd().innerHTML = `<button class="go" id="paGo">⚡ วิเคราะห์จังหวะเข้าตอนนี้</button>
-      <div class="info">AI จะอ่านแท่งเทียน ${TFN[O.tf] || O.tf} ล่าสุด 40 แท่ง + Price Action ที่ระบบตรวจเจอ + โมเดล Quant จากข้อมูล OI / GEX / Flow / EM / gmf ณ ตอนกด แล้วบอกว่าควร BUY / SELL หรือรอ<br>เปลี่ยน TF ที่กราฟก่อนกด เพื่อให้วิเคราะห์ TF นั้น</div>` + sideBlock(true) + (result ? resultHTML(result, true) : '');
-    $('paGo').onclick = run; bindSides();
+      <div class="info">AI จะอ่านแท่งเทียน ${TFN[O.tf] || O.tf} ล่าสุด 40 แท่ง + Price Action ที่ระบบตรวจเจอ + โมเดล Quant จากข้อมูล OI / GEX / Flow / EM / gmf ณ ตอนกด แล้วบอกว่าควร BUY / SELL หรือรอ<br>เปลี่ยน TF ที่กราฟก่อนกด เพื่อให้วิเคราะห์ TF นั้น</div>` + sideBlock(true) + minorBlock() + (result ? resultHTML(result, true) : '');
+    $('paGo').onclick = run; bindSides(); bindMinor();
     window.OIColorize && OIColorize(bd());
     if (result) bindResult();
   }
@@ -467,7 +515,7 @@
       ${r.entry || r.sl || r.tp1 ? `<div class="plan"><div><small>${r.action === 'WAIT' ? 'รอเข้า' : 'Entry'}</small>${f2(r.entry)}</div><div><small>SL</small><span style="color:#ff6b82">${f2(r.sl)}</span></div><div><small>TP1</small><span style="color:#2fe3a6">${f2(r.tp1)}</span></div><div><small>TP2${r.rr ? ' · R:R 1:' + r.rr : ''}</small><span style="color:#2fe3a6">${f2(r.tp2)}</span></div></div>` : ''}
       ${r.reasons && r.reasons.length ? `<ul>${r.reasons.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
       ${r.wait_for && r.action === 'WAIT' ? `<p>⏳ ${esc(r.wait_for)}</p>` : ''}${r.invalid ? `<p class="warn">⚠️ ${esc(r.invalid)}</p>` : ''}${r.checked ? `<p class="warn">${esc(r.checked)}</p>` : ''}
-      ${old ? '' : sideBlock()}
+      ${old ? '' : sideBlock() + minorBlock()}
       <div class="row2"><button id="paPlan">${showPlan ? '🧹 ซ่อนแผนบนกราฟ' : '📍 แสดงแผนบนกราฟ'}</button><button id="paAgain">🔄 วิเคราะห์ใหม่</button></div>
       <div class="muted">วิเคราะห์โดย DeepSeek จากกราฟ ณ เวลาที่กด · ใช้ประกอบการตัดสินใจ ไม่ใช่คำแนะนำการลงทุน</div>`;
   }
@@ -713,7 +761,7 @@
     drawMini($('paCv'), draw, draw.length, null, result, null);
     requestAnimationFrame(() => { const i = bd().querySelector('.conf .bar i'); if (i) i.style.width = (result.confidence || 0) + '%'; });
     window.OIColorize && OIColorize(bd());
-    bindResult(); bindSides(); O.markDirty();
+    bindResult(); bindSides(); bindMinor(); O.markDirty();
     if (O.beep && result.action !== 'WAIT') O.beep();
   }
 

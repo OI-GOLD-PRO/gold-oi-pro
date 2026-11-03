@@ -83,5 +83,18 @@
       </div>
       <div class="note">ข้อมูล ณ วันอังคารที่ ${dt} (CFTC ประกาศคืนวันศุกร์) · นับเฉพาะรายใหญ่ที่ต้องรายงาน ผู้ถือ spread นับทั้งสองฝั่ง · รายย่อยไม่มีจำนวนคน ใช้สัดส่วนสัญญาแทน</div></div>`;
   };
-  window.OICrowd = { load, get state() { return st; } };
+  // สรุปตัวเลขให้ AI (ถาดวิเคราะห์สด)
+  function summary() {
+    if (!st.rows || !st.rows.length) return null;
+    const R = st.rows[0], P = st.rows[1] || R, A = R.all, nTot = A.tl + A.ts;
+    const share = A.tl / nTot * 100, hist = st.rows.map(r => r.all.tl / (r.all.tl + r.all.ts) * 100);
+    const nrPct = R.nrL / Math.max(1, R.nrL + R.nrS) * 100, nrHist = st.rows.map(r => r.nrL / Math.max(1, r.nrL + r.nrS) * 100);
+    const g = k => ({ long_traders: R[k].tl, short_traders: R[k].ts, long_contracts: R[k].pl, short_contracts: R[k].ps });
+    return { report_date: R.d, note: 'COT ทองคำ COMEX รายสัปดาห์ (ข้อมูลวันอังคาร)',
+      large_traders: { long_traders: A.tl, short_traders: A.ts, long_contracts: A.pl, short_contracts: A.ps, majority_side: A.tl >= A.ts ? 'LONG' : 'SHORT', long_trader_share_pct: +share.toFixed(1), share_pctile_3y: +pctRank(hist, share).toFixed(0), wow_long_traders: A.tl - P.all.tl, wow_short_traders: A.ts - P.all.ts },
+      retail_nonreportable: { long_pct: +nrPct.toFixed(1), pctile_3y: +pctRank(nrHist, nrPct).toFixed(0), long: R.nrL, short: R.nrS },
+      groups: { producers_hedgers: g('pm'), swap_dealers_banks: g('sw'), managed_money_funds: g('mm'), other_large: g('ot') },
+      directional_spec: { long: R.mm.pl + R.ot.pl, short: R.mm.ps + R.ot.ps }, hedgers_short: R.pm.ps + R.sw.ps };
+  }
+  window.OICrowd = { load, summary, get state() { return st; } };
 })();

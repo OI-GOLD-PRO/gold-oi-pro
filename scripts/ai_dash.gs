@@ -226,10 +226,18 @@ function runAI_(reason) {
 function aiWeb_(e) {
   const p = (e && e.parameter) || {};
   const out = o => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
-  if (p.api !== 'ai' && p.api !== 'ai_pa') return out({ error: 'bad api' });
+  if (p.api !== 'ai' && p.api !== 'ai_pa' && p.api !== 'ai_minor') return out({ error: 'bad api' });
   let ok = false;
   try { const r = JSON.parse(doGet({ parameter: { api: 'login', code: p.code || '' } }).getContent()); ok = !!(r && (r.ok || r.legacy)); } catch (err) { ok = false; }
   if (!ok) return out({ error: 'auth' });
+  if (p.api === 'ai_minor') {
+    let snap = null; try { snap = JSON.parse((e.postData && e.postData.contents) || 'null'); } catch (err) {}
+    if (!snap || !isFinite(Number(snap.price))) return out({ error: 'ข้อมูลไม่พอ' });
+    const cache = CacheService.getScriptCache(), ck = 'mn_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, String(p.code))).slice(0, 16);
+    if (cache.get(ck)) return out({ error: 'กดถี่เกินไป รอ 20 วินาทีแล้วลองใหม่' });
+    cache.put(ck, '1', 20);
+    try { return out({ ok: true, minor: aiMinor_(snap) }); } catch (err) { return out({ error: String(err.message || err).slice(0, 300) }); }
+  }
   if (p.api === 'ai_pa') {
     let snap = null; try { snap = JSON.parse((e.postData && e.postData.contents) || 'null'); } catch (err) {}
     if (!snap || !Array.isArray(snap.bars) || snap.bars.length < 10) return out({ error: 'ข้อมูลกราฟไม่พอ' });
@@ -370,5 +378,47 @@ function aiSide_(snap) {
   }
   if (bad.length) { out.checked = 'ระบบตรวจแผนไม่ผ่าน: ' + bad.join(', '); if (out.verdict === 'GO') out.verdict = 'WAIT'; out.sl = out.tp1 = out.tp2 = null; }
   else if (e && out.sl && (out.tp2 || out.tp1)) out.rr = Math.round(Math.abs((out.tp2 || out.tp1) - e) / Math.max(0.01, Math.abs(e - out.sl)) * 10) / 10;
+  return out;
+}
+
+
+// ---------- ถาดลับ: 👥 ทฤษฎีคนส่วนน้อย (V4.6.2) ----------
+// snap: ข้อมูลกราฟ ณ ตอนกด + tfs (หลาย TF) + options + cot_crowd (COT ใครถือฝั่งไหน) + oi_cme (OI วันนี้/สัปดาห์นี้) + dealer + squeeze + iv + vol_regime + oi_divergence + big_traders
+function aiMinor_(snap) {
+  const key = PropertiesService.getScriptProperties().getProperty('DEEPSEEK_API_KEY');
+  if (!key) throw new Error('ยังไม่ได้ใส่ DEEPSEEK_API_KEY');
+  const price = Number(snap.price);
+  const sys = [
+    'คุณคือนักวิเคราะห์ทองคำ (GC/XAUUSD) ที่ใช้ "ทฤษฎีการเป็นคนส่วนน้อย": ตลาดเป็นเกมที่เงินไหลจากคนส่วนมากไปหาคนส่วนน้อย คนส่วนมากมักเข้าช้า ไล่ราคา วาง Stop Loss ที่จุดชัด ๆ (เหนือแนวต้าน/ใต้แนวรับ/swing/เลขกลม) ราคาจึงมักวิ่งไปเก็บ SL เหล่านั้นก่อนแล้วกลับตัว (Liquidity Hunt / Wall Rejection)',
+    'หน้าที่: ระบุจากข้อมูลจริง (1) คนส่วนมากคือใคร ถือฝั่งไหน มองยังไง (2) คนส่วนน้อยคือใคร ถือฝั่งไหน มองยังไง (3) จุดที่คนส่วนมากติดกับ/SL กองอยู่ เป็นราคา (4) แผนเทรดทองวันนี้ของคนส่วนน้อย',
+    'แหล่งระบุคนส่วนมาก: cot_crowd.retail_nonreportable (รายย่อย long_pct, pctile_3y = สุดโต่งแค่ไหนเทียบ 3 ปี), cot_crowd.large_traders.majority_side (ฝั่งที่จำนวนรายใหญ่มากกว่า), options.flows_today (รายย่อยมักซื้อ Call ตอนราคาขึ้น ซื้อ Put ตอนลง), oi_cme (Call/Put OI วันนี้และสัปดาห์นี้: ฝั่งที่ OI หนา = คนส่วนมากเดิมพัน · ผู้ขายออปชัน (dealer) คือฝั่งตรงข้าม), คนไล่เบรกในกราฟ (แท่งยาวตามทาง)',
+    'แหล่งระบุคนส่วนน้อย: cot_crowd.groups.swap_dealers_banks และ producers_hedgers (ตัวใหญ่ ถือเฉลี่ยต่อรายมาก แต่ฝั่ง Short ส่วนใหญ่คือ hedge ไม่ใช่เดิมพันขาลงทั้งหมด), managed_money_funds, dealer (S>0 dealer รับ/ตรึงราคา = ราคาแกว่งกรอบ สวนได้; S<0 dealer ไล่ = วิ่งแรงตามทาง ห้ามสวน), big_traders (ไม้ใหญ่ซื้อ/ขายสุทธิ 60 นาที), squeeze (level≥2 = ห้ามสวนทิศ dir)',
+    'กฎสำคัญ: อย่าสวนคนส่วนมากแบบหลับหูหลับตา · สวนเฉพาะเมื่อ (ก) คนส่วนมากเอียงสุดโต่ง (pctile_3y ≥ 80 หรือ ≤ 20) หรือ OI/Flow วันนี้เอียงหนัก และ (ข) ราคาไปถึงจุดที่ SL ของคนส่วนมากกองอยู่ แล้วมี Price Action ปฏิเสธ · ถ้าคนส่วนน้อย (dealer ไล่ / squeeze / ไม้ใหญ่ / กองทุน) ไปทางเดียวกับคนส่วนมาก = เทรนด์จริง ให้ตามหรือรอ ไม่ใช่สวน',
+    'COT เป็นข้อมูลรายสัปดาห์ (ภาพใหญ่) · OI/Flow/Dealer/Big Traders เป็นข้อมูลวันนี้ (จังหวะ) ให้ใช้คู่กัน · oi_divergence = ป้าย OI รายวัน (ทดสอบย้อนหลังแล้วความแม่นต่ำ ใช้ประกอบเท่านั้น)',
+    'levels = แนว OI/Wall/EM/gmf/Max Pain ของเรา · tfs = สรุปหลาย TF (trend, structure, smc) · ใช้ตัวเลขในข้อมูลเท่านั้น ห้ามแต่งราคา ห้ามอ้าง EMA/VWAP',
+    'แผน: bias = ฝั่งที่คนส่วนน้อยน่าจะได้เปรียบวันนี้ ("BUY"|"SELL"|"WAIT") · entry ต้องอยู่ที่จุดที่คนส่วนมากติดกับ (ไม่ใช่ไล่ราคาตอนนี้) ห่างราคาปัจจุบันไม่เกิน 1.5% · SL เลยจุดเก็บ SL ของคนส่วนมากไปอีกเล็กน้อย · TP1/TP2 = แนว OI ถัดไป · ถ้าข้อมูลขัดกันหรือใกล้ข่าวแดงให้ WAIT',
+    'ตอบ JSON เท่านั้น ภาษาไทย กระชับ เข้าใจง่าย ฟิลด์: summary (สรุป 2 ประโยค), majority {side ("LONG"/"SHORT"/"ไม่ชัด"), who (ใคร + ตัวเลขยืนยัน 1 ประโยค), view (มองยังไง 1 ประโยค)}, minority {side, who, view}, traps (array 2-4 ข้อ: ราคา + ทำไมเป็นจุดที่คนส่วนมากติดกับ/SL กอง), bias, confidence (0-100 ประเมินแบบระมัดระวัง), entry, sl, tp1, tp2 (ตัวเลข; WAIT ใส่ราคาที่ควรรอได้), trigger (ต้องเห็น Price Action อะไรก่อนเข้า 1 ประโยค), scenarios (array 2 ข้อ "ถ้า...→..."), avoid (array 2-3 ข้อ สิ่งที่คนส่วนมากทำผิดวันนี้), invalid (เงื่อนไขที่แผนผิด 1 ประโยค)',
+  ].join('\n');
+  let heads = []; try { heads = aiNews_().slice(0, 8); } catch (e) {}
+  snap.headlines = heads.map(h => ({ t: h.t, src: h.src, ago_min: h.ago_min }));
+  const body = { model: AI_MODEL, temperature: 0.25, response_format: { type: 'json_object' }, max_tokens: 1800,
+    messages: [{ role: 'system', content: sys }, { role: 'user', content: JSON.stringify(snap) }] };
+  const res = aiFetchJson_('https://api.deepseek.com/chat/completions', { method: 'post', contentType: 'application/json', headers: { Authorization: 'Bearer ' + key }, payload: JSON.stringify(body) });
+  const A = aiParseJson_(res.choices[0].message.content);
+  const num = v => { const n = Number(v); return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
+  const arr = (v, k) => (Array.isArray(v) ? v : [v]).filter(Boolean).map(x => typeof x === 'object' ? Object.values(x).join(' ') : String(x)).slice(0, k || 4);
+  const grp = g => ({ side: String((g && g.side) || '–'), who: String((g && g.who) || ''), view: String((g && g.view) || '') });
+  const out = { summary: String(A.summary || ''), majority: grp(A.majority), minority: grp(A.minority), traps: arr(A.traps), bias: String(A.bias || 'WAIT').toUpperCase(),
+    confidence: Math.max(0, Math.min(100, Math.round(Number(A.confidence) || 0))), entry: num(A.entry), sl: num(A.sl), tp1: num(A.tp1), tp2: num(A.tp2),
+    trigger: String(A.trigger || ''), scenarios: arr(A.scenarios, 2), avoid: arr(A.avoid, 3), invalid: String(A.invalid || ''), price, time_th: snap.time_th, model: AI_MODEL };
+  if (['BUY', 'SELL', 'WAIT'].indexOf(out.bias) < 0) out.bias = 'WAIT';
+  // ตรวจแผน: SL/TP ถูกฝั่ง · entry ไม่ไกลราคาเกิน 1.5%
+  if (out.bias !== 'WAIT' && out.entry) {
+    const b = out.bias === 'BUY', e = out.entry, bad = [];
+    if (Math.abs(e - price) > price * 0.015) bad.push('entry ไกลราคาเกิน 1.5%');
+    if (out.sl && (b ? out.sl >= e : out.sl <= e)) bad.push('SL ผิดฝั่ง');
+    if (out.tp1 && (b ? out.tp1 <= e : out.tp1 >= e)) bad.push('TP ผิดฝั่ง');
+    if (bad.length) { out.checked = 'ระบบตรวจแผนไม่ผ่าน: ' + bad.join(', ') + ' → ปรับเป็นรอ'; out.bias = 'WAIT'; }
+  }
   return out;
 }

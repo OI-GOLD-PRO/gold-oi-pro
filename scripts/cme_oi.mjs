@@ -38,6 +38,18 @@ const FETCHER = async ({ dates, wantGroup, wantLabel, root }) => {
     const j = async u => { const r = await fetch(u + (u.includes('?') ? '&' : '?') + 'isProtected&_t=' + Date.now()); if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + u); return r.json(); };
     const n = s => +String(s).replace(/,/g, '') || 0;
     const log = [];
+    // ราคา settlement ราย strike (ไว้คำนวณ IV เอง) · contractId เช่น G1MX26, optionExpiration เช่น 10143-X6
+    const getSettle = async (e, td) => {
+      try {
+        const code = e.expirationCode, ex = code[0] + code.slice(-1), mdY = td.slice(4, 6) + '/' + td.slice(6, 8) + '/' + td.slice(0, 4);
+        const sj = await j(`/CmeWS/mvc/Settlements/Options/Settlements/${e.productId}/OOF?strategy=DEFAULT&optionProductId=${e.productId}&monthYear=${root}${code}&optionExpiration=${e.productId}-${ex}&tradeDate=${mdY}&pageSize=500`);
+        const sr = (sj.settlements || []).map(x => [+x.strike, /^c/i.test(x.type) ? 'C' : 'P', +String(x.settle).replace(/[^0-9.]/g, '')]).filter(x => x[0] > 0 && x[2] > 0);
+        if (sr.length) return { tradeDate: String(sj.tradeDate || mdY), reportType: sj.reportType || '', rows: sr };
+        log.push(td + ' settle empty');
+      } catch (er) { log.push(td + ' settle ' + er.message); }
+      return null;
+    };
+    let newest = null; // V4.5.10: settle ของวันล่าสุด แม้ OI ของวันนั้นยังไม่ออก (CME ออก settle ก่อน OI)
     for (const td of dates) {
       let groups;
       try { groups = await j(`/CmeWS/mvc/Volume/Options/Expirations?productid=437&tradedate=${td}`); } catch (e) { log.push(td + ' exp ' + e.message); continue; }
@@ -57,16 +69,8 @@ const FETCHER = async ({ dates, wantGroup, wantLabel, root }) => {
         totals[t] = n(md.totalData && md.totalData.atClose);
         (md.strikeData || []).forEach(s => { const v = n(s.atClose); if (v > 0) rows.push([+s.strike, t, v]); });
       });
-      if (!rows.length) { log.push(td + ' empty'); continue; }
-      // ราคา settlement ราย strike (ไว้คำนวณ IV เองตอนตลาดปิด) · contractId เช่น G1MX26, optionExpiration เช่น 10143-X6
-      let settle = null;
-      try {
-        const code = e.expirationCode, ex = code[0] + code.slice(-1), mdY = td.slice(4, 6) + '/' + td.slice(6, 8) + '/' + td.slice(0, 4);
-        const sj = await j(`/CmeWS/mvc/Settlements/Options/Settlements/${e.productId}/OOF?strategy=DEFAULT&optionProductId=${e.productId}&monthYear=${root}${code}&optionExpiration=${e.productId}-${ex}&tradeDate=${mdY}&pageSize=500`);
-        const sr = (sj.settlements || []).map(x => [+x.strike, /^c/i.test(x.type) ? 'C' : 'P', +String(x.settle).replace(/[^0-9.]/g, '')]).filter(x => x[0] > 0 && x[2] > 0);
-        if (sr.length) settle = { tradeDate: String(sj.tradeDate || mdY), reportType: sj.reportType || '', rows: sr };
-        else log.push(td + ' settle empty');
-      } catch (er) { log.push(td + ' settle ' + er.message); }
+      if (!rows.length) { log.push(td + ' empty'); if (!newest) newest = await getSettle(e, td); continue; }
+      const settle = newest || await getSettle(e, td);
       return { tradeDate: td, productId: e.productId, expirationCode: e.expirationCode, totals, rows, settle, log };
     }
     return { error: 'not found', log };

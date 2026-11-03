@@ -194,8 +194,10 @@
       const key = Math.round(x / 6); if (seen.has(key)) return; seen.add(key); // แท่งเดียวกันบน TF ใหญ่ แสดงครั้งเดียว
       const y = Y(s.ri !== undefined ? s.entry : s.ext); if (y === null) return;
       const col = s.st === 4 ? '#22e39a' : s.st === 5 ? '#ff4d6a' : '#ffb347';
-      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, 7); ctx.fill();
-      ctx.textAlign = 'left'; ctx.fillText(s.st === 4 ? '✓' : s.st === 5 ? '✗' : s.st === 1 ? '💀' : '', x + 4, y);
+      // V4.8.6: 💀 ที่จุดเข้า + ✓ (ถึง TP1) / ✗ (โดน SL) · กำลังรอผล = 💀 เฉย ๆ
+      ctx.textAlign = 'center'; ctx.font = `11px ${mono}`; ctx.fillText('💀', x, y);
+      if (s.st === 4 || s.st === 5) { ctx.font = `bold 11px ${mono}`; ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.fillText(s.st === 4 ? '✓' : '✗', x + 7, y); }
+      ctx.font = `bold 9px ${mono}`;
     });
     // แผนที่ยังทำงาน
     if (fresh()) setups.filter(s => s.st === 3 || s.st === 1).forEach(s => {

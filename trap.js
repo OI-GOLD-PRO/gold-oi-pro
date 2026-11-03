@@ -62,7 +62,9 @@
     // ยอด/ก้นเท่ากัน (2 swing ขึ้นไปรวมกัน) = หนักขึ้นอีก
     out.forEach(x => { const sw = x.why.filter(w => /swing/.test(w)).length; if (sw >= 2) { x.w += 2; x.why.push('ยอด/ก้นเท่ากัน'); } x.why = [...new Set(x.why)]; });
     // ถูกกวาดไปแล้วหรือยัง (ไว้แสดงเฉพาะแถบที่ยังมี SL เหลือ)
-    out.forEach(x => { x.swept = B.some(b => (!x.t || b.time > x.t) && (x.side > 0 ? b.high > x.p + 0.2 : b.low < x.p - 0.2)); });
+    // swing/High-Low เมื่อวาน: ถูกกวาดถ้ามีแท่งทะลุหลังเกิด · เลขกลม/กำแพง (ไม่มีเวลาเกิด): ถือว่า SL กองใหม่ ถ้าราคาไม่ได้แตะใน 1 ชม. ล่าสุด
+    const rec = B.slice(-12);
+    out.forEach(x => { const hit = b => (x.side > 0 ? b.high > x.p + 0.2 : b.low < x.p - 0.2); x.swept = x.t ? B.some(b => b.time > x.t && hit(b)) : rec.some(hit); });
     return out.filter(x => x.w >= 2);
   }
 

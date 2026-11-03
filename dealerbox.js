@@ -69,7 +69,7 @@
     const X = i => ts.timeToCoordinate(toChart(bars[Math.min(i, bars.length - 1)].time)), Y = p => sr.priceToCoordinate(p);
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
     ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'bottom';
-    boxes.filter(bx => bx.broke === undefined).forEach(bx => { // แสดงเฉพาะจุดที่ยังผ่านไม่ได้ (แตกแล้วไม่วาด ลดความรก)
+    boxes.forEach(bx => { // V4.9.7: แตกแล้วยังวาดไว้ (เส้นประ จาง) · ยังยืน = เส้นทึบ
       let x0 = X(bx.start), x1 = bx.live ? plotW - 2 : X(bx.end);
       if (x1 === null || x0 === null) { if (x0 === null && x1 !== null) x0 = 0; else return; }
       const step = Math.max(3, ts.options().barSpacing || 6); x0 -= step / 2; if (!bx.live) x1 += step / 2;
@@ -77,7 +77,7 @@
       const pad = 0.6, top = bx.side < 0 ? Math.max(bx.ext, bx.l.p) + pad : bx.l.p + pad, bot = bx.side < 0 ? bx.l.p - pad : Math.min(bx.ext, bx.l.p) - pad;
       const yt = Y(top), yb = Y(bot); if (yt === null || yb === null || yb < 0 || yt > plotH) return;
       const broke = bx.broke !== undefined;
-      ctx.globalAlpha = broke ? 0.45 : 1;
+      ctx.globalAlpha = broke ? 0.5 : 1;
       ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(Math.max(0, x0), yt, Math.min(plotW, x1) - Math.max(0, x0), yb - yt);
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = broke ? 1 : 1.4; ctx.setLineDash(broke ? [4, 3] : []);
       ctx.strokeRect(Math.max(0, x0) + 0.5, yt + 0.5, Math.min(plotW, x1) - Math.max(0, x0), yb - yt);

@@ -239,8 +239,10 @@
     });
     // แผนที่ยังทำงาน
     if (fresh()) setups.filter(s => s.st === 3 || s.st === 1).forEach(s => {
-      const x0 = X(s.ri !== undefined ? s.ri : s.si); if (x0 === null) return; const xr = plotW - 2;
-      const line = (p, col, dash, lab) => { const y = Y(p); if (y === null || y < 0 || y > plotH) return; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(xr, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = col; ctx.textAlign = 'right'; ctx.fillText(lab, xr - 2, y - 6); };
+      const x0 = X(s.ri !== undefined ? s.ri : s.si); if (x0 === null) return;
+      // V4.9.14: เส้นแผนยาวแค่ 4 แท่งจากจุดเข้า (เดิมลากถึงขอบขวา) · ป้ายต่อท้ายเส้น
+      const xr = Math.min(plotW - 2, x0 + 4 * Math.max(3, ts.options().barSpacing || 6));
+      const line = (p, col, dash, lab) => { const y = Y(p); if (y === null || y < 0 || y > plotH) return; ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(xr, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = col; const right = xr + 90 > plotW; ctx.textAlign = right ? 'right' : 'left'; ctx.fillText(lab, right ? xr - 2 : xr + 3, right ? y - 6 : y); };
       if (s.st === 1) line(s.P.p, '#ffb347', [2, 2], `💀 รอปิดกลับ ${s.P.p.toFixed(1)}`);
       else { line(s.entry, '#e0b44c', [], `💀 ${s.side > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(1)} · ${s.score}`); line(s.sl, '#ff4d6a', [4, 3], `SL ${s.sl.toFixed(1)}`); line(s.tp1, '#22e39a', [4, 3], `TP1 ${s.tp1.toFixed(1)}`); line(s.tp2, '#22e39a', [2, 4], `TP2 ${s.tp2.toFixed(1)}`); }
     });

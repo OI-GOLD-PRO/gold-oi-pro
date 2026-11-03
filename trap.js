@@ -18,6 +18,10 @@
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   const PIV = 3, BACK = 3, HOLD = 72;
+  // V4.9.3: ล็อกแผนเมื่อเกิดแล้ว (จุดเข้า/SL/TP/คะแนนไม่เลื่อนตามการคำนวณรอบใหม่) · เก็บในเครื่อง 3 วัน
+  const FKEY = 'oi_trap_frozen';
+  let frozen = {}; try { frozen = JSON.parse(localStorage.getItem(FKEY) || '{}') || {}; } catch (e) {}
+  const saveF = () => { try { const lim = Date.now() / 1000 + 7 * 3600 - 3 * 86400; Object.keys(frozen).forEach(k => { if (+k.split('|')[0] < lim) delete frozen[k]; }); localStorage.setItem(FKEY, JSON.stringify(frozen)); } catch (e) {} };
   let B = [], pools = [], setups = [], atr = 2, busy = false, lastRun = 0;
   // ราคาสปอต XAUUSD (ที่รายย่อย CFD เห็น) ≠ ราคาบนกราฟ (สเกลฟิวเจอร์ส) → basis = กราฟ − สปอต (ดึงทุก 1 นาที)
   let basis = null, basisAt = 0;
@@ -92,8 +96,13 @@
     } catch (e) {}
     return { sc, out };
   }
+  function track(s, n) { // ผลหลังเข้า: SL / TP1 / หมดเวลา
+    const buy = s.side > 0; s.st = 2; s.end = undefined;
+    for (let k = s.ri + 1; k < n; k++) { const x = B[k]; if (buy ? x.low <= s.sl : x.high >= s.sl) { s.st = 5; s.end = k; break; } if (buy ? x.high >= s.tp1 : x.low <= s.tp1) { s.st = 4; s.end = k; break; } if (k - s.ri > HOLD) { s.st = 6; s.end = k; break; } }
+    if (s.st === 2) s.st = 3;
+  }
   function scan() {
-    const n = B.length, res = [], nextOk = new Map();
+    const n = B.length, res = [], nextOk = new Map(), seenF = new Set(); let dirtyF = false;
     const minPoke = Math.max(1, atr * 0.3), BRK = Math.max(2, atr * 0.6);
     for (let i = 1; i < n; i++) {
       const b = B[i];
@@ -114,17 +123,29 @@
         if (rk >= 0) {
           const entry = B[rk].close, sl = below ? ext - 0.5 : ext + 0.5, R = Math.abs(entry - sl);
           if (R < 0.6 || R > atr * 4) { s.st = -1; s.why = 'SL ไม่เหมาะ'; res.push(s); return; }
-          const opp = pools.filter(q => q.side === -P.side && (below ? q.p > entry + R : q.p < entry - R)).sort((a, b2) => Math.abs(a.p - entry) - Math.abs(b2.p - entry));
-          const ev = evidence(i, rk, P.side), base = 40 + Math.min(25, P.w * 3);
-          Object.assign(s, { ri: rk, entry, sl, R, tp1: opp[0] ? opp[0].p : entry + s.side * 1.5 * R, tp2: opp[1] ? opp[1].p : entry + s.side * 2.5 * R, tpLab: opp[0] ? opp[0].why[0] : '1.5R', score: Math.min(100, Math.round(base + ev.sc)), ev: ev.out });
+          const fk = B[rk].time + '|' + s.side, F = frozen[fk];
+          if (F) { Object.assign(s, { ri: rk, entry: F.entry, sl: F.sl, R: F.R, tp1: F.tp1, tp2: F.tp2, tpLab: F.tpLab, score: F.score, ev: F.ev, ext: F.ext, P: Object.assign({}, P, { p: F.pp, why: F.why, w: F.w }) }); seenF.add(fk); }
+          else {
+            const opp = pools.filter(q => q.side === -P.side && (below ? q.p > entry + R : q.p < entry - R)).sort((a, b2) => Math.abs(a.p - entry) - Math.abs(b2.p - entry));
+            const ev = evidence(i, rk, P.side), base = 40 + Math.min(25, P.w * 3);
+            Object.assign(s, { ri: rk, entry, sl, R, tp1: opp[0] ? opp[0].p : entry + s.side * 1.5 * R, tp2: opp[1] ? opp[1].p : entry + s.side * 2.5 * R, tpLab: opp[0] ? opp[0].why[0] : '1.5R', score: Math.min(100, Math.round(base + ev.sc)), ev: ev.out });
+            frozen[fk] = { entry: s.entry, sl: s.sl, R: s.R, tp1: s.tp1, tp2: s.tp2, tpLab: s.tpLab, score: s.score, ev: s.ev, ext: s.ext, pp: P.p, why: P.why, w: P.w }; seenF.add(fk); dirtyF = true;
+          }
           // ติดตามผล
-          for (let k = rk + 1; k < n; k++) { const x = B[k]; if (below ? x.low <= sl : x.high >= sl) { s.st = 5; s.end = k; break; } if (below ? x.high >= s.tp1 : x.low <= s.tp1) { s.st = 4; s.end = k; break; } if (k - rk > HOLD) { s.st = 6; s.end = k; break; } }
+          track(s, n);
           if (s.st === 2) s.st = 3; // เข้าแล้ว รอผล
           nextOk.set(pi, (s.end || n) + 1);
         }
         res.push(s);
       });
     }
+    // แผนที่ล็อกไว้แต่รอบนี้หาไม่เจอ (แถบเลื่อน) → คงไว้ตามเดิม
+    const idx = new Map(B.map((b, k) => [b.time, k]));
+    Object.keys(frozen).forEach(fk => { if (seenF.has(fk)) return; const [t, sd] = fk.split('|'), rk = idx.get(+t); if (rk === undefined) return; const F = frozen[fk];
+      const s2 = { P: { p: F.pp, why: F.why, w: F.w, side: -sd }, side: +sd, si: Math.max(0, rk - 1), ri: rk, ext: F.ext, entry: F.entry, sl: F.sl, R: F.R, tp1: F.tp1, tp2: F.tp2, tpLab: F.tpLab, score: F.score, ev: F.ev, st: 2 };
+      track(s2, n); res.push(s2); });
+    if (dirtyF) saveF();
+    res.sort((a, b) => a.si - b.si);
     return res;
   }
   function filters(s) { // คำเตือนห้ามสวน ณ ตอนนี้ (ใช้กับสัญญาณสดเท่านั้น)
@@ -141,7 +162,7 @@
     busy = true; lastRun = Date.now();
     try {
       const X = await O.fetchTF('5m', 576);
-      if (X && X.length > 60) { B = X.slice(0, -1).concat(X.slice(-1)); pools = buildPools(B.slice(0, -1)); setups = scan(); notify(); O.markDirty(); }
+      if (X && X.length > 60) { B = X.slice(0, -1); pools = buildPools(B); setups = scan(); notify(); O.markDirty(); } // V4.9.3: ใช้เฉพาะแท่งที่ปิดแล้ว (แท่งที่กำลังวิ่งทำให้จุดเข้าเลื่อน)
     } catch (e) {} finally { busy = false; }
   }
   const fresh = () => B.length && Date.now() / 1000 + 7 * 3600 - B[B.length - 1].time < 3 * 3600;

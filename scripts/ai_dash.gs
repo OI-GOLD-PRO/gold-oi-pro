@@ -226,10 +226,15 @@ function runAI_(reason) {
 function aiWeb_(e) {
   const p = (e && e.parameter) || {};
   const out = o => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
-  if (p.api !== 'ai' && p.api !== 'ai_pa' && p.api !== 'ai_minor') return out({ error: 'bad api' });
+  if (['ai', 'ai_pa', 'ai_minor', 'siglog'].indexOf(p.api) < 0) return out({ error: 'bad api' });
   let ok = false;
   try { const r = JSON.parse(doGet({ parameter: { api: 'login', code: p.code || '' } }).getContent()); ok = !!(r && (r.ok || r.legacy)); } catch (err) { ok = false; }
   if (!ok) return out({ error: 'auth' });
+  if (p.api === 'siglog') {
+    let body = null; try { body = JSON.parse((e.postData && e.postData.contents) || 'null'); } catch (err) {}
+    if (!body || !Array.isArray(body.rows)) return out({ error: 'ข้อมูลไม่ถูกต้อง' });
+    try { return out({ ok: true, n: sigLog_(body.rows.slice(0, 100)) }); } catch (err) { return out({ error: String(err.message || err).slice(0, 300) }); }
+  }
   if (p.api === 'ai_minor') {
     let snap = null; try { snap = JSON.parse((e.postData && e.postData.contents) || 'null'); } catch (err) {}
     if (!snap || !isFinite(Number(snap.price))) return out({ error: 'ข้อมูลไม่พอ' });
@@ -421,4 +426,31 @@ function aiMinor_(snap) {
     if (bad.length) { out.checked = 'ระบบตรวจแผนไม่ผ่าน: ' + bad.join(', ') + ' → ปรับเป็นรอ'; out.bias = 'WAIT'; }
   }
   return out;
+}
+
+
+// ---------- 📒 บันทึกสัญญาณเข้าออเดอร์ของอินดี้ (แท็บ signal_log) — V4.9.0 ----------
+// แถวละ 1 สัญญาณ (id ไม่ซ้ำ) · แถวเดิมถูกอัปเดตเมื่อผลเปลี่ยน (open → TP / SL / timeout)
+const SIGLOG_HEAD = ['id', 'indicator', 'side', 'tf', 'signal_time_th', 'entry', 'sl', 'tp1', 'tp2', 'risk_usd', 'score', 'reason', 'evidence', 'status', 'exit_time_th', 'result_R', 'contract', 'updated_th'];
+function sigLog_(rows) {
+  const lock = LockService.getScriptLock(); if (!lock.tryLock(20000)) throw new Error('busy');
+  try {
+    const ss = SpreadsheetApp.openById(AI_SHEET_ID);
+    let sh = ss.getSheetByName('signal_log');
+    if (!sh) { sh = ss.insertSheet('signal_log'); sh.getRange(1, 1, 1, SIGLOG_HEAD.length).setValues([SIGLOG_HEAD]).setFontWeight('bold').setBackground('#14283f').setFontColor('#ffffff'); sh.setFrozenRows(1); }
+    const last = sh.getLastRow(), ids = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues().map(r => String(r[0])) : [];
+    const idx = new Map(ids.map((id, i) => [id, i + 2]));
+    const now = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss');
+    const add = []; let n = 0;
+    rows.forEach(r => {
+      if (!r || !r.id) return;
+      const v = [String(r.id), r.ind || '', r.side || '', r.tf || '', r.sig_th || '', r.entry, r.sl, r.tp1, r.tp2, r.risk, r.score, r.reason || '', r.evidence || '', r.status || '', r.exit_th || '', r.result_r, r.contract || '', now]
+        .map(x => x === null || x === undefined ? '' : x);
+      const at = idx.get(String(r.id));
+      if (at) { sh.getRange(at, 1, 1, v.length).setValues([v]); n++; }
+      else { add.push(v); idx.set(String(r.id), -1); }
+    });
+    if (add.length) { sh.getRange(sh.getLastRow() + 1, 1, add.length, SIGLOG_HEAD.length).setValues(add); n += add.length; }
+    return n;
+  } finally { lock.releaseLock(); }
 }

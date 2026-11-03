@@ -233,5 +233,5 @@
     menu.addEventListener('click', e => { const a = e.target.closest('[data-tr]'); if (!a) return; if (a.dataset.tr === 'on') cfg.on = !cfg.on; else cfg.pools = !cfg.pools; save(); O.markDirty(); const b = $('trBox'); if (b) b.remove(); mount(); run(true); });
   }
   if (window.OIAlerts) OIAlerts.reg('trap', '💀 กับดักคนส่วนน้อย (กวาด SL แล้วเด้ง)', { desc: 'เตือนตอนราคากวาด SL ที่แถบ และตอนแท่ง M5 ปิดกลับ = จุดเข้า (บอกคะแนน/หลักฐาน/คำเตือนห้ามสวน)', active: () => cfg.on });
-  window.OI_trap = { get basis() { return basis; }, get pools() { return pools; }, get setups() { return setups; }, get atr() { return atr; }, run, stats, filters };
+  window.OI_trap = { get bars() { return B; }, get basis() { return basis; }, get pools() { return pools; }, get setups() { return setups; }, get atr() { return atr; }, run, stats, filters };
 })();

@@ -1,0 +1,15 @@
+# Backtest ป้าย 🌡 ±$/วัน (HV20) GC=F รายวันตั้งแต่ 2000 — กด Run workflow เอง ผลอยู่ใน log
+name: hv-bt
+on:
+  workflow_dispatch:
+  push:
+    paths: ['scripts/hv_bt.mjs']
+jobs:
+  bt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/hv_bt.mjs

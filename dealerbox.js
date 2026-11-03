@@ -84,7 +84,7 @@
       ctx.setLineDash([]); ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left';
       const lab = `🛡 ดีลเลอร์รับ ${bx.l.k} · ${bx.side < 0 ? 'ขึ้นไม่ผ่าน' : 'ลงไม่ผ่าน'} ${bx.tests.length} ครั้ง${broke ? ' (แตกแล้ว)' : ''}`;
       const ly = bx.side < 0 ? yt - 2 : yb + 11;
-      if (ly > 10 && ly < plotH) ctx.fillText(lab, Math.max(2, x0 + 2), ly);
+      // V4.9.2: ผู้ใช้ไม่ต้องการคำบรรยายบนกรอบ (เหลือแค่กรอบขาว)
     });
     ctx.restore();
   });

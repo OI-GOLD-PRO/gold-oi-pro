@@ -43,7 +43,12 @@ const FETCHER = async ({ dates, wantGroup, wantLabel, root }) => {
       try { groups = await j(`/CmeWS/mvc/Volume/Options/Expirations?productid=437&tradedate=${td}`); } catch (e) { log.push(td + ' exp ' + e.message); continue; }
       const g = (groups || []).find(x => x.label === wantGroup);
       const exps = g ? [].concat(g.expirations || [], g.weekly || [], g.daily || [], g.sto || []) : []; // V4.5.10: รูปแบบใหม่ของ CME แยก weekly/daily/sto
-      const e = exps.find(x => x && x.label === wantLabel); // กลุ่มบางวัน (ตัวเลขเบื้องต้น) ไม่มี expirations → ลองวันถัดไป
+      let e = exps.find(x => x && x.label === wantLabel);
+      // บางวัน CME ส่งกลุ่มแบบไม่มีรายการ expiration (มีแค่ productIds = สัปดาห์ 1–5) → สร้างเอง: pid ของสัปดาห์ N + รหัสเดือน (เช่น X26)
+      if (!e && g && Array.isArray(g.productIds)) {
+        const mw = /Week (\d) - ([A-Z]{3}) (\d{4})/.exec(wantLabel), MC = { JAN: 'F', FEB: 'G', MAR: 'H', APR: 'J', MAY: 'K', JUN: 'M', JUL: 'N', AUG: 'Q', SEP: 'U', OCT: 'V', NOV: 'X', DEC: 'Z' };
+        if (mw && g.productIds[+mw[1] - 1]) e = { label: wantLabel, productId: +g.productIds[+mw[1] - 1], expirationCode: MC[mw[2]] + mw[3].slice(2), built: true };
+      } // กลุ่มบางวัน (ตัวเลขเบื้องต้น) ไม่มี expirations → ลองวันถัดไป
       if (!e) { log.push(td + ' no ' + wantGroup + '/' + wantLabel + (g ? ' g=' + JSON.stringify(g).slice(0, 700) : ' groups=' + (Array.isArray(groups) ? groups.map(x => x.label).join('|') : typeof groups))); continue; }
       const det = await j(`/CmeWS/mvc/Volume/Options/Details?productid=${e.productId}&tradedate=${td}&expirationcode=${e.expirationCode}&reporttype=P`);
       const rows = [], totals = { C: 0, P: 0 };

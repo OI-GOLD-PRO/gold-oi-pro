@@ -13,7 +13,10 @@
   const cfg = { on: true };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
   const saveCfg = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
-  const BK = 15 * 60e3, NC = 16, KEEP = 26 * 3600e3, HALF = 8 * 3600e3;
+  const BK = 15 * 60e3, NC = 16, KEEP = 26 * 3600e3;
+  // V4.9.18: FAST = โซนที่แสดง (ไม้ใหม่มีผลไวขึ้น ย้อน 8 ชม. ครึ่งชีวิต 2 ชม. z ≥ 1.5 หนา ≥ 1.15× สูงสุด 6 โซน) · TRAP = ชุดเดิมให้ 💀 (ตรงกับ Worker)
+  const FAST = { WIN: 8 * 3600e3, HALF: 2 * 3600e3, Z: 1.5, PEAK: 1.15, MAXZ: 6, MIN: 300 };
+  const TRAP = { WIN: 24 * 3600e3, HALF: 8 * 3600e3, Z: 2, PEAK: 1.3, MAXZ: 4, MIN: 500 };
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   // bins: "ช่วงเวลา 15 นาที|ราคา $1 (perp)" → [ซื้อ: จำนวนไม้ 16 ขนาด][ขาย: 16][ซื้อ oz 16][ขาย oz 16]
   let bins = new Map(), dirty = false;
@@ -61,15 +64,15 @@
   function needFull(since) { let mn = Infinity; bins.forEach((a, k) => { const t = +k.split('|')[0]; if (t < mn) mn = t; }); return !bins.size || mn > since + 3600e3; }
 
   // ---------- คำนวณโซน ----------
-  let Z = null, zAt = 0;
-  function compute() {
-    const now = Date.now(), cnt = new Float64Array(NC);
-    bins.forEach((a, k) => { if (+k.split('|')[0] < now - 24 * 3600e3) return; for (let c = 0; c < NC; c++) cnt[c] += a[c] + a[NC + c]; });
-    const tot = cnt.reduce((x, y) => x + y, 0); if (tot < 500) return null;
+  let Z = null, zAt = 0, ZT = null, ztAt = 0;
+  function compute(opt = FAST) {
+    const now = Date.now(), cnt = new Float64Array(NC), HALF = opt.HALF;
+    bins.forEach((a, k) => { if (+k.split('|')[0] < now - opt.WIN) return; for (let c = 0; c < NC; c++) cnt[c] += a[c] + a[NC + c]; });
+    const tot = cnt.reduce((x, y) => x + y, 0); if (tot < opt.MIN) return null;
     let mc = 0, acc = 0; for (let c = 0; c < NC; c++) { acc += cnt[c]; if (acc >= tot / 2) { mc = c; break; } }
     const P = new Map(); let n = 0;
     bins.forEach((a, k) => {
-      const [tb, pb] = k.split('|').map(Number); if (tb < now - 24 * 3600e3) return;
+      const [tb, pb] = k.split('|').map(Number); if (tb < now - opt.WIN) return;
       const w = Math.pow(0.5, Math.max(0, now - tb - BK / 2) / HALF); let b = 0, s = 0, qb = 0, qs = 0;
       for (let c = 0; c <= mc; c++) { b += a[c]; s += a[NC + c]; qb += a[2 * NC + c]; qs += a[3 * NC + c]; }
       n += b + s; const o = P.get(pb) || { b: 0, s: 0, qb: 0, qs: 0 }; o.b += b * w; o.s += s * w; o.qb += qb * w; o.qs += qs * w; P.set(pb, o);
@@ -79,15 +82,15 @@
     const mean = arr.reduce((x, o) => x + o.b + o.s, 0) / arr.filter(o => o.b + o.s > 0).length;
     // V4.9.12b: ไม้เล็กซื้อ/ขายแทบ 50/50 ทุกราคา → หาโซนจาก "ความหนาแน่น" (คนเข้าเยอะสุด) แล้วดูว่าเอียงฝั่งไหนแบบมีนัยสถิติ (z ≥ 2)
     const den = arr.map(o => o.b + o.s), sm = den.map((v, i) => v + 0.5 * ((den[i - 1] || 0) + (den[i + 1] || 0)));
-    const peaks = sm.map((v, i) => ({ v, i })).filter(x => x.v > 0 && x.v >= (sm[x.i - 1] || 0) && x.v >= (sm[x.i + 1] || 0) && den[x.i] >= mean * 1.3).sort((a, b) => b.v - a.v);
-    const pick = []; peaks.forEach(x => { if (pick.length < 4 && pick.every(y => Math.abs(y.i - x.i) >= 3)) pick.push(x); });
+    const peaks = sm.map((v, i) => ({ v, i })).filter(x => x.v > 0 && x.v >= (sm[x.i - 1] || 0) && x.v >= (sm[x.i + 1] || 0) && den[x.i] >= mean * opt.PEAK).sort((a, b) => b.v - a.v);
+    const pick = []; peaks.forEach(x => { if (pick.length < opt.MAXZ && pick.every(y => Math.abs(y.i - x.i) >= 3)) pick.push(x); });
     const zones = pick.map((x, r) => {
       let a = x.i, b = x.i; while (a > 0 && x.i - a < 2 && den[a - 1] >= den[x.i] * 0.6) a--; while (b < arr.length - 1 && b - x.i < 2 && den[b + 1] >= den[x.i] * 0.6) b++;
       let cb = 0, cs = 0, pq = 0, q = 0; for (let i = a; i <= b; i++) { const o = arr[i]; cb += o.b; cs += o.s; pq += o.p * (o.qb + o.qs); q += o.qb + o.qs; }
-      const z = (cb - cs) / Math.sqrt(Math.max(1, cb + cs)), pr = Math.round(cb / Math.max(1, cb + cs) * 100) / 100, side = (pr >= 0.49 && pr <= 0.51) ? 0 : z >= 2 ? 1 : z <= -2 ? -1 : 0; // V4.9.15: 49–51% = สองฝั่ง
+      const z = (cb - cs) / Math.sqrt(Math.max(1, cb + cs)), pr = Math.round(cb / Math.max(1, cb + cs) * 100) / 100, side = (pr >= 0.49 && pr <= 0.51) ? 0 : z >= opt.Z ? 1 : z <= -opt.Z ? -1 : 0; // V4.9.15: 49–51% = สองฝั่ง
       return { side, rank: r, lo: arr[a].p - 0.5, hi: arr[b].p + 0.5, avg: q ? pq / q : arr[x.i].p, n: cb + cs, pct: cb / Math.max(1, cb + cs), z };
     });
-    return { zones, mc, maxSz: Math.pow(2, mc + 1) / 1000, n, hrs: (() => { let mn = Infinity; bins.forEach((a, k) => { mn = Math.min(mn, +k.split('|')[0]); }); return Math.min(24, (now - mn) / 3600e3); })() };
+    return { zones, mc, maxSz: Math.pow(2, mc + 1) / 1000, n, hrs: (() => { let mn = Infinity; bins.forEach((a, k) => { mn = Math.min(mn, +k.split('|')[0]); }); return Math.min(opt.WIN / 3600e3, (now - mn) / 3600e3); })() };
   }
   function off() { try { const bt = window.OI_bigtr, B = O.series.data() || []; return bt && B.length ? bt.offAt(B[B.length - 1].time) : 0; } catch (e) { return 0; } }
   // V4.9.15: โซนคำนวณที่เซิร์ฟเวอร์ (ไม้จริง Binance + Bybit + Bitget) → ทุกเครื่องได้โซนเดียวกัน ไม่ต้องเปิด 🐋
@@ -107,16 +110,30 @@
     if (!Z) return []; const d = off();
     return Z.zones.map(z => Object.assign({}, z, { lo: z.lo - d, hi: z.hi - d, avg: z.avg - d }));
   }
+  const shift = (list, d) => (list || []).map(z => Object.assign({}, z, { lo: z.lo - d, hi: z.hi - d, avg: z.avg - d }));
+  // V4.9.18: 💀 กับดักใช้ชุดเดิม (ย้อน 24 ชม. z ≥ 2) ไม่เปลี่ยนตามโซนที่แสดง
+  function trapZones() {
+    if (!cfg.on) return [];
+    if (srvOk() && SZ.trap) return shift(SZ.trap, O.sym === 'gcy' ? off() : (O.adj || 0));
+    if (srvOk()) return zones();
+    if (!ZT || Date.now() - ztAt > 20000) { ZT = compute(TRAP); ztAt = Date.now(); }
+    return ZT ? shift(ZT.zones, off()) : [];
+  }
+  // V4.9.18: ⚡ ไม้สด 1 ชม. ล่าสุด (จากเซิร์ฟเวอร์)
+  function freshZones() {
+    if (!cfg.on || !srvOk() || !SZ.fresh) return [];
+    return shift(SZ.fresh, O.sym === 'gcy' ? off() : (O.adj || 0));
+  }
   const live = () => { const bt = window.OI_bigtr; return srvOk() || !!(bt && bt.cfg && bt.cfg.on); };
 
   // ---------- วาด: แถบแนวนอนชิดขวา (ยาว = จำนวนไม้รายย่อย) ----------
   const fmt = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v) + '';
   O.hooks.push((ctx, w, h) => {
     if (!cfg.on || !live() || (TFS[O.tf] || 60) >= 86400) return;
-    const Zs = zones(); if (!Zs.length) return;
+    const Zs = zones(); if (!Zs.length && !freshZones().length) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height(), px = O.lastClose;
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
-    const mx = Math.max(...Zs.map(z => z.n)); hit = [];
+    const mx = Zs.length ? Math.max(...Zs.map(z => z.n)) : 1; hit = [];
     ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'middle';
     Zs.forEach(z => { // V4.9.17: แถบสีไม่มีตัวหนังสือ แตะแถบดูรายละเอียด · Buy ฟ้า / Sell ส้ม (ไม่ซ้ำแดง/เขียวของ OI) · สองฝั่ง = เทาจาง
       let y1 = sr.priceToCoordinate(z.hi), y2 = sr.priceToCoordinate(z.lo); if (y1 === null || y2 === null || y2 < 0 || y1 > plotH) return;
@@ -127,6 +144,16 @@
       const under = z.side > 0 ? px < z.lo : z.side < 0 ? px > z.hi : false, prof = z.side > 0 ? px > z.hi : z.side < 0 ? px < z.lo : false;
       const lab = z.side > 0 ? `Buy ${Math.round(z.pct * 100)}%` : z.side < 0 ? `Sell ${Math.round((1 - z.pct) * 100)}%` : 'สองฝั่ง';
       hit.push({ x0, x1: plotW, y1: y1 - 4, y2: y2 + 4, txt: `👥 <b style="color:${col}">${lab}</b> · ${fmt(z.n)} ไม้ · ${z.lo.toFixed(1)}–${z.hi.toFixed(1)} (เฉลี่ย ${z.avg.toFixed(1)})${under ? ' · คนกลุ่มนี้ติดลบ' : prof ? ' · คนกลุ่มนี้กำไร' : ''}` });
+    });
+    // V4.9.18: ⚡ ไม้สด 1 ชม. = เส้นประบาง ที่ราคาเฉลี่ย (ไม่มีตัวหนังสือ แตะดูรายละเอียด)
+    const Fz = freshZones(), fm = Fz.length ? Math.max(...Fz.map(z => z.n)) : 1;
+    Fz.forEach(z => {
+      const y = sr.priceToCoordinate(z.avg); if (y === null || y < 0 || y > plotH) return;
+      const len = Math.max(30, plotW * 0.4 * z.n / fm), x0 = plotW - len, col = z.side > 0 ? '#38bdf8' : z.side < 0 ? '#ff9f43' : '#9aa3b8';
+      ctx.globalAlpha = z.side ? 0.95 : 0.5; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(x0, Math.round(y) + 0.5); ctx.lineTo(plotW, Math.round(y) + 0.5); ctx.stroke(); ctx.setLineDash([]);
+      const lab = z.side > 0 ? `Buy ${Math.round(z.pct * 100)}%` : z.side < 0 ? `Sell ${Math.round((1 - z.pct) * 100)}%` : 'สองฝั่ง';
+      hit.push({ x0, x1: plotW, y1: y - 5, y2: y + 5, txt: `⚡ ไม้สด 1 ชม. <b style="color:${col}">${lab}</b> · ${fmt(z.n)} ไม้ · ${z.lo.toFixed(1)}–${z.hi.toFixed(1)} (เฉลี่ย ${z.avg.toFixed(1)})` });
     });
     ctx.restore();
   });
@@ -154,5 +181,5 @@
   if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }
   setInterval(() => { if (cfg.on && live()) O.markDirty(); }, 30000);
 
-  window.OI_retail = { zones, compute, get server() { return srvOk() ? SZ : null; }, save, needFull, get bins() { return bins; }, get cfg() { return cfg; } };
+  window.OI_retail = { zones, trapZones, freshZones, compute, get server() { return srvOk() ? SZ : null; }, save, needFull, get bins() { return bins; }, get cfg() { return cfg; } };
 })();

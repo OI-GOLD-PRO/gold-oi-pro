@@ -2,7 +2,7 @@
 // แล้วราคาวิ่งเข้าไปทดสอบแต่ "ปิดผ่านไม่ได้" อย่างน้อย 2 ครั้ง → ตีกรอบสี่เหลี่ยมเส้นขาวคลุมจุดนั้น
 //  - แนว: strike ที่ GEX บวก 8 อันดับแรก (ห่างราคาไม่เกิน 3%) จากข้อมูลออปชันสด (live.js)
 //  - ทดสอบ: ไส้แท่ง M5 แตะแนว (ห่างไม่เกิน tol) แต่ราคาปิดกลับฝั่งเดิม · นับครั้งที่ห่างกันอย่างน้อย 2 แท่ง
-//  - แตก: ราคาปิดเลยแนวเกิน $2 → กรอบจบที่แท่งนั้น (เส้นประจาง) · ยังไม่แตก = กรอบยืดถึงแท่งล่าสุด
+//  - แตก: ราคาปิดเลยแนวเกิน $2 → ไม่วาดกรอบนั้น · ทดสอบชุดล่าสุดที่ยังไม่แตก = กรอบยืดถึงแท่งล่าสุด
 //  ข้อจำกัด: ใช้ GEX ของตอนนี้กับแท่งย้อนหลังทั้งหมด (ไม่มีประวัติ GEX รายแท่ง)
 (() => {
   'use strict';
@@ -69,7 +69,7 @@
     const X = i => ts.timeToCoordinate(toChart(bars[Math.min(i, bars.length - 1)].time)), Y = p => sr.priceToCoordinate(p);
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
     ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'bottom';
-    boxes.forEach(bx => {
+    boxes.filter(bx => bx.broke === undefined).forEach(bx => { // แสดงเฉพาะจุดที่ยังผ่านไม่ได้ (แตกแล้วไม่วาด ลดความรก)
       let x0 = X(bx.start), x1 = bx.live ? plotW - 2 : X(bx.end);
       if (x1 === null || x0 === null) { if (x0 === null && x1 !== null) x0 = 0; else return; }
       const step = Math.max(3, ts.options().barSpacing || 6); x0 -= step / 2; if (!bx.live) x1 += step / 2;

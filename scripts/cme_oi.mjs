@@ -42,8 +42,8 @@ const FETCHER = async ({ dates, wantGroup, wantLabel, root }) => {
       let groups;
       try { groups = await j(`/CmeWS/mvc/Volume/Options/Expirations?productid=437&tradedate=${td}`); } catch (e) { log.push(td + ' exp ' + e.message); continue; }
       const g = (groups || []).find(x => x.label === wantGroup);
-      const e = g && g.expirations.find(x => x.label === wantLabel);
-      if (!e) { log.push(td + ' no ' + wantGroup + '/' + wantLabel); continue; }
+      const e = g && (g.expirations || []).find(x => x.label === wantLabel); // กลุ่มบางวัน (ตัวเลขเบื้องต้น) ไม่มี expirations → ลองวันถัดไป
+      if (!e) { log.push(td + ' no ' + wantGroup + '/' + wantLabel + (g ? ' keys=' + Object.keys(g).join('|') : ' groups=' + (Array.isArray(groups) ? groups.map(x => x.label).join('|') : typeof groups))); continue; }
       const det = await j(`/CmeWS/mvc/Volume/Options/Details?productid=${e.productId}&tradedate=${td}&expirationcode=${e.expirationCode}&reporttype=P`);
       const rows = [], totals = { C: 0, P: 0 };
       (det.monthData || []).forEach(md => {

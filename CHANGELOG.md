@@ -1,3 +1,8 @@
+### cme_oi.mjs แก้ดึงข้อมูลไม่ได้ — 2026-11-03 — Claude
+- ไฟล์: scripts/cme_oi.mjs
+- แก้อะไร: หลังสัญญา G1M หมดอายุ (01:30) ดึง G1T ไม่ได้ ("Cannot read properties of undefined (reading 'find')") เพราะ CME ส่งกลุ่ม expiration แบบใหม่ (มีแค่ productIds ไม่มี expirations) → ป้าย IV ไม่มี "· CME" · แก้: รองรับ weekly/daily/sto, สร้าง expiration จาก productIds (สัปดาห์ N) เอง, และใช้ settle ของวันล่าสุดแม้ OI วันนั้นยังไม่ออก
+- ระวัง: 3 พ.ย. 09:00 CME ยังไม่ประกาศ settlement ของวันจันทร์ (แม้แต่ฟิวเจอร์ส) → ตอนนี้ใช้ settle วันศุกร์ของ G1T ไปก่อน workflow รายชั่วโมงจะดึงของวันจันทร์เองเมื่อ CME ประกาศ
+
 ### V4.5.9 — 2026-11-03 — Claude
 - ไฟล์: index.html (zoneBanner + CSS #zoneWait, เรียกคู่ checkAlerts)
 - แก้อะไร: ราคาเข้าโซน OI/Vol (โซนเดียวกับที่แจ้งเตือน) → ป้ายกลางกราฟด้านบน "⏳ รอดู PA เด้ง หรือ ทะลุ · อย่าเพิ่งออกออเดอร์" + ชื่อโซน/ช่วงราคา · ค้างจนราคาออกจากโซนแล้วหายเอง · ทำงานแม้ปิดกระดิ่ง

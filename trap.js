@@ -41,14 +41,14 @@
     for (let i = PIV; i < n - PIV; i++) {
       const b = B[i]; let hi = true, lo = true;
       for (let j = i - PIV; j <= i + PIV; j++) { if (j === i) continue; if (B[j].high >= b.high) hi = false; if (B[j].low <= b.low) lo = false; }
-      if (hi) add(b.high, 1, 2, 'ยอด swing', b.time + PIV * 300); // ยืนยัน swing ได้หลัง PIV แท่ง
-      if (lo) add(b.low, -1, 2, 'ก้น swing', b.time + PIV * 300);
+      if (hi) add(b.high, 1, 1, 'ยอด swing', b.time + PIV * 300); // ยืนยัน swing ได้หลัง PIV แท่ง · V4.9.4: swing เดี่ยวน้ำหนัก 1 (ต้องซ้อนแหล่งอื่นถึงขึ้นเป็นแถบ — backtest 60 วัน EV ติดลบ)
+      if (lo) add(b.low, -1, 1, 'ก้น swing', b.time + PIV * 300);
     }
     // High/Low ของรอบเทรดก่อน (รอบแบ่งที่ช่วงพักตลาด ≥ 40 นาที)
     let s0 = 0; for (let i = n - 1; i > 0; i--) if (B[i].time - B[i - 1].time >= 2400) { s0 = i; break; }
     let p0 = 0; for (let i = s0 - 1; i > 0; i--) if (B[i].time - B[i - 1].time >= 2400) { p0 = i; break; }
     if (s0 > p0 + 10) { const ps = B.slice(p0, s0), ph = Math.max(...ps.map(x => x.high)), pl = Math.min(...ps.map(x => x.low)), cur = B.slice(s0);
-      if (!cur.some(x => x.high > ph)) add(ph, 1, 3, 'High เมื่อวาน', B[s0].time); if (!cur.some(x => x.low < pl)) add(pl, -1, 3, 'Low เมื่อวาน', B[s0].time); }
+      if (!cur.some(x => x.high > ph)) add(ph, 1, 4, 'High เมื่อวาน', B[s0].time); if (!cur.some(x => x.low < pl)) add(pl, -1, 4, 'Low เมื่อวาน', B[s0].time); }
     const px = B[n - 1].close, rng = atr * 8;
     // เลขกลมฟิวเจอร์ส + เลขกลมราคาสปอต (สปอต = ราคากราฟ + adj)
     for (let r = Math.ceil((px - rng) / 25) * 25; r <= px + rng; r += 25) { const w = r % 100 === 0 ? 2.5 : r % 50 === 0 ? 1.5 : 0.8; add(r + (r > px ? 0.3 : -0.3), r > px ? 1 : -1, w, `เลขกลม ${r}`, null); }
@@ -128,7 +128,11 @@
           else {
             const opp = pools.filter(q => q.side === -P.side && (below ? q.p > entry + R : q.p < entry - R)).sort((a, b2) => Math.abs(a.p - entry) - Math.abs(b2.p - entry));
             const ev = evidence(i, rk, P.side), base = 40 + Math.min(25, P.w * 3);
-            Object.assign(s, { ri: rk, entry, sl, R, tp1: opp[0] ? opp[0].p : entry + s.side * 1.5 * R, tp2: opp[1] ? opp[1].p : entry + s.side * 2.5 * R, tpLab: opp[0] ? opp[0].why[0] : '1.5R', score: Math.min(100, Math.round(base + ev.sc)), ev: ev.out });
+            // V4.9.4 TP ตามแหล่ง (backtest 60 วัน): High/Low เมื่อวาน → 2R ดีสุด · ยอด/ก้นเท่ากัน → 1R ดีสุด · อื่น ๆ → แถบฝั่งตรงข้าม (≥1R) หรือ 1.5R
+            const isPD = P.why.some(w => /เมื่อวาน/.test(w)), isEQ = P.why.includes('ยอด/ก้นเท่ากัน');
+            const t1 = isPD ? [entry + s.side * 2 * R, '2R (High/Low เมื่อวาน)'] : isEQ ? [entry + s.side * R, '1R (ยอด/ก้นเท่ากัน)'] : opp[0] ? [opp[0].p, opp[0].why[0]] : [entry + s.side * 1.5 * R, '1.5R'];
+            const far = opp.find(q => (below ? q.p > t1[0] + 0.5 : q.p < t1[0] - 0.5));
+            Object.assign(s, { ri: rk, entry, sl, R, tp1: t1[0], tp2: far ? far.p : entry + s.side * Math.max(2.5, isPD ? 3 : 2.5) * R, tpLab: t1[1], score: Math.min(100, Math.round(base + ev.sc)), ev: ev.out });
             frozen[fk] = { entry: s.entry, sl: s.sl, R: s.R, tp1: s.tp1, tp2: s.tp2, tpLab: s.tpLab, score: s.score, ev: s.ev, ext: s.ext, pp: P.p, why: P.why, w: P.w }; seenF.add(fk); dirtyF = true;
           }
           // ติดตามผล

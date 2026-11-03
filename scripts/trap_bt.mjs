@@ -61,3 +61,11 @@ console.log('\nแหล่ง                 กวาด  ไม่กลั�
   console.log(t.padEnd(20), String(all.length).padStart(5), String(f).padStart(8), ' |', String(e.length).padStart(5), pct(w1, e.length).padStart(6), pct(w15, e.length).padStart(8), pct(w2, e.length).padStart(6), ' |', (ev >= 0 ? '+' : '') + ev.toFixed(2) + 'R');
   ['BUY', 'SELL'].forEach(sd => { const ee = e.filter(x => (x.side > 0) === (sd === 'BUY')), w = ee.filter(x => x.hit.r15).length; console.log('   ', sd.padEnd(16), '          |', String(ee.length).padStart(5), '      ', pct(w, ee.length).padStart(8)); });
 });
+
+// นโยบาย V4.9.4: ไม่ใช้ swing เดี่ยว (ต้องซ้อนแหล่งอื่น) · ยอด/ก้นเท่ากัน TP 1R · High/Low เมื่อวาน TP 2R
+{
+  const pick = (t, m) => res.filter(x => x.type === t && !x.fail).map(x => (m === 1 ? x.hit.r1 : x.hit.r2) ? m : -1);
+  const eq = pick('ยอด/ก้นเท่ากัน', 1), pd = pick('High/Low เมื่อวาน', 2), all = eq.concat(pd), sw = pick('swing เดี่ยว', 1.5 === 1.5 ? 2 : 2);
+  const avg = a => a.length ? (a.reduce((x, y) => x + y, 0) / a.length) : 0;
+  console.log(`\nนโยบายใหม่: ยอด/ก้นเท่ากัน@1R ${eq.length} ครั้ง EV ${avg(eq).toFixed(2)}R · High/Low@2R ${pd.length} ครั้ง EV ${avg(pd).toFixed(2)}R · รวม ${all.length} ครั้ง EV ${avg(all).toFixed(2)}R · ชนะ ${(all.filter(v => v > 0).length / all.length * 100).toFixed(0)}% · รวม ${all.reduce((x, y) => x + y, 0).toFixed(1)}R`);
+}

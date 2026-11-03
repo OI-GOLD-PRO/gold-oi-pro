@@ -17,7 +17,9 @@
       "i": "M",
       "title": "JOLTS Job Openings",
       "forecast": "7.15M",
-      "previous": "7.08M"
+      "previous": "7.08M",
+      "actual": "7.52M",
+      "better": true
     },
     {
       "date": "2026-11-03T10:16:00-05:00",

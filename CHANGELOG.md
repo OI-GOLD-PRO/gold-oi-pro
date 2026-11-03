@@ -1,3 +1,8 @@
+### V4.6.0 — 2026-11-03 — Claude
+- ไฟล์: crowd.js (ใหม่), dash.js (เรียก window.OICrowdCard ต่อจากการ์ด COT แยกกลุ่ม), index.html
+- แก้อะไร: การ์ดแดช "👥 คนส่วนมาก vs คนส่วนน้อย" จาก COT (CFTC Disaggregated): นับจำนวนรายใหญ่ฝั่ง Long/Short → ฝั่งคนมาก/คนน้อย · แยกกลุ่มในแต่ละฝั่ง (ผู้ผลิต, Swap/ธนาคาร, กองทุน, รายใหญ่อื่น) พร้อมเหตุผลที่ถือ · รายย่อย Long % · ขนาดเฉลี่ยต่อราย · คนเดิมพันทิศทางจริง (กองทุน+อื่น) vs ฝั่ง hedge · เทียบ 3 ปี เตือนเมื่อคนส่วนมากเอียงสุดโต่ง · เปลี่ยนแปลงสัปดาห์ล่าสุด
+- ระวัง: Myfxbook (สัดส่วนรายย่อย CFD) ลองแล้วโดน Cloudflare บล็อกจาก GitHub Actions จึงไม่ได้ใช้
+
 ### cme_oi.mjs แก้ดึงข้อมูลไม่ได้ — 2026-11-03 — Claude
 - ไฟล์: scripts/cme_oi.mjs
 - แก้อะไร: หลังสัญญา G1M หมดอายุ (01:30) ดึง G1T ไม่ได้ ("Cannot read properties of undefined (reading 'find')") เพราะ CME ส่งกลุ่ม expiration แบบใหม่ (มีแค่ productIds ไม่มี expirations) → ป้าย IV ไม่มี "· CME" · แก้: รองรับ weekly/daily/sto, สร้าง expiration จาก productIds (สัปดาห์ N) เอง, และใช้ settle ของวันล่าสุดแม้ OI วันนั้นยังไม่ออก

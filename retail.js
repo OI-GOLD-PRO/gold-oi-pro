@@ -136,7 +136,7 @@
 
   // ---------- วาด: แถบแนวนอนชิดขวา (ยาว = จำนวนไม้รายย่อย) ----------
   const fmt = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v) + '';
-  O.hooks.push((ctx, w, h) => {
+  (O.bgHooks || O.hooks).push((ctx, w, h) => { // V4.9.20: วาดชั้นพื้นหลัง ใต้แถบโซน OI (ไม่บัง OI)
     if (!cfg.on || !live() || (TFS[O.tf] || 60) >= 86400) return;
     const R = rows(), Zs = R.length ? [] : zones(); if (!R.length && !Zs.length && !freshZones().length) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height(), px = O.lastClose;
@@ -151,6 +151,7 @@
       V.forEach(r => {
         const t = r.b + r.s; if (!(t > 0)) return;
         const pct = r.b / t, z = (r.b - r.s) / Math.sqrt(Math.max(1, t)), pr = Math.round(pct * 100) / 100, side = pr >= 0.49 && pr <= 0.51 ? 0 : z >= 1.5 ? 1 : z <= -1.5 ? -1 : 0;
+        if (!side) return; // V4.9.20: ไม่แสดงแถวที่ซื้อ≈ขาย (เดิมเป็นแถบจางสีเทา) เหลือเฉพาะแถวที่เอียงชัด
         const y = Math.round(r.y1) + 0.5, hh = Math.max(1, r.y2 - r.y1 - 1), len = Math.max(2, W * t / mx), x0 = plotW - len, lb = len * pct;
         ctx.globalAlpha = side ? 0.8 : 0.3;
         ctx.fillStyle = '#38bdf8'; ctx.fillRect(x0, y, lb, hh);

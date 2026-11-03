@@ -98,7 +98,7 @@
     try { const j = await (await fetch(O.worker + '/retail', { cache: 'no-store' })).json(); if (j && j.ready && j.zones) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
   }
   setTimeout(loadSrv, 1500); setInterval(() => { if (document.visibilityState === 'visible') loadSrv(); }, 30000);
-  const srvOk = () => SZ && Date.now() - SZat < 5 * 60e3;
+  const srvOk = () => SZ && Date.now() - SZat < 5 * 60e3 && (SZ.hrs >= 3 || !(window.OI_bigtr && OI_bigtr.cfg && OI_bigtr.cfg.on)); // เซิร์ฟเวอร์เก็บยังไม่ถึง 3 ชม. และเครื่องนี้เปิด 🐋 อยู่ → ใช้ของเครื่องก่อน
   // โซนในสเกลราคากราฟ
   function zones() {
     if (!cfg.on) return [];

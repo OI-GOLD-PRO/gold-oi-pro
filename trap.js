@@ -22,6 +22,18 @@
   const FKEY = 'oi_trap_frozen_v499'; // V4.9.9: กติกาใหม่ (กรองกลางทาง) เริ่มล็อกใหม่ // เปลี่ยนกติกาแล้วเริ่มล็อกใหม่ (ของเดิมคำนวณด้วยกติกาเก่า)
   try { localStorage.removeItem('oi_trap_frozen'); localStorage.removeItem('oi_trap_frozen_v494'); } catch (e) {}
   let frozen = {}; try { frozen = JSON.parse(localStorage.getItem(FKEY) || '{}') || {}; } catch (e) {}
+  // V4.9.15: แผนที่ล็อกแล้วเก็บกลางที่เซิร์ฟเวอร์ — เครื่องแรกที่เห็นสัญญาณเป็นคนล็อก เครื่องอื่นใช้แผนเดียวกัน
+  const FZ = O.worker ? O.worker + '/trapfz' : null; let fzNew = {};
+  function fzApply(j) { if (!j || typeof j !== 'object') return; let ch = false; Object.entries(j).forEach(([k, v]) => { if (JSON.stringify(frozen[k]) !== JSON.stringify(v)) { frozen[k] = v; ch = true; } }); if (ch) { saveF(); lastRun = 0; O.markDirty(); } }
+  async function fzSync() {
+    if (!FZ) return;
+    try {
+      const body = Object.keys(fzNew).length ? JSON.stringify(fzNew) : null; fzNew = {};
+      const r = await fetch(FZ, body ? { method: 'POST', body, headers: { 'content-type': 'application/json' } } : { cache: 'no-store' });
+      fzApply(await r.json());
+    } catch (e) {}
+  }
+  setTimeout(fzSync, 2000); setInterval(() => { if (document.visibilityState === 'visible') fzSync(); }, 30000);
   const saveF = () => { try { const lim = Date.now() / 1000 + 7 * 3600 - 3 * 86400; Object.keys(frozen).forEach(k => { if (+k.split('|')[0] < lim) delete frozen[k]; }); localStorage.setItem(FKEY, JSON.stringify(frozen)); } catch (e) {} };
   let B = [], pools = [], setups = [], atr = 2, busy = false, lastRun = 0;
   // ราคาสปอต XAUUSD (ที่รายย่อย CFD เห็น) ≠ ราคาบนกราฟ (สเกลฟิวเจอร์ส) → basis = กราฟ − สปอต (ดึงทุก 1 นาที)
@@ -143,7 +155,7 @@
             const t1 = isPD ? [entry + s.side * 2 * R, '2R (High/Low เมื่อวาน)'] : isEQ ? [entry + s.side * R, '1R (ยอด/ก้นเท่ากัน)'] : opp[0] ? [opp[0].p, opp[0].why[0]] : [entry + s.side * 1.5 * R, '1.5R'];
             const far = opp.find(q => (below ? q.p > t1[0] + 0.5 : q.p < t1[0] - 0.5));
             Object.assign(s, { ri: rk, entry, sl, R, tp1: t1[0], tp2: far ? far.p : entry + s.side * Math.max(2.5, isPD ? 3 : 2.5) * R, tpLab: t1[1], score: Math.min(100, Math.round(base + ev.sc)), ev: ev.out });
-            frozen[fk] = { entry: s.entry, sl: s.sl, R: s.R, tp1: s.tp1, tp2: s.tp2, tpLab: s.tpLab, score: s.score, ev: s.ev, ext: s.ext, pp: P.p, why: P.why, w: P.w }; seenF.add(fk); dirtyF = true;
+            frozen[fk] = { entry: s.entry, sl: s.sl, R: s.R, tp1: s.tp1, tp2: s.tp2, tpLab: s.tpLab, score: s.score, ev: s.ev, ext: s.ext, pp: P.p, why: P.why, w: P.w }; seenF.add(fk); dirtyF = true; fzNew[fk] = frozen[fk]; setTimeout(fzSync, 500);
           }
           // ติดตามผล
           track(s, n);

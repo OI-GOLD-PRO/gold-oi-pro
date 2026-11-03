@@ -84,20 +84,30 @@
     const zones = pick.map((x, r) => {
       let a = x.i, b = x.i; while (a > 0 && x.i - a < 2 && den[a - 1] >= den[x.i] * 0.6) a--; while (b < arr.length - 1 && b - x.i < 2 && den[b + 1] >= den[x.i] * 0.6) b++;
       let cb = 0, cs = 0, pq = 0, q = 0; for (let i = a; i <= b; i++) { const o = arr[i]; cb += o.b; cs += o.s; pq += o.p * (o.qb + o.qs); q += o.qb + o.qs; }
-      const z = (cb - cs) / Math.sqrt(Math.max(1, cb + cs)), side = z >= 2 ? 1 : z <= -2 ? -1 : 0;
+      const z = (cb - cs) / Math.sqrt(Math.max(1, cb + cs)), pr = Math.round(cb / Math.max(1, cb + cs) * 100) / 100, side = (pr >= 0.49 && pr <= 0.51) ? 0 : z >= 2 ? 1 : z <= -2 ? -1 : 0; // V4.9.15: 49–51% = สองฝั่ง
       return { side, rank: r, lo: arr[a].p - 0.5, hi: arr[b].p + 0.5, avg: q ? pq / q : arr[x.i].p, n: cb + cs, pct: cb / Math.max(1, cb + cs), z };
     });
     return { zones, mc, maxSz: Math.pow(2, mc + 1) / 1000, n, hrs: (() => { let mn = Infinity; bins.forEach((a, k) => { mn = Math.min(mn, +k.split('|')[0]); }); return Math.min(24, (now - mn) / 3600e3); })() };
   }
   function off() { try { const bt = window.OI_bigtr, B = O.series.data() || []; return bt && B.length ? bt.offAt(B[B.length - 1].time) : 0; } catch (e) { return 0; } }
+  // V4.9.15: โซนคำนวณที่เซิร์ฟเวอร์ (ไม้จริง Binance + Bybit + Bitget) → ทุกเครื่องได้โซนเดียวกัน ไม่ต้องเปิด 🐋
+  //          ถ้าเซิร์ฟเวอร์ยังไม่พร้อม ค่อยใช้ที่เครื่องนี้เก็บเอง (ต้องเปิด 🐋)
+  let SZ = null, SZat = 0;
+  async function loadSrv() {
+    if (!cfg.on || !O.worker) return;
+    try { const j = await (await fetch(O.worker + '/retail', { cache: 'no-store' })).json(); if (j && j.ready && j.zones) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
+  }
+  setTimeout(loadSrv, 1500); setInterval(() => { if (document.visibilityState === 'visible') loadSrv(); }, 30000);
+  const srvOk = () => SZ && Date.now() - SZat < 5 * 60e3;
   // โซนในสเกลราคากราฟ
   function zones() {
     if (!cfg.on) return [];
+    if (srvOk()) { const d = O.sym === 'gcy' ? off() : (O.adj || 0); return SZ.zones.map(z => Object.assign({}, z, { lo: z.lo - d, hi: z.hi - d, avg: z.avg - d })); }
     if (!Z || Date.now() - zAt > 20000) { Z = compute(); zAt = Date.now(); }
     if (!Z) return []; const d = off();
     return Z.zones.map(z => Object.assign({}, z, { lo: z.lo - d, hi: z.hi - d, avg: z.avg - d }));
   }
-  const live = () => { const bt = window.OI_bigtr; return !!(bt && bt.cfg && bt.cfg.on); };
+  const live = () => { const bt = window.OI_bigtr; return srvOk() || !!(bt && bt.cfg && bt.cfg.on); };
 
   // ---------- วาด: แถบแนวนอนชิดขวา (ยาว = จำนวนไม้รายย่อย) ----------
   const fmt = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v) + '';
@@ -124,7 +134,8 @@
 
   // ---------- เมนู ƒx ----------
   function info() {
-    if (!live()) return 'ต้องเปิด 🐋 Big Traders ก่อน (ใช้ข้อมูลไม้ชุดเดียวกัน)';
+    if (srvOk()) return `เซิร์ฟเวอร์ · ${Object.keys(SZ.src || {}).join('+') || '-'} · ${fmt(SZ.n)} ไม้ · ย้อน ${(SZ.hrs || 0).toFixed(0)} ชม.`;
+    if (!live()) return 'รอข้อมูลจากเซิร์ฟเวอร์… (หรือเปิด 🐋 Big Traders ให้เครื่องนี้เก็บเอง)';
     if (!Z) Z = compute(); if (!Z) return 'กำลังเก็บไม้รายย่อย…';
     return `ไม้ ≤ ${Z.maxSz < 1 ? Z.maxSz.toFixed(3) : Z.maxSz} oz · ${fmt(Z.n)} ไม้ · ย้อน ${Z.hrs.toFixed(0)} ชม.`;
   }
@@ -134,5 +145,5 @@
   if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }
   setInterval(() => { if (cfg.on && live()) O.markDirty(); }, 30000);
 
-  window.OI_retail = { zones, compute, save, needFull, get bins() { return bins; }, get cfg() { return cfg; } };
+  window.OI_retail = { zones, compute, get server() { return srvOk() ? SZ : null; }, save, needFull, get bins() { return bins; }, get cfg() { return cfg; } };
 })();

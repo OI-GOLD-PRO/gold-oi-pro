@@ -19,7 +19,8 @@
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   const PIV = 3, BACK = 3, HOLD = 72;
   // V4.9.3: ล็อกแผนเมื่อเกิดแล้ว (จุดเข้า/SL/TP/คะแนนไม่เลื่อนตามการคำนวณรอบใหม่) · เก็บในเครื่อง 3 วัน
-  const FKEY = 'oi_trap_frozen';
+  const FKEY = 'oi_trap_frozen_v494'; // เปลี่ยนกติกาแล้วเริ่มล็อกใหม่ (ของเดิมคำนวณด้วยกติกาเก่า)
+  try { localStorage.removeItem('oi_trap_frozen'); } catch (e) {}
   let frozen = {}; try { frozen = JSON.parse(localStorage.getItem(FKEY) || '{}') || {}; } catch (e) {}
   const saveF = () => { try { const lim = Date.now() / 1000 + 7 * 3600 - 3 * 86400; Object.keys(frozen).forEach(k => { if (+k.split('|')[0] < lim) delete frozen[k]; }); localStorage.setItem(FKEY, JSON.stringify(frozen)); } catch (e) {} };
   let B = [], pools = [], setups = [], atr = 2, busy = false, lastRun = 0;

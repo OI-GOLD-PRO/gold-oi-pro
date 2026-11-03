@@ -224,6 +224,9 @@
       const key = Math.round(x / 6); if (seen.has(key)) return; seen.add(key); // แท่งเดียวกันบน TF ใหญ่ แสดงครั้งเดียว
       const y = Y(s.ri !== undefined ? s.entry : s.ext); if (y === null) return;
       const col = s.st === 4 ? '#22e39a' : s.st === 5 ? '#ff4d6a' : '#ffb347';
+      // V4.9.11: ขีดแดง = ราคาที่คนส่วนมากวาง SL (แถบที่ถูกกวาด) คร่อมแท่งที่กวาด → แท่งที่ปิดกลับ
+      { const yp = Y(s.P.p), xa = X(s.si), xb = X(s.ri !== undefined ? s.ri : s.si), st = Math.max(4, ts.options().barSpacing || 6);
+        if (yp !== null && xa !== null && xb !== null && yp > 0 && yp < plotH) { ctx.strokeStyle = '#ff2e4d'; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(Math.min(xa, xb) - st * 1.2, yp); ctx.lineTo(Math.max(xa, xb) + st * 1.2, yp); ctx.stroke(); ctx.fillStyle = col; } }
       // V4.8.6: 💀 ที่จุดเข้า + ✓ (ถึง TP1) / ✗ (โดน SL) · กำลังรอผล = 💀 เฉย ๆ
       ctx.textAlign = 'center'; ctx.font = `11px ${mono}`; ctx.fillText('💀', x, y);
       if (s.st === 4 || s.st === 5) { ctx.font = `bold 11px ${mono}`; ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.fillText(s.st === 4 ? '✓' : '✗', x + 7, y); }

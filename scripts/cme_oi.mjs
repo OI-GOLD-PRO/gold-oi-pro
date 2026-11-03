@@ -76,6 +76,35 @@ const FETCHER = async ({ dates, wantGroup, wantLabel, root }) => {
     return { error: 'not found', log };
 };
 
+// V4.6.1: OI รวม Call/Put ของทุกสัญญารายสัปดาห์ที่หมดอายุในสัปดาห์นี้ (จ.–ศ. เวลาชิคาโก · เสาร์-อาทิตย์ = สัปดาห์หน้า)
+const WEEKDAYS = (() => {
+  const t = new Date(chi); const wd0 = t.getDay(); t.setDate(t.getDate() + (wd0 === 6 ? 2 : wd0 === 0 ? 1 : 1 - wd0));
+  const out = [];
+  for (let i = 0; i < 5; i++) { const x = new Date(t); x.setDate(t.getDate() + i); const y = x.getFullYear(), m = x.getMonth() + 1, d = x.getDate();
+    out.push({ ymd: y * 10000 + m * 100 + d, group: DAYG[i + 1], label: `Week ${Math.ceil(d / 7)} - ${MON[m - 1]} ${y}` }); }
+  return out;
+})();
+const WEEKF = async ({ td, days }) => {
+  const j = async u => { const r = await fetch(u + (u.includes('?') ? '&' : '?') + 'isProtected&_t=' + Date.now()); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); };
+  const n = s => +String(s).replace(/,/g, '') || 0;
+  const MC = { JAN: 'F', FEB: 'G', MAR: 'H', APR: 'J', MAY: 'K', JUN: 'M', JUL: 'N', AUG: 'Q', SEP: 'U', OCT: 'V', NOV: 'X', DEC: 'Z' };
+  const groups = await j(`/CmeWS/mvc/Volume/Options/Expirations?productid=437&tradedate=${td}`);
+  const out = [];
+  for (const dy of days) {
+    const g = (groups || []).find(x => x.label === dy.group);
+    let e = g ? [].concat(g.expirations || [], g.weekly || [], g.daily || [], g.sto || []).find(x => x && x.label === dy.label) : null;
+    if (!e && g && Array.isArray(g.productIds)) { const mw = /Week (\d) - ([A-Z]{3}) (\d{4})/.exec(dy.label); if (mw && g.productIds[+mw[1] - 1]) e = { productId: +g.productIds[+mw[1] - 1], expirationCode: MC[mw[2]] + mw[3].slice(2) }; }
+    if (!e) { out.push({ ...dy, err: 'ไม่พบสัญญา' }); continue; }
+    try {
+      const det = await j(`/CmeWS/mvc/Volume/Options/Details?productid=${e.productId}&tradedate=${td}&expirationcode=${e.expirationCode}&reporttype=P`);
+      const tot = { C: 0, P: 0 };
+      (det.monthData || []).forEach(md => { tot[/Call/i.test(md.monthID) ? 'C' : 'P'] = n(md.totalData && md.totalData.atClose); });
+      out.push({ ...dy, C: tot.C, P: tot.P });
+    } catch (er) { out.push({ ...dy, err: er.message }); }
+  }
+  return out;
+};
+
 // CME มีระบบกันบอต (Akamai) → ลองหลายแบบจนกว่าจะผ่าน (headful ต้องรันใต้ xvfb)
 const STRATS = [
   { name: 'chrome-headful', channel: 'chrome', headless: false, args: [] },
@@ -96,6 +125,7 @@ for (const st of STRATS) {
     globalThis.__pageStatus = resp && resp.status(); globalThis.__title = await page.title().catch(() => '');
     await page.waitForTimeout(6000);
     result = await page.evaluate(FETCHER, { dates, wantGroup, wantLabel, root });
+    if (result && !result.error) { try { result.week = await page.evaluate(WEEKF, { td: result.tradeDate, days: WEEKDAYS }); } catch (e) { result.week = null; } }
     tries.push(st.name + ': ' + (result && !result.error ? 'ok' : 'page ' + globalThis.__pageStatus + ' ' + JSON.stringify(result).slice(0, 200)));
   } catch (e) { tries.push(st.name + ': ' + e.message.split('\n')[0]); result = null; }
   try { if (browser) await browser.close(); } catch (e) {}
@@ -105,9 +135,11 @@ err = tries.join(' | ');
 console.log(err);
 
 if (!result || result.error) { console.log('FAILED', err || JSON.stringify(result)); status({ ok: false, root, exp, want: wantGroup + ' / ' + wantLabel, page: globalThis.__pageStatus, title: globalThis.__title, err, result }); process.exit(0); }
-const out = { root, exp, tradeDate: result.tradeDate, productId: result.productId, expirationCode: result.expirationCode, group: wantGroup, label: wantLabel, fetchedAt: Math.floor(Date.now() / 1000), totals: result.totals, settle: result.settle || null, rows: result.rows.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1])) };
+const prevWeek = () => { try { return JSON.parse(fs.readFileSync(OUT, 'utf8')).week || null; } catch (e) { return null; } };
+const out = { root, exp, tradeDate: result.tradeDate, productId: result.productId, expirationCode: result.expirationCode, group: wantGroup, label: wantLabel, fetchedAt: Math.floor(Date.now() / 1000), totals: result.totals, settle: result.settle || null, week: result.week || (prevWeek()), rows: result.rows.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1])) };
 let prev = null; try { prev = JSON.parse(fs.readFileSync(OUT, 'utf8')); } catch (e) {}
-const same = prev && prev.root === out.root && prev.exp === out.exp && prev.tradeDate === out.tradeDate && JSON.stringify(prev.rows) === JSON.stringify(out.rows) && JSON.stringify(prev.settle) === JSON.stringify(out.settle);
+const same = prev && prev.root === out.root && prev.exp === out.exp && prev.tradeDate === out.tradeDate && JSON.stringify(prev.rows) === JSON.stringify(out.rows) && JSON.stringify(prev.settle) === JSON.stringify(out.settle) && JSON.stringify(prev.week) === JSON.stringify(out.week);
+console.log('WEEK', JSON.stringify(out.week));
 console.log('OK', out.root, out.exp, 'trade', out.tradeDate, 'C', out.totals.C, 'P', out.totals.P, 'strikes', out.rows.length, same ? '(unchanged)' : '(new)');
 if (!same) fs.writeFileSync(OUT, JSON.stringify(out));
 status({ ok: true, root, exp, tradeDate: out.tradeDate, strikes: out.rows.length, settle: out.settle ? out.settle.rows.length : 0, log: result.log, page: globalThis.__pageStatus });

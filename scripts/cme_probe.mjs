@@ -5,8 +5,7 @@ const ctx = await b.newContext({ locale: 'en-US', viewport: { width: 1366, heigh
 await ctx.addInitScript(() => { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); });
 const p = await ctx.newPage();
 const r = await p.goto('https://www.myfxbook.com/community/outlook', { waitUntil: 'domcontentloaded', timeout: 45000 }); await p.waitForTimeout(8000);
-const h = await p.evaluate(() => { const tr = [...document.querySelectorAll('tr')].find(x => /^\s*XAUUSD\b/.test(x.innerText)); return tr ? tr.outerHTML : 'no row'; });
-console.log('ROW', h.slice(0, 4000));
-const pop = await p.evaluate(() => { const el = document.querySelector('[id*="XAUUSD"], [data-name="XAUUSD"]'); return el ? el.outerHTML.slice(0, 3000) : 'none'; });
-console.log('POP', pop);
+console.log('STATUS', r && r.status(), await p.title());
+const h = await p.evaluate(() => { const els = [...document.querySelectorAll('*')].filter(e => e.children.length === 0 && e.textContent.trim() === 'XAUUSD'); return els.slice(0, 2).map(e => { let a = e; for (let k = 0; k < 4 && a.parentElement; k++) a = a.parentElement; return a.outerHTML.slice(0, 3500); }); });
+console.log('ROW', JSON.stringify(h));
 await b.close(); process.exit(0);

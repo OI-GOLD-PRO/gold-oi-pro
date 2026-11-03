@@ -1,7 +1,7 @@
 // 🪤 กับดักคนส่วนน้อย (Liquidity Sweep) — M5
 // แนวคิด: รายย่อยวาง SL ที่จุดชัด ๆ → รายใหญ่ดันราคาไปกวาด SL (ได้สภาพคล่องเปิดฝั่งตรงข้าม) → ราคาเด้งกลับ
 //  ขั้น 1 จุดที่ SL กอง (แถบ 🪤): swing high/low ที่ยังไม่ถูกกวาด (ยอดเท่ากัน = หนักขึ้น) · High/Low รอบเทรดก่อน
-//         · เลขกลมฟิวเจอร์ส · เลขกลม "ราคาสปอต" (รายย่อย CFD เห็นราคาสปอต ซึ่งต่างจากฟิวเจอร์ส → แปลงมาเป็นสเกลกราฟ) · เลยกำแพง OI อันดับ 1–5
+//         · เลขกลมฟิวเจอร์ส · เลขกลม "ราคาสปอต" (รายย่อย CFD เห็นราคาสปอตจาก gold-api ซึ่งต่างจากราคากราฟ → บวก basis แปลงเป็นสเกลกราฟ) · เลยกำแพง OI อันดับ 1–5
 //         · น้ำหนัก COT: รายย่อยถือ Long มาก → SL ฝั่งล่างหนักกว่า
 //  ขั้น 2 การกวาด: ไส้แท่ง M5 แทงเลยแถบ ≥ 0.3 ATR (≥ $1) แล้วปิดกลับเข้าภายใน 3 แท่ง
 //         หลักฐานรายใหญ่รับ: ไม้ใหญ่สุทธิสวนทาง · Absorption (Volume สูง ตัวแท่งเล็ก) · ตรงกับ strike gamma บวก (ดีลเลอร์รับ)
@@ -19,6 +19,13 @@
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   const PIV = 3, BACK = 3, HOLD = 72;
   let B = [], pools = [], setups = [], atr = 2, busy = false, lastRun = 0;
+  // ราคาสปอต XAUUSD (ที่รายย่อย CFD เห็น) ≠ ราคาบนกราฟ (สเกลฟิวเจอร์ส) → basis = กราฟ − สปอต (ดึงทุก 1 นาที)
+  let basis = null, basisAt = 0;
+  async function loadSpot() {
+    try { const r = await (await fetch('https://api.gold-api.com/price/XAU', { cache: 'no-store' })).json(), sp = Number(r.price), px = O.lastClose;
+      if (sp > 0 && px > 0 && Math.abs(px - sp) < 80) { basis = px - sp; basisAt = Date.now(); } } catch (e) {}
+  }
+  setTimeout(loadSpot, 3000); setInterval(loadSpot, 60000);
 
   // ---------- ขั้น 1: แถบ SL ----------
   function buildPools(B) {
@@ -40,9 +47,9 @@
       if (!cur.some(x => x.high > ph)) add(ph, 1, 3, 'High เมื่อวาน', B[s0].time); if (!cur.some(x => x.low < pl)) add(pl, -1, 3, 'Low เมื่อวาน', B[s0].time); }
     const px = B[n - 1].close, rng = atr * 8;
     // เลขกลมฟิวเจอร์ส + เลขกลมราคาสปอต (สปอต = ราคากราฟ + adj)
-    const adj = Number(O.adj) || 0;
     for (let r = Math.ceil((px - rng) / 25) * 25; r <= px + rng; r += 25) { const w = r % 100 === 0 ? 2.5 : r % 50 === 0 ? 1.5 : 0.8; add(r + (r > px ? 0.3 : -0.3), r > px ? 1 : -1, w, `เลขกลม ${r}`, null); }
-    if (Math.abs(adj) >= 1) for (let r = Math.ceil((px + adj - rng) / 25) * 25; r <= px + adj + rng; r += 25) { const p = r - adj, w = r % 100 === 0 ? 3 : r % 50 === 0 ? 2 : 1; add(p + (p > px ? 0.3 : -0.3), p > px ? 1 : -1, w, `เลขกลมสปอต ${r}`, null); }
+    // เลขกลมของราคาสปอต แปลงเป็นราคาบนกราฟ (สปอต + basis) · รายย่อย CFD ใช้เลขนี้วาง SL มากที่สุด จึงน้ำหนักสูงกว่า
+    if (basis !== null && Date.now() - basisAt < 15 * 60e3) for (let r = Math.ceil((px - basis - rng) / 25) * 25; r <= px - basis + rng; r += 25) { const p = r + basis, w = r % 100 === 0 ? 3 : r % 50 === 0 ? 2 : 1; add(p + (p > px ? 0.3 : -0.3), p > px ? 1 : -1, w, `เลขกลมสปอต ${r}`, null); }
     // เลยกำแพง OI อันดับ 1–5 ไปนิด (รายย่อยมองกำแพงเป็นแนวรับ/ต้าน)
     const oi = O.oi;
     if (oi && oi.rows) oi.rows.forEach(r => { if (r.price == null) return; const rc = r.c > 0 && oi.rankC ? oi.rankC.get(r.strike) || 0 : 0, rp = r.p > 0 && oi.rankP ? oi.rankP.get(r.strike) || 0 : 0, rk = Math.min(rc || 99, rp || 99); if (rk > 5 || Math.abs(r.price - px) > rng) return; const up = r.price > px; add(r.price + (up ? 1.5 : -1.5), up ? 1 : -1, 1.5, `เลยกำแพง ${rc && rc === rk ? 'C' : 'P'}${r.strike}`, null); });
@@ -207,7 +214,7 @@
   function stats() { const d = setups.filter(s => s.st === 4 || s.st === 5), w = d.filter(s => s.st === 4).length; return d.length ? `ย้อนหลัง 2 วัน: เข้า ${d.length} · TP1 ${w} · SL ${d.length - w} (${Math.round(w / d.length * 100)}%)` : 'ยังไม่มีสัญญาณครบในช่วงนี้'; }
   function section() {
     const d = document.createElement('div'); d.id = 'trBox'; d.className = 'gsbox';
-    d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-tr="on"><i style="background:#ffb347"></i>🪤 กับดักคนส่วนน้อย (กวาด SL แล้วเด้ง · M5)</button><span class="gsinfo">${cfg.on ? stats() : ''}</span></div>` +
+    d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-tr="on"><i style="background:#ffb347"></i>🪤 กับดักคนส่วนน้อย (กวาด SL แล้วเด้ง · M5)</button><span class="gsinfo">${cfg.on ? stats() + (basis !== null ? ` · สปอตต่างจากกราฟ ${basis >= 0 ? '−' : '+'}${Math.abs(basis).toFixed(1)}` : '') : ''}</span></div>` +
       (cfg.on ? `<div class="row ps"><button class="gsb${cfg.pools ? ' on' : ''}" data-tr="pools">แสดงแถบ SL กอง</button></div>` : '');
     return d;
   }
@@ -218,5 +225,5 @@
     menu.addEventListener('click', e => { const a = e.target.closest('[data-tr]'); if (!a) return; if (a.dataset.tr === 'on') cfg.on = !cfg.on; else cfg.pools = !cfg.pools; save(); O.markDirty(); const b = $('trBox'); if (b) b.remove(); mount(); run(true); });
   }
   if (window.OIAlerts) OIAlerts.reg('trap', '🪤 กับดักคนส่วนน้อย (กวาด SL แล้วเด้ง)', { desc: 'เตือนตอนราคากวาด SL ที่แถบ และตอนแท่ง M5 ปิดกลับ = จุดเข้า (บอกคะแนน/หลักฐาน/คำเตือนห้ามสวน)', active: () => cfg.on });
-  window.OI_trap = { get pools() { return pools; }, get setups() { return setups; }, get atr() { return atr; }, run, stats, filters };
+  window.OI_trap = { get basis() { return basis; }, get pools() { return pools; }, get setups() { return setups; }, get atr() { return atr; }, run, stats, filters };
 })();

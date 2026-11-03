@@ -1,0 +1,15 @@
+# Backtest 2 💀 กับดัก: ตัวกรองจุดสวิง (กันสัญญาณกลางทาง) — กด Run workflow เอง ผลอยู่ใน log
+name: trap-bt2
+on:
+  workflow_dispatch:
+  push:
+    paths: ['scripts/trap_bt2.mjs']
+jobs:
+  bt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/trap_bt2.mjs

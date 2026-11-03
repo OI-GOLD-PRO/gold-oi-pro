@@ -212,11 +212,47 @@
   // ---------- ป้าย ----------
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     if (!cfg.on || !fresh()) return null;
-    const cur = setups.filter(s => s.st === 1 || s.st === 3).sort((a, b) => b.si - a.si)[0]; if (!cur) return null;
+    const cur = setups.filter(s => s.st === 1 || s.st === 3).sort((a, b) => b.si - a.si)[0];
+    if (!cur) { const l = setups.filter(s => (s.st === 4 || s.st === 5) && s.end !== undefined && B.length - 1 - s.end <= 6).sort((a, b) => b.end - a.end)[0]; // จบไม่เกิน 30 นาที → ป้ายยังอยู่ให้แตะดูผล
+      return l ? [`💀 ${l.side > 0 ? 'BUY' : 'SELL'} ${l.entry.toFixed(1)} ${l.st === 4 ? '✓ TP' : '✗ SL'}`, l.st === 4 ? '#22e39a' : '#ff4d6a', 'trap'] : null; }
     if (cur.st === 1) return [`💀 กวาด SL ${cur.side > 0 ? 'ใต้' : 'เหนือ'} ${cur.P.p.toFixed(0)} รอยืนยัน`, '#ffb347', 'trap'];
     const f = filters(cur);
     return [`💀 ${cur.side > 0 ? 'BUY' : 'SELL'} ${cur.entry.toFixed(1)} · ${cur.score}${f.block ? ' ⛔' : ''}`, f.block ? '#8a93ad' : cur.side > 0 ? '#22e39a' : '#ff8a3d', 'trap'];
   });
+
+  // ---------- แตะป้าย 💀 = การวิเคราะห์ล่าสุด (V4.9.1) ----------
+  function explain() {
+    const px = O.lastClose || (B.length ? B[B.length - 1].close : 0);
+    const cur = setups.filter(s => s.st === 1 || s.st === 3).sort((a, b) => b.si - a.si)[0];
+    const last = cur || setups.filter(s => s.ri !== undefined).sort((a, b) => b.si - a.si)[0];
+    const tt = i => B[i] ? new Date(B[i].time * 1000).toISOString().slice(11, 16) : '–';
+    const f2 = v => v === null || v === undefined || !isFinite(v) ? '–' : v.toFixed(2);
+    let h = `<b style="color:#ffb347">💀 กับดักคนส่วนน้อย · M5</b> · ราคา ${f2(px)}<br>`;
+    if (last) {
+      const d = last.side > 0 ? 'BUY' : 'SELL', where = last.side > 0 ? 'ใต้' : 'เหนือ';
+      const stTxt = { 1: '⏳ กำลังกวาด รอแท่งปิดกลับเข้าแถบ', 3: '🟡 เข้าแล้ว รอผล', 4: '✅ ถึง TP1', 5: '❌ โดน SL', 6: '⌛ หมดเวลา' }[last.st] || '';
+      h += `<b>${cur ? 'สัญญาณตอนนี้' : 'สัญญาณล่าสุด'} (${tt(last.si)} น.): ${stTxt}</b><br>`;
+      h += `● กวาด SL ${where} <b>${last.P.p.toFixed(1)}</b> — ${last.P.why.join(' + ')} (น้ำหนัก ${last.P.w.toFixed(1)})<br>● ไส้แทงไปถึง ${f2(last.ext)}<br>`;
+      if (last.ri !== undefined) {
+        h += `● แผน <b>${d} ${f2(last.entry)}</b> · SL ${f2(last.sl)} (เสี่ยง $${f2(last.R)}) · TP1 ${f2(last.tp1)} (${last.tpLab}) · TP2 ${f2(last.tp2)}<br>`;
+        h += `● คะแนน <b>${last.score}/100</b> = พื้นฐาน + น้ำหนักแถบ${last.ev && last.ev.length ? ' + หลักฐาน: ' + last.ev.join(' · ') : ' (ไม่มีหลักฐานรายใหญ่เพิ่ม)'}<br>`;
+        const f = filters(last); if (f.w.length) h += `<b style="color:#ff4d6a">⛔ ห้ามสวนตอนนี้: ${f.w.join(' · ')}</b><br>`;
+      }
+    } else h += 'ยังไม่มีสัญญาณกวาด SL ในช่วงนี้<br>';
+    const up = pools.filter(p => !p.swept && p.side > 0 && p.p > px).sort((a, b) => a.p - b.p).slice(0, 2), dn = pools.filter(p => !p.swept && p.side < 0 && p.p < px).sort((a, b) => b.p - a.p).slice(0, 2);
+    h += `<br><b>แถบ SL ที่ยังไม่ถูกกวาด</b><br>` + up.reverse().map(p => `▲ ${p.p.toFixed(1)} SL Short — ${p.why.join(' + ')}`).concat(dn.map(p => `▼ ${p.p.toFixed(1)} SL Long — ${p.why.join(' + ')}`)).join('<br>');
+    h += `<br><span style="opacity:.65">${stats()}${basis !== null ? ` · สปอตต่ำกว่ากราฟ ${basis.toFixed(1)}` : ''}</span>`;
+    O.showToast && O.showToast(h, 25000);
+  }
+  let down = null;
+  const onBadge = e => { const el = e.target && (e.target.nodeType === 1 ? e.target : e.target.parentElement); return el && el.closest ? el.closest('#badges [data-k="trap"]') : null; };
+  document.addEventListener('pointerdown', e => { down = onBadge(e) ? { x: e.clientX, y: e.clientY } : null; }, true);
+  document.addEventListener('pointerup', e => {
+    if (!down) return;
+    const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10; down = null;
+    const r = document.querySelector('#badges [data-k="trap"]')?.getBoundingClientRect();
+    if (!moved && r && e.clientX >= r.left - 4 && e.clientX <= r.right + 4 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6) setTimeout(explain, 120);
+  }, true);
 
   // ---------- เมนู ƒx ----------
   function stats() { const d = setups.filter(s => s.st === 4 || s.st === 5), w = d.filter(s => s.st === 4).length; return d.length ? `ย้อนหลัง 2 วัน: เข้า ${d.length} · TP1 ${w} · SL ${d.length - w} (${Math.round(w / d.length * 100)}%)` : 'ยังไม่มีสัญญาณครบในช่วงนี้'; }
@@ -233,5 +269,5 @@
     menu.addEventListener('click', e => { const a = e.target.closest('[data-tr]'); if (!a) return; if (a.dataset.tr === 'on') cfg.on = !cfg.on; else cfg.pools = !cfg.pools; save(); O.markDirty(); const b = $('trBox'); if (b) b.remove(); mount(); run(true); });
   }
   if (window.OIAlerts) OIAlerts.reg('trap', '💀 กับดักคนส่วนน้อย (กวาด SL แล้วเด้ง)', { desc: 'เตือนตอนราคากวาด SL ที่แถบ และตอนแท่ง M5 ปิดกลับ = จุดเข้า (บอกคะแนน/หลักฐาน/คำเตือนห้ามสวน)', active: () => cfg.on });
-  window.OI_trap = { get bars() { return B; }, get basis() { return basis; }, get pools() { return pools; }, get setups() { return setups; }, get atr() { return atr; }, run, stats, filters };
+  window.OI_trap = { explain, get bars() { return B; }, get basis() { return basis; }, get pools() { return pools; }, get setups() { return setups; }, get atr() { return atr; }, run, stats, filters };
 })();

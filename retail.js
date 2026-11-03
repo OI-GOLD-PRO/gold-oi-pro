@@ -116,9 +116,9 @@
     const Zs = zones(); if (!Zs.length) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height(), px = O.lastClose;
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
-    const mx = Math.max(...Zs.map(z => z.n));
+    const mx = Math.max(...Zs.map(z => z.n)); hit = [];
     ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'middle';
-    Zs.forEach(z => {
+    Zs.filter(z => z.side !== 0).forEach(z => { // V4.9.16: ซ่อนโซนสองฝั่ง (ไม่บอกทิศ) · เหลือแถบสีไม่มีตัวหนังสือ แตะแถบดูรายละเอียด
       let y1 = sr.priceToCoordinate(z.hi), y2 = sr.priceToCoordinate(z.lo); if (y1 === null || y2 === null || y2 < 0 || y1 > plotH) return;
       if (y2 - y1 < 3) { const m = (y1 + y2) / 2; y1 = m - 1.5; y2 = m + 1.5; }
       const len = Math.max(24, plotW * 0.3 * z.n / mx), x0 = plotW - len, col = z.side > 0 ? '#22e39a' : z.side < 0 ? '#ff4d6a' : '#e0b44c';
@@ -126,11 +126,20 @@
       ctx.globalAlpha = 0.9; ctx.fillRect(x0, y1, 2, y2 - y1);
       const under = z.side > 0 ? px < z.lo : z.side < 0 ? px > z.hi : false, prof = z.side > 0 ? px > z.hi : z.side < 0 ? px < z.lo : false;
       const lab = z.side > 0 ? `Buy ${Math.round(z.pct * 100)}%` : z.side < 0 ? `Sell ${Math.round((1 - z.pct) * 100)}%` : 'สองฝั่ง';
-      ctx.textAlign = 'right'; ctx.fillStyle = col;
-      ctx.fillText(`👥 ${lab} · ${fmt(z.n)} ไม้${under ? ' · ติดลบ' : prof ? ' · กำไร' : ''}`, x0 - 3, (y1 + y2) / 2);
+      hit.push({ x0, x1: plotW, y1: y1 - 4, y2: y2 + 4, txt: `👥 <b style="color:${col}">${lab}</b> · ${fmt(z.n)} ไม้ · ${z.lo.toFixed(1)}–${z.hi.toFixed(1)} (เฉลี่ย ${z.avg.toFixed(1)})${under ? ' · คนกลุ่มนี้ติดลบ' : prof ? ' · คนกลุ่มนี้กำไร' : ''}` });
     });
     ctx.restore();
   });
+
+  // แตะแถบ 👥 = รายละเอียดโซน
+  let hit = [], dn = null;
+  O.chartEl.addEventListener('pointerdown', e => { dn = { x: e.clientX, y: e.clientY }; }, true);
+  O.chartEl.addEventListener('pointerup', e => {
+    if (!dn || Math.hypot(e.clientX - dn.x, e.clientY - dn.y) > 8) { dn = null; return; } dn = null;
+    const r = O.chartEl.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    const z = hit.find(b => x >= b.x0 && x <= b.x1 && y >= b.y1 && y <= b.y2);
+    if (z && O.showToast) setTimeout(() => O.showToast(z.txt, 6000), 120);
+  }, true);
 
   // ---------- เมนู ƒx ----------
   function info() {

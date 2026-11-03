@@ -236,7 +236,10 @@
     // V4.8.4: วาดเฉพาะสัญญาณที่ "ครบ" (กวาดแล้วปิดกลับ = มีจุดเข้า) หรือที่กำลังเกิดตอนนี้ · การกวาดที่ไม่กลับเข้า (เบรกจริง) ไม่วาด
     // ใช้จุดเล็ก + ✓/✗ แทนไอคอน 💀 ทุกจุด (เดิมรกมาก โดยเฉพาะ TF ใหญ่ที่หลายสัญญาณ M5 ซ้อนในแท่งเดียว)
     const seen = new Set();
-    setups.filter(s => s.ri !== undefined || s.st === 1).slice(-12).forEach(s => {
+    // V4.9.16: ลดความรก — วาดเฉพาะสัญญาณที่ยังทำงาน (รอปิดกลับ/เข้าแล้วรอผล) ถ้าไม่มี แสดงอันล่าสุดที่จบไม่เกิน 30 นาที · ประวัติดูได้จากการแตะป้าย 💀
+    let show = setups.filter(s => s.st === 1 || (s.st === 3 && s.ri !== undefined));
+    if (!show.length) show = setups.filter(s => (s.st === 4 || s.st === 5) && s.end !== undefined && B.length - 1 - s.end <= 6).sort((a, b) => b.end - a.end).slice(0, 1);
+    show.slice(-3).forEach(s => {
       const x = X(s.ri !== undefined ? s.ri : s.si); if (x === null || x < 0 || x > plotW) return;
       const key = Math.round(x / 6); if (seen.has(key)) return; seen.add(key); // แท่งเดียวกันบน TF ใหญ่ แสดงครั้งเดียว
       const y = Y(s.ri !== undefined ? s.entry : s.ext); if (y === null) return;

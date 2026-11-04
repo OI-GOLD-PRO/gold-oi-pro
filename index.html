@@ -497,7 +497,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.34';
+  const APP_VER = '4.9.35';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -1647,6 +1647,12 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     if (Date.now() - viewUserAt > 3000) return; // เปลี่ยนจากโปรแกรม ไม่ใช่ผู้ใช้ (รวมช่วงกราฟไหลต่อหลังปล่อยนิ้ว)
     clearTimeout(viewSaveT); viewSaveT = setTimeout(() => { try { const ts = chart.timeScale(), V = { bs: Math.round(ts.options().barSpacing * 100) / 100, sp: Math.round(ts.scrollPosition() * 10) / 10 }; localStorage.setItem(VKEY, JSON.stringify(V)); } catch (e) {} }, 400);
   });
+  // V4.9.35: ราคาวิ่งหลุดขอบบน/ล่างของจอ (เพราะเคยลาก/ซูมแกนราคาเอง ทำให้แกนไม่ปรับอัตโนมัติ) → เปิดปรับแกนราคาอัตโนมัติให้ราคากลับมาในจอ
+  setInterval(() => {
+    if (lastClose === null || lastClose === undefined || Date.now() - viewUserAt < 1500 || document.visibilityState !== 'visible') return;
+    try { const y = series.priceToCoordinate(lastClose), H = chartEl.clientHeight - chart.timeScale().height(); if (y === null || !H) return;
+      if (y < 4 || y > H - 4) chart.priceScale('right').applyOptions({ autoScale: true }); } catch (e) {}
+  }, 1000);
   setInterval(() => { // แท่งใหม่ → คงระยะเดิม
     if (lastBarTime === null || lastBarTime === viewLast) return; const prev = viewLast; viewLast = lastBarTime;
     if (prev === null || Date.now() - viewUserAt < 1500) return; const V = viewGet(); if (!V) return;

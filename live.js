@@ -289,7 +289,7 @@
         const sig = (b, sl, lab) => { const v = b + sl, n = b - sl; if (v >= 10 && Math.abs(n) >= Math.max(5, v * 0.2)) { parts.push([lab, lab === 'C' ? C('--call') : C('--put'), 0]); parts.push([n > 0 ? '▲' : '▼', n > 0 ? C('--call') : C('--put'), 4]); } }; // C เขียว P แดง · ▲ เขียว ▼ แดง
         sig(s.bc, s.sc, 'C'); sig(s.bp, s.sp, 'P');
         const v = s.vc + s.vp, o = s.c + s.p;
-        if (hot(s, vMax)) parts.push(['🔥', '#fff', 4]);
+        // V4.9.28: ผู้ใช้ไม่เอาไอคอน 🔥 บนกราฟ (ยังดู 'เงินใหม่' ได้ในหน้าแดช)
         if (!parts.length) return;
         const L = r && oi.maxOI ? barMax * Math.max(r.c, r.p) / oi.maxOI : 0;
         const wAll = parts.reduce((a, [t, , g]) => a + ctx.measureText(t).width + g, 0);

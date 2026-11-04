@@ -179,7 +179,7 @@
         const mxn = V.length ? Math.max(...V.map(r => Math.abs(r.b - r.s))) : 0;
         if (mxn > 0) V.forEach(r => {
           const net = r.b - r.s; if (Math.abs(net) < mxn * 0.04) return; // สุทธิเล็กมาก (ซื้อขายหักกันหมด) ไม่แสดง
-          const side = net > 0 ? 1 : -1, col = side > 0 ? '#38bdf8' : '#ff9f43', y = Math.round(r.y1) + 0.5, hh = Math.max(1, r.y2 - r.y1 - 1), len = Math.max(2, W * Math.abs(net) / mxn), x0 = plotW - len;
+          const side = net > 0 ? 1 : -1, col = side > 0 ? '#38bdf8' : '#e87516', y = Math.round(r.y1) + 0.5, hh = Math.max(1, r.y2 - r.y1 - 1), len = Math.max(2, W * Math.abs(net) / mxn), x0 = plotW - len;
           const strong = mode === 'delta' ? Math.abs(net) / Math.sqrt(Math.max(1, r.b + r.s)) >= 2 : Math.abs(net) >= mxn * 0.5;
           if (outline) { ctx.globalAlpha = 1; ctx.strokeStyle = side > 0 ? '#9be3ff' : '#ffd1a1'; ctx.lineWidth = strong ? 2 : 1.2; ctx.setLineDash(strong ? [] : [3, 2]); ctx.strokeRect(x0 + 0.5, y + 0.5, len - 1, Math.max(1, hh - 1)); ctx.setLineDash([]); }
           else { ctx.globalAlpha = strong ? 0.85 : 0.55; ctx.fillStyle = col; ctx.fillRect(x0, y, len, hh);
@@ -196,10 +196,10 @@
         const pct = r.b / t, z = (r.b - r.s) / Math.sqrt(Math.max(1, t)), pr = Math.round(pct * 100) / 100, side = pr >= 0.49 && pr <= 0.51 ? 0 : z >= 1.5 ? 1 : z <= -1.5 ? -1 : 0;
         if (!side) return; // V4.9.20: ไม่แสดงแถวที่ซื้อ≈ขาย
         const y = Math.round(r.y1) + 0.5, hh = Math.max(1, r.y2 - r.y1 - 1), len = Math.max(2, W * t / mx), x0 = plotW - len;
-        ctx.globalAlpha = 0.8; ctx.fillStyle = side > 0 ? '#38bdf8' : '#ff9f43'; ctx.fillRect(x0, y, len, hh); // V4.9.21: ทั้งแถวเป็นสีฝั่งที่มากกว่า
-        ctx.globalAlpha = 1; ctx.strokeStyle = side > 0 ? '#38bdf8' : '#ff9f43'; ctx.lineWidth = 1; ctx.strokeRect(x0 - 0.5, y - 0.5, len + 1, hh + 1);
+        ctx.globalAlpha = 0.8; ctx.fillStyle = side > 0 ? '#38bdf8' : '#e87516'; ctx.fillRect(x0, y, len, hh); // V4.9.21: ทั้งแถวเป็นสีฝั่งที่มากกว่า
+        ctx.globalAlpha = 1; ctx.strokeStyle = side > 0 ? '#38bdf8' : '#e87516'; ctx.lineWidth = 1; ctx.strokeRect(x0 - 0.5, y - 0.5, len + 1, hh + 1);
         const st = side > 0 ? (px < r.p - r.hw ? ' · คนกลุ่มนี้ติดลบ' : px > r.p + r.hw ? ' · คนกลุ่มนี้กำไร' : '') : (px > r.p + r.hw ? ' · คนกลุ่มนี้ติดลบ' : px < r.p - r.hw ? ' · คนกลุ่มนี้กำไร' : '');
-        const lab = side > 0 ? `<b style="color:#38bdf8">Buy ${Math.round(pct * 100)}%</b>` : `<b style="color:#ff9f43">Sell ${Math.round((1 - pct) * 100)}%</b>`;
+        const lab = side > 0 ? `<b style="color:#38bdf8">Buy ${Math.round(pct * 100)}%</b>` : `<b style="color:#e87516">Sell ${Math.round((1 - pct) * 100)}%</b>`;
         hit.push({ x0: Math.min(x0, plotW - 40), x1: plotW, y1: r.y1 - 1, y2: r.y2 + 1, txt: `👥 ${r.p.toFixed(r.hw < 0.5 ? 2 : r.hw < 1 ? 1 : 0)} ± ${r.hw} · ${lab} · ไล่ซื้อ ${fmt(r.b)} / ไล่ขาย ${fmt(r.s)} ไม้${st}` });
       }); }
     });
@@ -207,7 +207,7 @@
     Zs.forEach(z => { // (สำรอง: ยังไม่มีแถวละเอียด) แถบโซนแบบเดิม
       let y1 = sr.priceToCoordinate(z.hi), y2 = sr.priceToCoordinate(z.lo); if (y1 === null || y2 === null || y2 < 0 || y1 > plotH) return;
       if (y2 - y1 < 3) { const m = (y1 + y2) / 2; y1 = m - 1.5; y2 = m + 1.5; }
-      const len = Math.max(24, plotW * 0.3 * z.n / mx), x0 = plotW - len, col = z.side > 0 ? '#38bdf8' : z.side < 0 ? '#ff9f43' : '#9aa3b8';
+      const len = Math.max(24, plotW * 0.3 * z.n / mx), x0 = plotW - len, col = z.side > 0 ? '#38bdf8' : z.side < 0 ? '#e87516' : '#9aa3b8';
       ctx.globalAlpha = z.side ? 0.24 : 0.1; ctx.fillStyle = col; ctx.fillRect(x0, y1, len, y2 - y1);
       ctx.globalAlpha = z.side ? 0.9 : 0.35; ctx.fillRect(x0, y1, 2, y2 - y1);
       const lab = z.side > 0 ? `Buy ${Math.round(z.pct * 100)}%` : z.side < 0 ? `Sell ${Math.round((1 - z.pct) * 100)}%` : 'สองฝั่ง';
@@ -217,7 +217,7 @@
     const Fz = freshZones(), fm = Fz.length ? Math.max(...Fz.map(z => z.n)) : 1;
     Fz.forEach(z => {
       const y = sr.priceToCoordinate(z.avg); if (y === null || y < 0 || y > plotH) return;
-      const len = Math.max(30, plotW * 0.4 * z.n / fm), x0 = plotW - len, col = z.side > 0 ? '#38bdf8' : z.side < 0 ? '#ff9f43' : '#9aa3b8';
+      const len = Math.max(30, plotW * 0.4 * z.n / fm), x0 = plotW - len, col = z.side > 0 ? '#38bdf8' : z.side < 0 ? '#e87516' : '#9aa3b8';
       ctx.globalAlpha = z.side ? 0.95 : 0.5; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
       ctx.beginPath(); ctx.moveTo(x0, Math.round(y) + 0.5); ctx.lineTo(plotW, Math.round(y) + 0.5); ctx.stroke(); ctx.setLineDash([]);
       const lab = z.side > 0 ? `Buy ${Math.round(z.pct * 100)}%` : z.side < 0 ? `Sell ${Math.round((1 - z.pct) * 100)}%` : 'สองฝั่ง';
@@ -243,7 +243,7 @@
     if (!Z) Z = compute(); if (!Z) return 'กำลังเก็บไม้รายย่อย…';
     return `ไม้ ≤ ${Z.maxSz < 1 ? Z.maxSz.toFixed(3) : Z.maxSz} oz · ${fmt(Z.n)} ไม้ · ย้อน ${Z.hrs.toFixed(0)} ชม.`;
   }
-  function section() { const d = document.createElement('div'); d.id = 'rtBox'; d.className = 'gsbox'; d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-rt="on"><i style="background:linear-gradient(90deg,#38bdf8 50%,#ff9f43 50%)"></i>👥 โซนรายย่อยเข้าออเดอร์</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>` +
+  function section() { const d = document.createElement('div'); d.id = 'rtBox'; d.className = 'gsbox'; d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-rt="on"><i style="background:linear-gradient(90deg,#38bdf8 50%,#e87516 50%)"></i>👥 โซนรายย่อยเข้าออเดอร์</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>` +
     (cfg.on ? `<div class="row ps"><span class="gsinfo">ความละเอียดแถว</span>${RES.map(r => `<button class="gsb${+cfg.res === r ? ' on' : ''}" data-rtres="${r}">$${r}</button>`).join('')}</div>` +
       `<div class="row ps"><span class="gsinfo">แสดง</span>${MODES.map(m => `<button class="gsb${modesSel().includes(m) ? ' on' : ''}" data-rtmode="${m}">${MODE_LAB[m]}</button>`).join('')}</div>` +
       (modesSel().length > 1 ? `<div class="row ps"><span class="gsinfo">เลือกคู่: Δ = แถบทึบ · ถือค้าง = กรอบเส้นทับ</span></div>` : '') +

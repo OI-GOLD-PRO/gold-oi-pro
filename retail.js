@@ -115,8 +115,8 @@
     try { const j = await (await fetch(O.worker + '/retail?win=' + winH() + (O.unlimited ? '&rt=1' : ''), { cache: 'no-store' })).json(); if (j && j.ready && j.zones && (!j.winH || j.winH === winH())) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
   }
   document.addEventListener('oiresume', () => loadSrv());
-  setTimeout(loadSrv, 1500); // V4.9.32: รหัสไม่จำกัดวัน = เรียลไทม์ (เซิร์ฟเวอร์รับไม้ Bybit สดทุกไม้) ดึงทุก 5 วิ · ผู้ใช้อื่นทุก 30 วิ
-  let lastLoad = 0; setInterval(() => { if (document.visibilityState !== 'visible') return; if (Date.now() - lastLoad >= (O.unlimited ? 5000 : 30000) - 300) { lastLoad = Date.now(); loadSrv(); } }, 5000);
+  setTimeout(loadSrv, 1500); // V4.9.32: รหัสไม่จำกัดวัน = เรียลไทม์ (เซิร์ฟเวอร์รับไม้ Bybit สดทุกไม้) ดึงทุก 2 วิ (V4.9.33) · ผู้ใช้อื่นทุก 30 วิ
+  let lastLoad = 0; setInterval(() => { if (document.visibilityState !== 'visible') return; if (Date.now() - lastLoad >= (O.unlimited ? 2000 : 30000) - 300) { lastLoad = Date.now(); loadSrv(); } }, 1000); // V4.9.33 เรียลไทม์ทุก 2 วิ
   const srvOk = () => SZ && Date.now() - SZat < 5 * 60e3; // V4.9.17: ใช้โซนเซิร์ฟเวอร์ทันที (ไม่รอ 3 ชม.) ทุกเครื่องตรงกัน
   // โซนในสเกลราคากราฟ
   function zones() {

@@ -10,7 +10,7 @@
   if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
   const $ = id => document.getElementById(id);
   const KEY = 'oi_dbox' + (O.psfx || '');
-  const cfg = { on: true };
+  const cfg = { on: !window.OI_NEWDEV }; // V4.9.29 เครื่องใหม่ปิดเป็นค่าเริ่ม
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };

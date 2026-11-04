@@ -10,7 +10,7 @@
   if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
   const $ = id => document.getElementById(id);
   const KEY = 'oi_retail' + (O.psfx || ''), SKEY = 'oi_retail_store_v1';
-  const cfg = { on: true, res: 1, win: 8 }; // V4.9.22: res = ความละเอียดแถว ($) · V4.9.25: win = ย้อนหลัง (ชม.)
+  const cfg = { on: !window.OI_NEWDEV, res: 1, win: 8 }; // V4.9.29 เครื่องใหม่ปิดเป็นค่าเริ่ม · // V4.9.22: res = ความละเอียดแถว ($) · V4.9.25: win = ย้อนหลัง (ชม.)
   const RES = [0.1, 0.25, 0.5, 1, 2], WINS = [1, 2, 4, 8, 12, 24];
   const winH = () => WINS.includes(+cfg.win) ? +cfg.win : 8;
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
@@ -46,7 +46,7 @@
   // V4.9.24: เซิร์ฟเวอร์ดึง Binance ไม่ได้ (บล็อก Cloudflare) → เครื่องที่เปิด 🐋 ช่วยส่งไม้ Binance ทุก 1 นาที (เซิร์ฟเวอร์กันนับซ้ำด้วย id)
   const PQ = []; let pushInfo = '';
   async function pushTrades() {
-    if (!PQ.length || !O.worker || !cfg.on) return;
+    if (!PQ.length || !O.worker || !cfg.on) return; // (ยังส่งไม้ต่อแม้พัก: ไม้ค้างในคิวไม่เกิน 14 นาที)
     const tr = PQ.splice(0, PQ.length);
     try { const j = await (await fetch(O.worker + '/rtpush', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ src: 'binance', via: 'phone', tr }) })).json(); pushInfo = `ส่ง Binance ${tr.length} ไม้ (ใหม่ ${j.added ?? 0})`; }
     catch (e) { if (PQ.length + tr.length <= 20000) PQ.unshift(...tr); pushInfo = 'ส่งไม้ไม่สำเร็จ จะลองใหม่'; }
@@ -109,9 +109,10 @@
   //          ถ้าเซิร์ฟเวอร์ยังไม่พร้อม ค่อยใช้ที่เครื่องนี้เก็บเอง (ต้องเปิด 🐋)
   let SZ = null, SZat = 0;
   async function loadSrv() {
-    if (!cfg.on || !O.worker) return;
+    if (!cfg.on || !O.worker || O.paused) return; // V4.9.29 พักตอนไม่ได้ดูกราฟ
     try { const j = await (await fetch(O.worker + '/retail?win=' + winH(), { cache: 'no-store' })).json(); if (j && j.ready && j.zones) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
   }
+  document.addEventListener('oiresume', () => loadSrv());
   setTimeout(loadSrv, 1500); setInterval(() => { if (document.visibilityState === 'visible') loadSrv(); }, 30000);
   const srvOk = () => SZ && Date.now() - SZat < 5 * 60e3; // V4.9.17: ใช้โซนเซิร์ฟเวอร์ทันที (ไม่รอ 3 ชม.) ทุกเครื่องตรงกัน
   // โซนในสเกลราคากราฟ

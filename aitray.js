@@ -352,9 +352,9 @@
       let B = null;
       if (t === cur) B = (O.series.data() || []).map(b => Object.assign({}, b, { volume: vol.get(b.time) || 0 }));
       else {
-        try { B = await O.fetchTF(t, n); } catch (e) { B = null; }
+        try { B = await O.fetchTF(t, n, true); } catch (e) { B = null; }
         // ช่วงตลาด CME ปิด แท่ง perp ถูกกรองทิ้ง → ขอย้อนหลังเพิ่ม
-        if (!B || B.length < 60) { try { B = await O.fetchTF(t, 1000); } catch (e) {} }
+        if (!B || B.length < 60) { try { B = await O.fetchTF(t, 1000, true); } catch (e) {} }
       }
       return tfSummary(nm, B, snap.levels, nb);
     }));

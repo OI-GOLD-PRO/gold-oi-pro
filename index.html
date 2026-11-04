@@ -497,7 +497,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.39';
+  const APP_VER = '4.9.40';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -1647,11 +1647,30 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     if (Date.now() - viewUserAt > 3000) return; // เปลี่ยนจากโปรแกรม ไม่ใช่ผู้ใช้ (รวมช่วงกราฟไหลต่อหลังปล่อยนิ้ว)
     clearTimeout(viewSaveT); viewSaveT = setTimeout(() => { try { const ts = chart.timeScale(), V = { bs: Math.round(ts.options().barSpacing * 100) / 100, sp: Math.round(ts.scrollPosition() * 10) / 10 }; localStorage.setItem(VKEY, JSON.stringify(V)); } catch (e) {} }, 400);
   });
-  // V4.9.35: ราคาวิ่งหลุดขอบบน/ล่างของจอ (เพราะเคยลาก/ซูมแกนราคาเอง ทำให้แกนไม่ปรับอัตโนมัติ) → เปิดปรับแกนราคาอัตโนมัติให้ราคากลับมาในจอ
+  // V4.9.40: ล็อกการซูมแนวตั้ง — ถ้าผู้ใช้ลาก/ซูมแกนราคาเอง จำช่วงราคา (ขนาดซูม) + ตำแหน่งราคาล่าสุดบนจอ (ต่อ TF)
+  //          ราคาวิ่งจนเกือบตกขอบบน/ล่าง (เหลือ 6%) → เลื่อนให้ราคาล่าสุดกลับมาที่ตำแหน่งเดิม โดยคงขนาดซูมไว้ · แตะสองครั้งที่กราฟ = ยกเลิกล็อก (กลับปรับอัตโนมัติ)
+  const VSKEY = 'oi_vspan' + PSFX; let vRange = null, vLock = null, vCapT = null;
+  const vAll = () => { try { return JSON.parse(localStorage.getItem(VSKEY) || '{}') || {}; } catch (e) { return {}; } };
+  const vGet = () => { const v = vAll()[tf]; return v && v.S > 0 && v.yf >= 0 && v.yf <= 1 ? v : null; };
+  const vSet = v => { try { const o = vAll(); if (v) o[tf] = v; else delete o[tf]; localStorage.setItem(VSKEY, JSON.stringify(o)); } catch (e) {} };
+  series.applyOptions({ autoscaleInfoProvider: orig => vRange ? { priceRange: { minValue: vRange.lo, maxValue: vRange.hi } } : orig() });
+  const plotH = () => chartEl.clientHeight - chart.timeScale().height();
+  const vApply = () => { try { const ps = chart.priceScale('right'); ps.applyOptions({ autoScale: false }); ps.applyOptions({ autoScale: true }); } catch (e) {} };
+  const vCenter = () => { if (!vLock || lastClose === null || lastClose === undefined) return; const lo = lastClose - vLock.yf * vLock.S; vRange = { lo, hi: lo + vLock.S }; vApply(); };
+  function vCapture() { // อ่านช่วงราคาที่ผู้ใช้ซูมไว้ (ไม่รวมขอบเว้น scaleMargins)
+    try { const H = plotH(), top = series.coordinateToPrice(0), bot = series.coordinateToPrice(H); if (top === null || bot === null || !(top > bot)) return;
+      const m = chart.priceScale('right').options().scaleMargins || { top: 0.08, bottom: 0.08 }, span = top - bot, hi = top - span * m.top, lo = bot + span * m.bottom, S = hi - lo;
+      if (!(S > 0) || lastClose === null) return; vLock = { S: Math.round(S * 100) / 100, yf: Math.min(0.94, Math.max(0.06, (lastClose - lo) / S)) }; vRange = { lo, hi }; vSet(vLock); vApply(); } catch (e) {}
+  }
+  ['pointerup', 'touchend', 'wheel'].forEach(ev => chartEl.addEventListener(ev, () => { clearTimeout(vCapT); vCapT = setTimeout(() => { if (chart.priceScale('right').options().autoScale === false) vCapture(); }, 1200); }, { passive: true, capture: true }));
+  chartEl.addEventListener('dblclick', () => { vLock = null; vRange = null; vSet(null); vApply(); }, true);
+  const vLoad = () => { vLock = vGet(); vRange = null; if (vLock) vCenter(); else vApply(); }; // เปิดแอป/เปลี่ยน TF
   setInterval(() => {
     if (lastClose === null || lastClose === undefined || Date.now() - viewUserAt < 1500 || document.visibilityState !== 'visible') return;
-    try { const y = series.priceToCoordinate(lastClose), H = chartEl.clientHeight - chart.timeScale().height(); if (y === null || !H) return;
-      if (y < 4 || y > H - 4) chart.priceScale('right').applyOptions({ autoScale: true }); } catch (e) {}
+    try { const y = series.priceToCoordinate(lastClose), H = plotH(); if (y === null || !H) return;
+      if (vLock) { if (y < H * 0.06 || y > H * 0.94) vCenter(); } // ใกล้ตกขอบ → กลับตำแหน่งเดิม คงซูม
+      else if (y < 4 || y > H - 4) chart.priceScale('right').applyOptions({ autoScale: true }); // V4.9.35 (ยังไม่เคยซูมเอง)
+    } catch (e) {}
   }, 1000);
   setInterval(() => { // แท่งใหม่ → คงระยะเดิม
     if (lastBarTime === null || lastBarTime === viewLast) return; const prev = viewLast; viewLast = lastBarTime;
@@ -1863,6 +1882,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
           const V = viewGet(); if (V) { ts.applyOptions({ barSpacing: V.bs, rightOffset: V.sp }); ts.scrollToPosition(V.sp, false); viewLast = lastBarTime; return; }
           const bs = ts.options().barSpacing || 6; ts.applyOptions({ rightOffset: Math.max(8, Math.round(w * 0.4 / bs)) }); ts.scrollToRealTime(); viewLast = lastBarTime; } catch (e) {} };
         room(); // กราฟยังไม่มีขนาด (ซ่อน/ยังไม่วาง) → ลองใหม่ทุก 0.3 วิ
+        vLoad(); // V4.9.40 ซูมแนวตั้งที่ล็อกไว้ของ TF นี้
         chart.timeScale().scrollToRealTime();
         $('msg').hidden = true;
         window.OISplash && OISplash.done(lastClose, SC.name);

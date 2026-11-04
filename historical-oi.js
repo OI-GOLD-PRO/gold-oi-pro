@@ -45,10 +45,21 @@ window.OIHistoryZonesDraw=function(ctx,w,h,chart,series,rawBars,tzShift,oscFrac)
  if(!state.on||!state.days.length||!rawBars.length)return;
  const ts=chart.timeScale(),pw=ts.width(),ph=h-ts.height(),ymax=ph*(1-(oscFrac||0));
  const fmt=v=>v===null||v===undefined?'—':Number(v).toLocaleString('en-US');
- const bars=rawBars.map((b,i)=>({i,date:new Date(Number(b[0])+7*3600000).toISOString().slice(0,10)}));
+ // Index once per bar-array identity instead of O(days × bars) on every repaint.
+ if(state._barsRef!==rawBars||state._barsLength!==rawBars.length||state._barsFirst!==rawBars[0]?.[0]||state._barsLast!==rawBars[rawBars.length-1]?.[0]){
+  const spans=new Map();
+  for(let i=0;i<rawBars.length;i++){
+   const date=new Date(Number(rawBars[i][0])+7*3600000).toISOString().slice(0,10);
+   const span=spans.get(date);if(span)span.last=i;else spans.set(date,{first:i,last:i});
+  }
+  state._spans=spans;state._barsRef=rawBars;state._barsLength=rawBars.length;
+  state._barsFirst=rawBars[0]?.[0];state._barsLast=rawBars[rawBars.length-1]?.[0];
+ }
+ const visible=ts.getVisibleLogicalRange();
  for(const d of state.days){
-  const matches=bars.filter(b=>b.date===d.date);if(!matches.length)continue;
-  const first=matches[0].i,last=matches[matches.length-1].i;
+  const span=state._spans.get(d.date);if(!span)continue;
+  const first=span.first,last=span.last;
+  if(visible&&(last<visible.from-2||first>visible.to+2))continue;
   const x0=ts.timeToCoordinate(Math.floor(Number(rawBars[first][0])/1000)+tzShift),x1=ts.timeToCoordinate(Math.floor(Number(rawBars[last][0])/1000)+tzShift);
   if(x0===null||x1===null||x1<0||x0>pw)continue;
   const step=last>first?(x1-x0)/(last-first):6;

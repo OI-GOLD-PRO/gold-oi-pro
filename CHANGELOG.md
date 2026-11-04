@@ -1,3 +1,9 @@
+### V4.9.46 — 2026-11-04 — Codex
+- ไฟล์: index.html, dealerbox.js
+- แก้กรอบดีลเลอร์รับหายหลังย้ายเลเยอร์: ใช้ native series primitive ชั้น bottom (เหนือพื้นกราฟ ใต้แท่งเทียน) แทน canvas นอกกราฟ
+- ลบ canvas/underlayHooks ที่เพิ่มใน V4.9.45; ขอวาดใหม่เมื่อกรอบเปลี่ยนหรือเปิด/ปิด และคงการแตะดูรายละเอียด
+- ระวัง: renderer ใช้ media coordinate space เพื่อจัดตำแหน่งตาม DPR; cache dealerbox v40946
+
 ### V4.9.45 — 2026-11-04 — Codex
 - ไฟล์: index.html, dealerbox.js
 - ย้ายกรอบดีลเลอร์รับสีขาวไป canvas ใต้แท่งเทียน แยกจาก overlay OI ให้ปรับตำแหน่งและความละเอียดตามกราฟ/แถบสถานะ

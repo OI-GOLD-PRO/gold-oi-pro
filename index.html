@@ -199,8 +199,7 @@
   #reload .ri { display: inline-block; line-height: 1; }
   button.icon.busy { color: var(--gold); border-color: var(--gold); }
   button.icon.busy .ri { animation: rlSpin .8s linear infinite; }
-  #chartUnderlay, #chart, #ov { position: absolute; inset: 0; }
-  #chartUnderlay { pointer-events: none; z-index: 0; }
+  #chart, #ov { position: absolute; inset: 0; }
   #chart { z-index: 1; }
   #ov { pointer-events: none; z-index: 2; }
   /* V3.5.7: แถบป้ายสถานะ (γ Flip, COT, Skew, EM) แยกเหนือกราฟ ไม่ซ้อนกับป้ายราคา/OI */
@@ -209,7 +208,7 @@
   #badges span[data-k] { cursor: pointer; -webkit-user-select: none; user-select: none; touch-action: manipulation; padding: 0 7px; }
   #badges span { flex: none; font: bold 10px var(--mono); line-height: 14px; padding: 0 5px; border: 1px solid; border-radius: 3px; }
   #wrap.bdg #badges { display: flex; }
-  #wrap.bdg #chartUnderlay, #wrap.bdg #chart, #wrap.bdg #ov { top: 22px; }
+  #wrap.bdg #chart, #wrap.bdg #ov { top: 22px; }
   #wrap.bdg #tip { top: 30px; }
   #tip { position: absolute; left: 10px; top: 8px; z-index: 3; font-size: 12px; background: rgba(18,26,48,.92); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-family: var(--mono); pointer-events: none; }
   #tip .p { color: var(--put); } #tip .c { color: var(--call); }
@@ -445,7 +444,6 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   </div>
   <div id="gsTbl"></div>
   <div id="wrap">
-    <canvas id="chartUnderlay" aria-hidden="true"></canvas>
     <div id="chart"></div>
     <div id="reloadOv" aria-hidden="true"><div class="sp"></div><small>กำลังโหลดกราฟใหม่…</small></div>
     <canvas id="ov"></canvas>
@@ -503,7 +501,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.45';
+  const APP_VER = '4.9.46';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -706,8 +704,6 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 
   // ---------- overlay แท่ง OI ----------
   const ov = $('ov'), ctx = ov.getContext('2d');
-  const chartUnderlay = $('chartUnderlay'), underlayCtx = chartUnderlay.getContext('2d');
-  const underlayHooks = []; // วาดหลังพื้นกราฟ แต่ใต้แท่งเทียน
   let dirty = true, lastKey = '';
   const overlayHooks = []; const bgHooks = []; // V4.9.20 ชั้นใต้แถบ OI // ส่วนเสริม (เช่น goldscalp.js) วาดทับกราฟได้
   window.OIHistoryZonesRedraw = () => { dirty = true; };
@@ -756,17 +752,6 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    if (chartUnderlay.width !== Math.round(w * dpr) || chartUnderlay.height !== Math.round(h * dpr)) {
-      chartUnderlay.width = Math.round(w * dpr); chartUnderlay.height = Math.round(h * dpr);
-      chartUnderlay.style.width = w + 'px'; chartUnderlay.style.height = h + 'px';
-    }
-    underlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    underlayCtx.clearRect(0, 0, w, h);
-    underlayHooks.forEach(f => {
-      underlayCtx.save();
-      try { f(underlayCtx, w, h); } catch (e) { console.error(e); }
-      finally { underlayCtx.restore(); }
-    });
     // วาดทีละชั้น: ชั้นไหนพังจะไม่ทำให้ชั้นอื่น (เช่นกรอบ OI) หายไปด้วย
     // V4.9.20: ชั้นพื้นหลัง (bgHooks) วาดก่อนแถบ OI → ไม่บังโซน OI
     const drawBgHooks = (w, h) => bgHooks.forEach(f => { try { ctx.save(); f(ctx, w, h); } catch (e) { console.error(e); } finally { ctx.restore(); ctx.globalAlpha = 1; ctx.setLineDash([]); } });
@@ -2621,7 +2606,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     get paused() { return paused; },
     get unlimited() { return !!authCode && (!authExpire || String(authExpire) >= '9999'); }, // V4.9.32 รหัสไม่จำกัดวัน
     get tf() { return tf; }, sym: SYM, cfg: SC, sfx: SYMSFX, psfx: PSFX,
-    chart, series, chartEl, hooks: overlayHooks, bgHooks, underlayHooks,
+    chart, series, chartEl, hooks: overlayHooks, bgHooks,
     get oi() { return oi; }, get lastClose() { return lastClose; }, get cfgData() { return lastCfg; }, setLevels, get rawBars() { return rawBars; }, get adj() { return adj; }, get src() { return prov ? prov.id : null; }, worker: GC_WORKER, beep: () => { try { beep(); } catch (e) {} },
     // ดึงข้อมูลชีตของสัญลักษณ์ใดก็ได้ (ใช้ในแดชบอร์ด dash.js)
     async fetchData(sym) {
@@ -2678,7 +2663,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <script src="trap.js?v=40929"></script>
 <script src="volreg.js?v=40929"></script>
 <script src="oidiv.js?v=40503"></script>
-<script src="dealerbox.js?v=40945"></script>
+<script src="dealerbox.js?v=40946"></script>
 <script src="siglog.js?v=40900"></script>
 <script src="quant.js?v=20031"></script>
 <script src="aitray.js?v=40929"></script>

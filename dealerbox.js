@@ -9,11 +9,13 @@
 (() => {
   'use strict';
   const O = window.OI;
-  if (!O || !O.underlayHooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
+  if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
   const $ = id => document.getElementById(id);
   const KEY = 'oi_dbox' + (O.psfx || '');
   const cfg = { on: !window.OI_NEWDEV }; // V4.9.29 เครื่องใหม่ปิดเป็นค่าเริ่ม
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+  let requestFrameUpdate = () => {};
+  const invalidate = () => { O.markDirty(); requestFrameUpdate(); };
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   const BRK = 2, MIN_TEST = 2, GAP = 2, NBARS = 1500, AHEAD = 48, FAKE = 12, TZ = 7 * 3600;
@@ -105,7 +107,7 @@
       if (Date.now() - histAt > 10 * 60e3) await loadHist();
       logToday();
       const B = await O.fetchTF('5m', NBARS);
-      if (B && B.length > 40) { bars = B; boxes = scan(B, levels()); O.markDirty(); }
+      if (B && B.length > 40) { bars = B; boxes = scan(B, levels()); invalidate(); }
     } catch (e) {} finally { busy = false; }
   }
   setInterval(() => run(false), 30000);
@@ -116,7 +118,7 @@
   // ---------- วาด ----------
   const csec = () => TFS[O.tf] || 60, toChart = t => Math.floor(t / csec()) * csec();
   let hit = [];
-  O.underlayHooks.push((ctx, w, h) => {
+  function drawFrames(ctx, w, h) {
     hit = [];
     if (!cfg.on || !boxes.length || !bars.length || csec() >= 86400) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height();
@@ -140,7 +142,26 @@
       hit.push({ x0: Math.max(0, x0), x1: Math.min(plotW, x1), y1: yt - 3, y2: yb + 3, bx });
     });
     ctx.restore();
-  });
+  }
+  // Native bottom primitive: above the chart background, below candles (CSS pixels via media space).
+  const frameRenderer = {
+    draw(target) {
+      target.useMediaCoordinateSpace(scope => {
+        drawFrames(scope.context, scope.mediaSize.width, scope.mediaSize.height + O.chart.timeScale().height());
+      });
+    },
+  };
+  const frameViews = [{ zOrder: () => 'bottom', renderer: () => frameRenderer }];
+  if (typeof O.series.attachPrimitive === 'function') {
+    O.series.attachPrimitive({
+      attached({ requestUpdate }) { requestFrameUpdate = requestUpdate; requestUpdate(); },
+      detached() { requestFrameUpdate = () => {}; hit = []; },
+      paneViews() { return frameViews; },
+    });
+  } else {
+    // Older chart library: retain visible frames until its cached script updates.
+    (O.bgHooks || O.hooks).push(drawFrames);
+  }
   // แตะกรอบ = รายละเอียด
   function txtOf(bx) {
     const ev = [...new Set(bx.ev)];
@@ -173,7 +194,7 @@
   const menu = $('indMenu');
   if (menu) {
     new MutationObserver(() => mount()).observe(menu, { childList: true });
-    menu.addEventListener('click', e => { if (!e.target.closest('[data-db]')) return; cfg.on = !cfg.on; save(); boxes = []; O.markDirty(); const b = $('dbBox'); if (b) b.remove(); mount(); run(true); });
+    menu.addEventListener('click', e => { if (!e.target.closest('[data-db]')) return; cfg.on = !cfg.on; save(); boxes = []; invalidate(); const b = $('dbBox'); if (b) b.remove(); mount(); run(true); });
   }
   window.OI_dbox = { get boxes() { return boxes; }, get hist() { return hist; }, levels, scan, run, dayKey };
 })();

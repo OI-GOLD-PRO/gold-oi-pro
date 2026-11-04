@@ -137,8 +137,11 @@
       const pad = 0.6, top = bx.side < 0 ? Math.max(bx.ext, bx.p) + pad : Math.max(bx.p, bx.near) + pad, bot = bx.side < 0 ? Math.min(bx.p, bx.near) - pad : Math.min(bx.ext, bx.p) - pad;
       const yt = Y(top), yb = Y(bot); if (yt === null || yb === null || yb < 0 || yt > plotH) return;
       const broke = bx.broke !== undefined, strong = bx.ev.length >= 2;
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(Math.max(0, x0), yt, Math.min(plotW, x1) - Math.max(0, x0), yb - yt);
+      if (!broke) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(255,255,255,.2)';
+        ctx.fillRect(Math.max(0, x0), yt, Math.min(plotW, x1) - Math.max(0, x0), yb - yt);
+      }
       ctx.globalAlpha = broke ? 0.45 : 1;
       ctx.strokeStyle = '#ffffff'; ctx.lineWidth = broke ? 1 : strong ? 2.4 : 1.4; ctx.setLineDash(broke ? [4, 3] : bx.est ? [6, 2] : []);
       ctx.strokeRect(Math.max(0, x0) + 0.5, yt + 0.5, Math.min(plotW, x1) - Math.max(0, x0), yb - yt);

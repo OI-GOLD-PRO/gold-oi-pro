@@ -25,8 +25,9 @@
     const c = window.OILive && window.OILive.calc, oi = O.oi; if (!c || !c.strikes || !oi || !oi.rows) return [];
     const px = O.lastClose; if (!px) return [];
     const pr = new Map(oi.rows.filter(r => r.price !== null && r.price !== undefined).map(r => [r.strike, r.price]));
-    return c.strikes.filter(s => s.gex > 0 && pr.has(s.k) && Math.abs(pr.get(s.k) - px) <= px * 0.03)
-      .sort((a, b) => b.gex - a.gex).slice(0, 8).map(s => ({ k: s.k, p: pr.get(s.k), gex: s.gex }));
+    // V4.9.39: ทุก strike ที่ GEX บวก ≥ 5% ของตัวสูงสุด (เดิม 8 อันดับแรก — 4050 หลุดอันดับ ทั้งที่ราคาไม่ผ่าน) สูงสุด 12 แนว
+    const P = c.strikes.filter(s => s.gex > 0 && pr.has(s.k) && Math.abs(pr.get(s.k) - px) <= px * 0.03), gm = Math.max(0, ...P.map(s => s.gex));
+    return P.filter(s => s.gex >= gm * 0.05).sort((a, b) => b.gex - a.gex).slice(0, 12).map(s => ({ k: s.k, p: pr.get(s.k), gex: s.gex }));
   }
   // ---------- ประวัติแนวรายวัน (เซิร์ฟเวอร์) ----------
   async function loadHist() { if (!O.worker || O.paused) return; try { const j = await (await fetch(O.worker + '/gexlog', { cache: 'no-store' })).json(); if (j && typeof j === 'object') { hist = j; histAt = Date.now(); } } catch (e) {} }
@@ -38,8 +39,9 @@
   // แนวที่ใช้กับแต่ละวัน: วันที่มีประวัติ = แนวของวันนั้น (+ แนวสดถ้าเป็นวันนี้) · ไม่มีประวัติ = แนวสดตอนนี้ (โดยประมาณ)
   function dayLevels(d, today, cur) {
     const h = hist[d] && hist[d].m, m = new Map();
-    if (h) Object.entries(h).forEach(([k, o]) => m.set(+k, { p: o.p, est: false }));
-    if (d === today || !h) cur.forEach(l => { if (!m.has(l.k)) m.set(l.k, { p: l.p, est: !h }); else if (d === today) m.get(l.k).p = l.p; });
+    if (h) Object.entries(h).forEach(([k, o]) => m.set(+k, { p: o.p, g: o.g || 0, est: false }));
+    if (d === today || !h) cur.forEach(l => { if (!m.has(l.k)) m.set(l.k, { p: l.p, g: l.gex, est: !h }); else if (d === today) { m.get(l.k).p = l.p; m.get(l.k).g = Math.max(m.get(l.k).g, l.gex); } });
+    let gm = 0; m.forEach(v => { gm = Math.max(gm, v.g || 0); }); m.forEach(v => { v.w = gm > 0 ? Math.sqrt((v.g || 0) / gm) : 0; }); // น้ำหนักแนว 0–1 (เทียบตัวสูงสุดของวัน)
     return m;
   }
 
@@ -73,7 +75,8 @@
       let cur = null; const fin = () => { if (cur && cur.tests.length >= MIN_TEST) out.push(cur); cur = null; };
       for (let i = 1; i < n; i++) {
         const L = DL.get(days.get(i)).get(k); if (!L) { fin(); continue; }
-        const p = L.p, b = B[i], pc = B[i - 1].close, tol = Math.max(0.8, ATR[i] * 0.25);
+        // V4.9.39: แนว GEX ใหญ่ ราคามักหยุดก่อนถึง strike (ดีลเลอร์เริ่มขาย/ซื้อก่อน) → ระยะแตะกว้างขึ้นตามขนาด GEX (ตัวใหญ่สุดวันนั้น +$3.5)
+        const p = L.p, b = B[i], pc = B[i - 1].close, tol = Math.max(0.8, ATR[i] * 0.25) + 3.5 * (L.w || 0);
         if (cur && Math.abs(cur.p - p) > 3) fin(); // offset เปลี่ยนมาก (ข้ามวัน/เปลี่ยนสัญญา) = แนวใหม่
         // ราคาปิดเลยแนวเกิน BRK = แตก → วัดว่าวิ่งต่อไกลแค่ไหน
         if (cur && (cur.side < 0 ? b.close > p + BRK : b.close < p - BRK)) {
@@ -86,9 +89,9 @@
         else if (pc > p && b.low <= p + tol && b.close > p) side = 1;
         if (!side) continue;
         if (cur && cur.side !== side) fin();
-        if (!cur) cur = { k, p, side, tests: [], ev: [], ext: side < 0 ? b.high : b.low, start: i, end: i, est: L.est, day: days.get(i) };
+        if (!cur) cur = { k, p, side, tests: [], ev: [], ext: side < 0 ? b.high : b.low, near: side < 0 ? b.high : b.low, start: i, end: i, est: L.est, day: days.get(i), g: L.g };
         if (!cur.tests.length || i - cur.tests[cur.tests.length - 1] > GAP) { cur.tests.push(i); cur.ev.push(...evAt(B, i, side, p)); }
-        cur.ext = side < 0 ? Math.max(cur.ext, b.high) : Math.min(cur.ext, b.low); cur.end = i; cur.p = p;
+        cur.ext = side < 0 ? Math.max(cur.ext, b.high) : Math.min(cur.ext, b.low); cur.near = side < 0 ? Math.min(cur.near, b.high) : Math.max(cur.near, b.low); cur.end = i; cur.p = p;
       }
       if (cur) { cur.live = true; cur.ev.push(...retailEv(cur.side, cur.p)); fin(); }
     });
@@ -123,7 +126,8 @@
       if (x1 === null || x0 === null) { if (x0 === null && x1 !== null) x0 = 0; else return; }
       const step = Math.max(3, ts.options().barSpacing || 6); x0 -= step / 2; if (!bx.live) x1 += step / 2;
       if (x1 < 0 || x0 > plotW) return;
-      const pad = 0.6, top = bx.side < 0 ? Math.max(bx.ext, bx.p) + pad : bx.p + pad, bot = bx.side < 0 ? bx.p - pad : Math.min(bx.ext, bx.p) - pad;
+      // V4.9.39: กรอบคลุมตั้งแต่ไส้ที่ทดสอบ (ซึ่งอาจหยุดก่อนถึง strike) ถึง strike
+      const pad = 0.6, top = bx.side < 0 ? Math.max(bx.ext, bx.p) + pad : Math.max(bx.p, bx.near) + pad, bot = bx.side < 0 ? Math.min(bx.p, bx.near) - pad : Math.min(bx.ext, bx.p) - pad;
       const yt = Y(top), yb = Y(bot); if (yt === null || yb === null || yb < 0 || yt > plotH) return;
       const broke = bx.broke !== undefined, strong = bx.ev.length >= 2;
       ctx.globalAlpha = broke ? 0.45 : 1;

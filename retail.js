@@ -112,10 +112,11 @@
   let SZ = null, SZat = 0;
   async function loadSrv() {
     if (!cfg.on || !O.worker || O.paused) return; // V4.9.29 พักตอนไม่ได้ดูกราฟ
-    try { const j = await (await fetch(O.worker + '/retail?win=' + winH(), { cache: 'no-store' })).json(); if (j && j.ready && j.zones && (!j.winH || j.winH === winH())) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
+    try { const j = await (await fetch(O.worker + '/retail?win=' + winH() + (O.unlimited ? '&rt=1' : ''), { cache: 'no-store' })).json(); if (j && j.ready && j.zones && (!j.winH || j.winH === winH())) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
   }
   document.addEventListener('oiresume', () => loadSrv());
-  setTimeout(loadSrv, 1500); setInterval(() => { if (document.visibilityState === 'visible') loadSrv(); }, 30000);
+  setTimeout(loadSrv, 1500); // V4.9.32: รหัสไม่จำกัดวัน = เรียลไทม์ (เซิร์ฟเวอร์รับไม้ Bybit สดทุกไม้) ดึงทุก 5 วิ · ผู้ใช้อื่นทุก 30 วิ
+  let lastLoad = 0; setInterval(() => { if (document.visibilityState !== 'visible') return; if (Date.now() - lastLoad >= (O.unlimited ? 5000 : 30000) - 300) { lastLoad = Date.now(); loadSrv(); } }, 5000);
   const srvOk = () => SZ && Date.now() - SZat < 5 * 60e3; // V4.9.17: ใช้โซนเซิร์ฟเวอร์ทันที (ไม่รอ 3 ชม.) ทุกเครื่องตรงกัน
   // โซนในสเกลราคากราฟ
   function zones() {
@@ -216,7 +217,7 @@
 
   // ---------- เมนู ƒx ----------
   function info() {
-    if (srvOk()) return `เซิร์ฟเวอร์ · ${Object.entries(SZ.src || {}).filter(([k]) => !/_via$/.test(k)).map(([k, v]) => k + (SZ.src[k + '_via'] ? '(' + (SZ.src[k + '_via'] === 'phone' ? 'มือถือ' : 'คอมบ้าน') + ')' : '')).join('+') || '-'}${pushInfo ? ' · ' + pushInfo : ''} · ${fmt(SZ.n)} ไม้ · ย้อน ${(SZ.hrs || 0).toFixed(0)} ชม.`;
+    if (srvOk()) return `${SZ.rt ? (SZ.rt.ws ? '⚡ เรียลไทม์ · ' : 'เรียลไทม์ (กำลังต่อสาย) · ') : ''}เซิร์ฟเวอร์ · ${Object.entries(SZ.src || {}).filter(([k]) => !/_via$/.test(k)).map(([k, v]) => k + (SZ.src[k + '_via'] ? '(' + (SZ.src[k + '_via'] === 'phone' ? 'มือถือ' : 'คอมบ้าน') + ')' : '')).join('+') || '-'}${pushInfo ? ' · ' + pushInfo : ''} · ${fmt(SZ.n)} ไม้ · ย้อน ${(SZ.hrs || 0).toFixed(0)} ชม.`;
     if (!live()) return 'รอข้อมูลจากเซิร์ฟเวอร์… (หรือเปิด 🐋 Big Traders ให้เครื่องนี้เก็บเอง)';
     if (!Z) Z = compute(); if (!Z) return 'กำลังเก็บไม้รายย่อย…';
     return `ไม้ ≤ ${Z.maxSz < 1 ? Z.maxSz.toFixed(3) : Z.maxSz} oz · ${fmt(Z.n)} ไม้ · ย้อน ${Z.hrs.toFixed(0)} ชม.`;

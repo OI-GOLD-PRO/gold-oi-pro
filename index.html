@@ -497,7 +497,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.33';
+  const APP_VER = '4.9.34';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -1637,6 +1637,21 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     });
   }
   let prov = null, pingTimer = null, lastBarTime = null, pollTimer = null;
+  // V4.9.34: จำมุมมองกราฟที่ผู้ใช้เลื่อน/ซูมล่าสุด (ขนาดแท่ง bs + ระยะจากแท่งล่าสุดถึงขอบขวา sp หน่วยแท่ง) → ค่าเริ่มครั้งต่อไป
+  //          แท่งใหม่เกิด → เลื่อนตามโดยคงระยะเดิม (ไม่ว่าจะเลื่อนไปซ้าย/ขวา หรือซูมไว้แค่ไหน)
+  const VKEY = 'oi_view' + PSFX; let viewUserAt = 0, viewLast = null, viewSaveT = null;
+  const viewGet = () => { try { const v = JSON.parse(localStorage.getItem(VKEY) || 'null'); return v && v.bs > 0 && isFinite(v.sp) ? v : null; } catch (e) { return null; } };
+  ['pointerdown', 'wheel', 'touchstart'].forEach(ev => chartEl.addEventListener(ev, () => { viewUserAt = Date.now(); }, { passive: true, capture: true }));
+  ['pointermove', 'touchmove'].forEach(ev => chartEl.addEventListener(ev, () => { if (Date.now() - viewUserAt < 3000) viewUserAt = Date.now(); }, { passive: true, capture: true }));
+  chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+    if (Date.now() - viewUserAt > 3000) return; // เปลี่ยนจากโปรแกรม ไม่ใช่ผู้ใช้ (รวมช่วงกราฟไหลต่อหลังปล่อยนิ้ว)
+    clearTimeout(viewSaveT); viewSaveT = setTimeout(() => { try { const ts = chart.timeScale(), V = { bs: Math.round(ts.options().barSpacing * 100) / 100, sp: Math.round(ts.scrollPosition() * 10) / 10 }; localStorage.setItem(VKEY, JSON.stringify(V)); } catch (e) {} }, 400);
+  });
+  setInterval(() => { // แท่งใหม่ → คงระยะเดิม
+    if (lastBarTime === null || lastBarTime === viewLast) return; const prev = viewLast; viewLast = lastBarTime;
+    if (prev === null || Date.now() - viewUserAt < 1500) return; const V = viewGet(); if (!V) return;
+    try { const ts = chart.timeScale(); if (Math.abs(ts.scrollPosition() - V.sp) > 0.5) ts.scrollToPosition(V.sp, false); } catch (e) {}
+  }, 500);
 // V4.9.15: ไม่จำแหล่งเดี่ยวที่เคยใช้แล้ว — เริ่มจากแท่งรวมเสมอ ทุกเครื่องจะได้ตรงกัน
 
   // ส่วนต่าง perp − GC เปลี่ยนไปทุกวัน (ค่าถือครอง/funding) ถ้าใช้ offset ปัจจุบันค่าเดียวกับทั้งกราฟ แท่งย้อนหลังหลายวันจะเพี้ยน
@@ -1837,7 +1852,10 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
         showPrice();
         if (SC.yahoo) paintOff();
         // V4.9.26: ค่าเริ่มเว้นที่ว่างขวา ~40% ของกราฟ (แท่งล่าสุดอยู่ราวกลางจอ เห็นแถบ 👥/OI ด้านขวาไม่ทับแท่ง)
-        const room = (k = 0) => { try { const ts = chart.timeScale(), bs = ts.options().barSpacing || 6, w = ts.width() || chartEl.clientWidth; if (!w) { if (k < 20) setTimeout(() => room(k + 1), 300); return; } ts.applyOptions({ rightOffset: Math.max(8, Math.round(w * 0.4 / bs)) }); ts.scrollToRealTime(); } catch (e) {} };
+        // V4.9.34: ถ้าผู้ใช้เคยเลื่อน/ซูมเอง ใช้มุมมองล่าสุด (ขนาดแท่ง + ระยะแท่งล่าสุดถึงขอบขวา) เป็นค่าเริ่ม
+        const room = (k = 0) => { try { const ts = chart.timeScale(), w = ts.width() || chartEl.clientWidth; if (!w) { if (k < 20) setTimeout(() => room(k + 1), 300); return; }
+          const V = viewGet(); if (V) { ts.applyOptions({ barSpacing: V.bs, rightOffset: V.sp }); ts.scrollToPosition(V.sp, false); viewLast = lastBarTime; return; }
+          const bs = ts.options().barSpacing || 6; ts.applyOptions({ rightOffset: Math.max(8, Math.round(w * 0.4 / bs)) }); ts.scrollToRealTime(); viewLast = lastBarTime; } catch (e) {} };
         room(); // กราฟยังไม่มีขนาด (ซ่อน/ยังไม่วาง) → ลองใหม่ทุก 0.3 วิ
         chart.timeScale().scrollToRealTime();
         $('msg').hidden = true;

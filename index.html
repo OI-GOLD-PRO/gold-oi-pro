@@ -497,7 +497,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.40';
+  const APP_VER = '4.9.41';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -1659,15 +1659,16 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const vSet = v => { try { const o = vAll(); if (v) o[tf] = v; else delete o[tf]; localStorage.setItem(VSKEY, JSON.stringify(o)); } catch (e) {} };
   series.applyOptions({ autoscaleInfoProvider: orig => vRange ? { priceRange: { minValue: vRange.lo, maxValue: vRange.hi } } : orig() });
   const plotH = () => chartEl.clientHeight - chart.timeScale().height();
-  const vApply = () => { try { const ps = chart.priceScale('right'); ps.applyOptions({ autoScale: false }); ps.applyOptions({ autoScale: true }); } catch (e) {} };
+  // V4.9.41: ตั้งช่วงราคาแล้วกลับเป็นโหมดเลื่อนเองได้ (autoScale ปิด = ลากขึ้นลงได้) · ไม่ล็อก = ปรับอัตโนมัติ
+  const vApply = () => { try { const ps = chart.priceScale('right'); ps.applyOptions({ autoScale: false }); ps.applyOptions({ autoScale: true }); if (vLock) requestAnimationFrame(() => requestAnimationFrame(() => { try { if (vLock) ps.applyOptions({ autoScale: false }); } catch (e) {} })); } catch (e) {} };
   const vCenter = () => { if (!vLock || lastClose === null || lastClose === undefined) return; const lo = lastClose - vLock.yf * vLock.S; vRange = { lo, hi: lo + vLock.S }; vApply(); };
   function vCapture() { // อ่านช่วงราคาที่ผู้ใช้ซูมไว้ (ไม่รวมขอบเว้น scaleMargins)
     try { const H = plotH(), top = series.coordinateToPrice(0), bot = series.coordinateToPrice(H); if (top === null || bot === null || !(top > bot)) return;
       const m = chart.priceScale('right').options().scaleMargins || { top: 0.08, bottom: 0.08 }, span = top - bot, hi = top - span * m.top, lo = bot + span * m.bottom, S = hi - lo;
-      if (!(S > 0) || lastClose === null) return; vLock = { S: Math.round(S * 100) / 100, yf: Math.min(0.94, Math.max(0.06, (lastClose - lo) / S)) }; vRange = { lo, hi }; vSet(vLock); vApply(); } catch (e) {}
+      if (!(S > 0) || lastClose === null) return; vLock = { S: Math.round(S * 100) / 100, yf: Math.min(0.94, Math.max(0.06, (lastClose - lo) / S)) }; vRange = { lo, hi }; vSet(vLock); } catch (e) {} // จำอย่างเดียว ไม่แตะจอ (ผู้ใช้ยังลากต่อได้)
   }
-  ['pointerup', 'touchend', 'wheel'].forEach(ev => chartEl.addEventListener(ev, () => { clearTimeout(vCapT); vCapT = setTimeout(() => { if (chart.priceScale('right').options().autoScale === false) vCapture(); }, 1200); }, { passive: true, capture: true }));
-  chartEl.addEventListener('dblclick', () => { vLock = null; vRange = null; vSet(null); vApply(); }, true);
+  ['pointerup', 'touchend', 'wheel'].forEach(ev => chartEl.addEventListener(ev, () => { clearTimeout(vCapT); vCapT = setTimeout(() => { if (chart.priceScale('right').options().autoScale === false) vCapture(); }, 1200); }, { passive: true, capture: true })); // ลาก/ซูมแนวตั้งแล้ว → จำขนาดซูม + ตำแหน่งใหม่
+  chartEl.addEventListener('dblclick', () => { vLock = null; vRange = null; vSet(null); setTimeout(vApply, 50); }, true);
   const vLoad = () => { vLock = vGet(); vRange = null; if (vLock) vCenter(); else vApply(); }; // เปิดแอป/เปลี่ยน TF
   setInterval(() => {
     if (lastClose === null || lastClose === undefined || Date.now() - viewUserAt < 1500 || document.visibilityState !== 'visible') return;

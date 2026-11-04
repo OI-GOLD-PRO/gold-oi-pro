@@ -501,7 +501,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.43';
+  const APP_VER = '4.9.44';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -1940,11 +1940,11 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 
   // V4.9.43: แท่งรวม (/mix) ดึงเป็นรอบ ราคาขยับเป็นช่วง ๆ (ดูเหมือนค้าง) → เปิดสายสดของ Bybit (ไม่ได้ลอง Bitget) อัปเดตแท่งล่าสุดทุกไม้
   //          แล้วให้ /mix (ค่ากลาง 3 แหล่ง) มาปรับแท่งทุก ~6 วิ · สายสดใช้แค่ราคาปิด (ไส้ขยายตาม) ไม่แทนค่าเปิด/ไส้ของแท่งรวม
-  let lws = null, lwsTimer = null, lwsPing = null, lwsAt = 0;
+  let lws = null, lwsTimer = null, lwsPing = null, lwsAt = 0, lwsRaw = null, lwsBasis = null; // basis = ค่ากลาง /mix − ราคาสายสด (ต่างตลาดกัน ~$0–3)
   function closeLive() { clearTimeout(lwsTimer); clearInterval(lwsPing); if (lws) { lws.onclose = null; try { lws.close(); } catch (e) {} lws = null; } }
   function liveTick(k) {
-    const last = rawBars[rawBars.length - 1]; if (!last || !(k[4] > 0) || k[0] < last[0]) return;
-    const c = k[4], row = k[0] === last[0] ? [last[0], last[1], Math.max(last[2], c), Math.min(last[3], c), c, last[5]] : [k[0], last[4], Math.max(last[4], c), Math.min(last[4], c), c, 0];
+    const last = rawBars[rawBars.length - 1]; lwsRaw = k[4]; if (!last || !(k[4] > 0) || k[0] < last[0] || lwsBasis === null) return; // ยังไม่รู้ส่วนต่าง → รอ /mix รอบแรก
+    const c = Math.round((k[4] + lwsBasis) * 100) / 100, row = k[0] === last[0] ? [last[0], last[1], Math.max(last[2], c), Math.min(last[3], c), c, last[5]] : [k[0], last[4], Math.max(last[4], c), Math.min(last[4], c), c, 0];
     applyRows([row]);
   }
   function openLive(t) {
@@ -1954,7 +1954,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       try { lws = new WebSocket(q.ws(t)); } catch (e) { return; }
       const me = lws;
       me.onopen = () => { try { if (q.sub) me.send(JSON.stringify(q.sub(t))); } catch (e) {} clearInterval(lwsPing); if (q.ping) lwsPing = setInterval(() => { try { me.send(q.ping); } catch (e) {} }, q.pingMs || 20000); };
-      me.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } const rows = q.msg(m, t); if (!rows || !rows.length || tf !== t) return; lwsAt = Date.now(); rows.sort((a, b) => a[0] - b[0]).forEach(liveTick); showPrice(); indTick(); checkAlerts(lastClose); zoneBanner(lastClose); };
+      me.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } const rows = q.msg(m, t); if (!rows || !rows.length || tf !== t) return; lwsAt = Date.now(); window.__live = { src: q.id, at: lwsAt, raw: rows[rows.length - 1][4], basis: lwsBasis }; rows.sort((a, b) => a[0] - b[0]).forEach(liveTick); showPrice(); indTick(); checkAlerts(lastClose); zoneBanner(lastClose); };
       me.onclose = () => { clearInterval(lwsPing); if (lws !== me) return; lws = null; if (tf !== t || prov !== MIX_PROV) return; if (Date.now() - lwsAt > 30000) idx++; lwsTimer = setTimeout(go, 3000); };
       me.onerror = () => { try { me.close(); } catch (e) {} };
     };
@@ -1980,7 +1980,8 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
           const rows = (await fetchBars(p, t, p.pollN || 800)).filter(k => !cmeClosed(k[0]));
           { const c = rows.length ? rows[rows.length - 1][4] : null; quiet = c !== null && c === lastC ? quiet + 1 : 0; lastC = c; }
           rows.forEach(k => {
-            { const lr = rawBars[rawBars.length - 1]; if (Date.now() - lwsAt < 10000 && lr && lr[0] === k[0]) k = [k[0], k[1], Math.max(k[2], lr[4]), Math.min(k[3], lr[4]), lr[4], k[5]]; } // V4.9.43 แท่งล่าสุด: ใช้ราคาปิดสด (ใหม่กว่า /mix)
+            // V4.9.43: แท่งล่าสุดจาก /mix = ค่าจริง (ค่ากลาง 3 ตลาด) → อัปเดตส่วนต่างกับสายสด ให้ราคาสดถัดไปเลื่อนตามค่ากลาง (ไม่กระโดด)
+            { const lr = rawBars[rawBars.length - 1]; if (lr && lr[0] <= k[0] && lwsRaw > 0 && Date.now() - lwsAt < 10000) { const nb = k[4] - lwsRaw; lwsBasis = lwsBasis === null ? nb : lwsBasis * 0.5 + nb * 0.5; } }
             const b = toBar(k);
             if (lastBarTime !== null && b.time < lastBarTime) return;
             series.update(b); lastBarTime = b.time; rawClose = k[4]; lastClose = rawClose - adj;

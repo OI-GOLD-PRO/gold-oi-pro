@@ -497,7 +497,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.29';
+  const APP_VER = '4.9.30';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -2371,7 +2371,21 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     window.OISplash && OISplash.login();
     $('loginBtn').disabled = false; $('loginBtn').textContent = 'เข้าสู่ระบบ';
   }
+  // V4.9.30: ปิดอินดี้ทั้งหมดครั้งเดียวสำหรับทุกผู้ใช้ที่รหัสมีวันหมดอายุ (รหัสไม่จำกัดวันไม่แตะ) → เหลือแค่ OI ให้เปิดเอง
+  function indOffOnce(expire) {
+    try {
+      if (!expire || String(expire) >= '9999' || localStorage.getItem('oi_indoff_v1')) return false;
+      const off = k => { let c = {}; try { c = JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) {} c.on = false; localStorage.setItem(k, JSON.stringify(c)); };
+      ['oi_dealer', 'oi_dbox', 'oi_step3', 'oi_retail', 'oi_trap', 'oi_volreg', 'oi_bigtr', 'oi_intra'].forEach(k => ['', '_b'].forEach(sf => off(k + sf)));
+      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i) || ''; if (/^oi_gs/.test(k)) off(k); }
+      ['', '_b'].forEach(sf => { let c = {}; try { c = JSON.parse(localStorage.getItem('oi_ind2' + sf) || '{}') || {}; } catch (e) {} Object.keys(c).forEach(id => { c[id] = Object.assign({}, c[id], { on: false }); }); localStorage.setItem('oi_ind2' + sf, JSON.stringify(c)); });
+      off('oih-settings');
+      localStorage.setItem('oi_indoff_v1', '1');
+      return true;
+    } catch (e) { return false; }
+  }
   function enterApp(code, expire, name) {
+    if (indOffOnce(expire)) { try { localStorage.setItem('oi_code', code); } catch (e) {} location.reload(); return; }
     authCode = code; authExpire = expire || null;
     try { localStorage.setItem('oi_code', code); } catch (e) {}
     $('login').hidden = true;

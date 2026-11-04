@@ -35,7 +35,9 @@
       "i": "M",
       "title": "ISM Services PMI",
       "forecast": "54.8",
-      "previous": "54.9"
+      "previous": "54.9",
+      "actual": "54.5",
+      "better": false
     },
     {
       "date": "2026-11-05T08:30:00-05:00",

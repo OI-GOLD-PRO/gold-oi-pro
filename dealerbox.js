@@ -139,7 +139,7 @@
       const broke = bx.broke !== undefined, strong = bx.ev.length >= 2;
       if (!broke) {
         ctx.globalAlpha = 1;
-        ctx.fillStyle = 'rgba(255,255,255,.2)';
+        ctx.fillStyle = 'rgba(255,255,255,.1)';
         ctx.fillRect(Math.max(0, x0), yt, Math.min(plotW, x1) - Math.max(0, x0), yb - yt);
       }
       ctx.globalAlpha = broke ? 0.45 : 1;

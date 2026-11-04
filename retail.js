@@ -10,8 +10,11 @@
   if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
   const $ = id => document.getElementById(id);
   const KEY = 'oi_retail' + (O.psfx || ''), SKEY = 'oi_retail_store_v1';
-  const cfg = { on: !window.OI_NEWDEV, res: 1, win: 8 }; // V4.9.29 เครื่องใหม่ปิดเป็นค่าเริ่ม · // V4.9.22: res = ความละเอียดแถว ($) · V4.9.25: win = ย้อนหลัง (ชม.)
+  const cfg = { on: !window.OI_NEWDEV, res: 1, win: 8, mode: 'delta' }; // V4.9.29 เครื่องใหม่ปิดเป็นค่าเริ่ม · // V4.9.22: res = ความละเอียดแถว ($) · V4.9.25: win = ย้อนหลัง (ชม.)
   const RES = [0.1, 0.25, 0.5, 1, 2], WINS = [0.5, 1, 2, 4, 8];
+  // V4.9.36: โหมด — delta = ซื้อลบขาย (ค่าเริ่ม) · hold = สถานะค้างโดยประมาณ (เปิดใหม่ − ที่ปิดไปแล้ว, จาก OI) · all = ยอดรวม + สีฝั่งที่เด่น (แบบเดิม)
+  const MODES = ['delta', 'hold', 'all'], MODE_LAB = { delta: 'Δ ซื้อ−ขาย', hold: 'ถือค้าง', all: 'ยอดรวม' };
+  const modeOf = () => MODES.includes(cfg.mode) ? cfg.mode : 'delta';
   // V4.9.31: ใส่ชั่วโมงเองได้ 0.1–24 · ต่ำกว่า 1 ชม. ทีละ 0.1 · ตั้งแต่ 1 ชม. ทีละ 1
   const normH = v => { v = +v; if (!(v > 0)) return 8; return Math.min(24, Math.max(0.1, v < 1 ? Math.round(v * 10) / 10 : Math.round(v))); };
   const winH = () => normH(cfg.win);
@@ -145,8 +148,9 @@
   let ZW = null;
   function rows() {
     if (!cfg.on) return [];
-    const res = RES.includes(+cfg.res) ? +cfg.res : 1;
+    const res = RES.includes(+cfg.res) ? +cfg.res : 1, mode = modeOf();
     const agg = (L, d, r) => { const m = new Map(); L.forEach(x => { const k = Math.round(x[0] / r); const o = m.get(k) || [0, 0]; o[0] += x[1]; o[1] += x[2]; m.set(k, o); }); return [...m.entries()].map(([k, o]) => [k * r - d, o[0], o[1], r]); };
+    if (mode === 'hold') { if (!srvOk() || !SZ.inv) return []; return agg(SZ.inv, O.sym === 'gcy' ? off() : (O.adj || 0), res); } // [ราคา, Long ค้าง, Short ค้าง] (oz)
     if (srvOk()) { const d = O.sym === 'gcy' ? off() : (O.adj || 0);
       if (SZ.fine && SZ.fine.length) return agg(SZ.fine, d, res);
       return SZ.rows ? agg(SZ.rows, d, Math.max(1, res)) : []; }
@@ -159,7 +163,7 @@
   const fmt = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v) + '';
   (O.bgHooks || O.hooks).push((ctx, w, h) => { // V4.9.20: วาดชั้นพื้นหลัง ใต้แถบโซน OI (ไม่บัง OI)
     if (!cfg.on || !live() || (TFS[O.tf] || 60) >= 86400) return;
-    const R = rows(), Zs = R.length ? [] : zones(); if (!R.length && !Zs.length && !freshZones().length) return;
+    const R = rows(), Zs = R.length || modeOf() === 'hold' ? [] : zones(); if (!R.length && !Zs.length && !freshZones().length) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height(), px = O.lastClose;
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
     hit = [];
@@ -168,8 +172,24 @@
     //   แถวที่เอียงชัด (z ≥ 1.5 และไม่ใช่ 49–51%) สีเข้ม + ขอบ · แถวไม่เอียง สีจาง · ไม่มีตัวหนังสือ แตะแถวดูรายละเอียด
     if (R.length) {
       const V = R.map(r => ({ p: r[0], b: r[1], s: r[2], y1: sr.priceToCoordinate(r[0] + r[3] / 2), y2: sr.priceToCoordinate(r[0] - r[3] / 2), hw: r[3] / 2 })).filter(r => r.y1 !== null && r.y2 !== null && r.y2 > 0 && r.y1 < plotH);
-      const mx = V.length ? Math.max(...V.map(r => r.b + r.s)) : 1, W = plotW * 0.3;
-      V.forEach(r => {
+      const mode = modeOf(), W = plotW * 0.3, mxAll = V.length ? Math.max(...V.map(q => q.b + q.s)) : 1;
+      if (mode !== 'all') { // V4.9.36: Δ ซื้อ−ขาย / ถือค้าง Long−Short → ยาว = |สุทธิ| · สี = ฝั่งที่เหลือ
+        const mxn = V.length ? Math.max(...V.map(r => Math.abs(r.b - r.s))) : 0;
+        if (mxn > 0) V.forEach(r => {
+          const net = r.b - r.s; if (Math.abs(net) < mxn * 0.04) return; // สุทธิเล็กมาก (ซื้อขายหักกันหมด) ไม่แสดง
+          const side = net > 0 ? 1 : -1, col = side > 0 ? '#38bdf8' : '#ff9f43', y = Math.round(r.y1) + 0.5, hh = Math.max(1, r.y2 - r.y1 - 1), len = Math.max(2, W * Math.abs(net) / mxn), x0 = plotW - len;
+          const strong = mode === 'delta' ? Math.abs(net) / Math.sqrt(Math.max(1, r.b + r.s)) >= 2 : Math.abs(net) >= mxn * 0.5;
+          ctx.globalAlpha = strong ? 0.85 : 0.55; ctx.fillStyle = col; ctx.fillRect(x0, y, len, hh);
+          if (strong) { ctx.globalAlpha = 1; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(x0 - 0.5, y - 0.5, len + 1, hh + 1); }
+          const loss = side > 0 ? px < r.p - r.hw : px > r.p + r.hw, gain = side > 0 ? px > r.p + r.hw : px < r.p - r.hw, st = loss ? ' · คนกลุ่มนี้ติดลบ' : gain ? ' · คนกลุ่มนี้กำไร' : '';
+          const pr = r.p.toFixed(r.hw < 0.5 ? 2 : r.hw < 1 ? 1 : 0), u = mode === 'hold' ? ' oz' : ' ไม้';
+          const txt = mode === 'hold'
+            ? `👥 ถือค้าง ${pr} ± ${r.hw} · <b style="color:${col}">${side > 0 ? 'Long' : 'Short'} เหลือสุทธิ ~${Math.abs(net).toFixed(2)}${u}</b><br>Long ค้าง ~${r.b.toFixed(2)} oz · Short ค้าง ~${r.s.toFixed(2)} oz${st}${loss ? ` → SL น่าจะอยู่${side > 0 ? 'ใต้' : 'เหนือ'}ราคานี้` : ''}<br><small>ประมาณจาก OI · เฉพาะไม้ Bybit</small>`
+            : `👥 Δ ${pr} ± ${r.hw} · <b style="color:${col}">${side > 0 ? 'ซื้อ' : 'ขาย'}สุทธิ ${fmt(Math.abs(net))}${u}</b> · ไล่ซื้อ ${fmt(r.b)} / ไล่ขาย ${fmt(r.s)}${st}`;
+          hit.push({ x0: Math.min(x0, plotW - 40), x1: plotW, y1: r.y1 - 1, y2: r.y2 + 1, txt });
+        });
+      } else V.forEach(r => {
+        const mx = mxAll;
         const t = r.b + r.s; if (!(t > 0)) return;
         const pct = r.b / t, z = (r.b - r.s) / Math.sqrt(Math.max(1, t)), pr = Math.round(pct * 100) / 100, side = pr >= 0.49 && pr <= 0.51 ? 0 : z >= 1.5 ? 1 : z <= -1.5 ? -1 : 0;
         if (!side) return; // V4.9.20: ไม่แสดงแถวที่ซื้อ≈ขาย (เดิมเป็นแถบจางสีเทา) เหลือเฉพาะแถวที่เอียงชัด
@@ -224,10 +244,12 @@
   }
   function section() { const d = document.createElement('div'); d.id = 'rtBox'; d.className = 'gsbox'; d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-rt="on"><i style="background:linear-gradient(90deg,#38bdf8 50%,#ff9f43 50%)"></i>👥 โซนรายย่อยเข้าออเดอร์</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>` +
     (cfg.on ? `<div class="row ps"><span class="gsinfo">ความละเอียดแถว</span>${RES.map(r => `<button class="gsb${+cfg.res === r ? ' on' : ''}" data-rtres="${r}">$${r}</button>`).join('')}</div>` +
+      `<div class="row ps"><span class="gsinfo">แสดง</span>${MODES.map(m => `<button class="gsb${modeOf() === m ? ' on' : ''}" data-rtmode="${m}">${MODE_LAB[m]}</button>`).join('')}</div>` +
+      (modeOf() === 'hold' ? `<div class="row ps"><span class="gsinfo">ถือค้าง = สะสมต่อเนื่อง (จางครึ่งทุก 36 ชม.) ไม่ใช้ช่วงย้อนหลัง${SZ && SZ.invSince ? ' · เริ่มนับ ' + new Date(SZ.invSince).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' }) : ''}</span></div>` : '') +
       `<div class="row ps"><label>ย้อนหลัง (ชม.)<input type="number" inputmode="decimal" step="0.1" min="0.1" max="24" data-rtwinin value="${winH()}" style="width:64px"></label>${WINS.map(h => `<button class="gsb${winH() === h ? ' on' : ''}" data-rtwin="${h}">${h}</button>`).join('')}</div>` : ''); return d; }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('rtBox')) return; const box = section(), anchor = $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }
   const menu = $('indMenu');
-  if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { const wb = e.target.closest('[data-rtwin]'); if (wb) { cfg.win = +wb.dataset.rtwin; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); loadSrv(); O.markDirty(); return; } const rb = e.target.closest('[data-rtres]'); if (rb) { cfg.res = +rb.dataset.rtres; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); return; } if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }
+  if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { const mb = e.target.closest('[data-rtmode]'); if (mb) { cfg.mode = mb.dataset.rtmode; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); return; } const wb = e.target.closest('[data-rtwin]'); if (wb) { cfg.win = +wb.dataset.rtwin; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); loadSrv(); O.markDirty(); return; } const rb = e.target.closest('[data-rtres]'); if (rb) { cfg.res = +rb.dataset.rtres; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); return; } if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }
   if (menu) menu.addEventListener('change', e => { const inp = e.target.closest('[data-rtwinin]'); if (!inp) return; cfg.win = normH(inp.value); inp.value = cfg.win; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); loadSrv(); O.markDirty(); });
   setInterval(() => { if (cfg.on && live()) O.markDirty(); }, 30000);
 

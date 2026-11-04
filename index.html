@@ -495,7 +495,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.26';
+  const APP_VER = '4.9.27';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -1835,7 +1835,8 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
         showPrice();
         if (SC.yahoo) paintOff();
         // V4.9.26: ค่าเริ่มเว้นที่ว่างขวา ~40% ของกราฟ (แท่งล่าสุดอยู่ราวกลางจอ เห็นแถบ 👥/OI ด้านขวาไม่ทับแท่ง)
-        try { const ts = chart.timeScale(), bs = ts.options().barSpacing || 6, w = ts.width() || chartEl.clientWidth; ts.applyOptions({ rightOffset: Math.max(8, Math.round(w * 0.4 / bs)) }); } catch (e) {}
+        const room = (k = 0) => { try { const ts = chart.timeScale(), bs = ts.options().barSpacing || 6, w = ts.width() || chartEl.clientWidth; if (!w) { if (k < 20) setTimeout(() => room(k + 1), 300); return; } ts.applyOptions({ rightOffset: Math.max(8, Math.round(w * 0.4 / bs)) }); ts.scrollToRealTime(); } catch (e) {} };
+        room(); // กราฟยังไม่มีขนาด (ซ่อน/ยังไม่วาง) → ลองใหม่ทุก 0.3 วิ
         chart.timeScale().scrollToRealTime();
         $('msg').hidden = true;
         window.OISplash && OISplash.done(lastClose, SC.name);

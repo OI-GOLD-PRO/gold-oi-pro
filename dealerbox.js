@@ -9,7 +9,7 @@
 (() => {
   'use strict';
   const O = window.OI;
-  if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
+  if (!O || !O.underlayHooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
   const $ = id => document.getElementById(id);
   const KEY = 'oi_dbox' + (O.psfx || '');
   const cfg = { on: !window.OI_NEWDEV }; // V4.9.29 เครื่องใหม่ปิดเป็นค่าเริ่ม
@@ -116,11 +116,13 @@
   // ---------- วาด ----------
   const csec = () => TFS[O.tf] || 60, toChart = t => Math.floor(t / csec()) * csec();
   let hit = [];
-  O.hooks.push((ctx, w, h) => {
+  O.underlayHooks.push((ctx, w, h) => {
+    hit = [];
     if (!cfg.on || !boxes.length || !bars.length || csec() >= 86400) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height();
     const X = i => ts.timeToCoordinate(toChart(bars[Math.min(i, bars.length - 1)].time)), Y = p => sr.priceToCoordinate(p);
-    ctx.save(); hit = [];
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, plotW, plotH); ctx.clip();
     boxes.forEach(bx => { // V4.9.7: แตกแล้วยังวาด (เส้นประ จาง) · V4.9.38: หลักฐาน ≥ 2 = เส้นหนา
       let x0 = X(bx.start), x1 = bx.live ? plotW - 2 : X(bx.end);
       if (x1 === null || x0 === null) { if (x0 === null && x1 !== null) x0 = 0; else return; }

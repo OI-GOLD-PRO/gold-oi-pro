@@ -11,8 +11,10 @@
   const $ = id => document.getElementById(id);
   const KEY = 'oi_retail' + (O.psfx || ''), SKEY = 'oi_retail_store_v1';
   const cfg = { on: !window.OI_NEWDEV, res: 1, win: 8 }; // V4.9.29 เครื่องใหม่ปิดเป็นค่าเริ่ม · // V4.9.22: res = ความละเอียดแถว ($) · V4.9.25: win = ย้อนหลัง (ชม.)
-  const RES = [0.1, 0.25, 0.5, 1, 2], WINS = [1, 2, 4, 8, 12, 24];
-  const winH = () => WINS.includes(+cfg.win) ? +cfg.win : 8;
+  const RES = [0.1, 0.25, 0.5, 1, 2], WINS = [0.5, 1, 2, 4, 8];
+  // V4.9.31: ใส่ชั่วโมงเองได้ 0.1–24 · ต่ำกว่า 1 ชม. ทีละ 0.1 · ตั้งแต่ 1 ชม. ทีละ 1
+  const normH = v => { v = +v; if (!(v > 0)) return 8; return Math.min(24, Math.max(0.1, v < 1 ? Math.round(v * 10) / 10 : Math.round(v))); };
+  const winH = () => normH(cfg.win);
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
   const saveCfg = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   const BK = 15 * 60e3, NC = 16, KEEP = 26 * 3600e3;
@@ -110,7 +112,7 @@
   let SZ = null, SZat = 0;
   async function loadSrv() {
     if (!cfg.on || !O.worker || O.paused) return; // V4.9.29 พักตอนไม่ได้ดูกราฟ
-    try { const j = await (await fetch(O.worker + '/retail?win=' + winH(), { cache: 'no-store' })).json(); if (j && j.ready && j.zones) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
+    try { const j = await (await fetch(O.worker + '/retail?win=' + winH(), { cache: 'no-store' })).json(); if (j && j.ready && j.zones && (!j.winH || j.winH === winH())) { SZ = j; SZat = Date.now(); O.markDirty(); } } catch (e) {}
   }
   document.addEventListener('oiresume', () => loadSrv());
   setTimeout(loadSrv, 1500); setInterval(() => { if (document.visibilityState === 'visible') loadSrv(); }, 30000);
@@ -221,10 +223,11 @@
   }
   function section() { const d = document.createElement('div'); d.id = 'rtBox'; d.className = 'gsbox'; d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-rt="on"><i style="background:linear-gradient(90deg,#38bdf8 50%,#ff9f43 50%)"></i>👥 โซนรายย่อยเข้าออเดอร์</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>` +
     (cfg.on ? `<div class="row ps"><span class="gsinfo">ความละเอียดแถว</span>${RES.map(r => `<button class="gsb${+cfg.res === r ? ' on' : ''}" data-rtres="${r}">$${r}</button>`).join('')}</div>` +
-      `<div class="row ps"><span class="gsinfo">ย้อนหลัง</span>${WINS.map(h => `<button class="gsb${winH() === h ? ' on' : ''}" data-rtwin="${h}">${h} ชม.</button>`).join('')}</div>` : ''); return d; }
+      `<div class="row ps"><label>ย้อนหลัง (ชม.)<input type="number" inputmode="decimal" step="0.1" min="0.1" max="24" data-rtwinin value="${winH()}" style="width:64px"></label>${WINS.map(h => `<button class="gsb${winH() === h ? ' on' : ''}" data-rtwin="${h}">${h}</button>`).join('')}</div>` : ''); return d; }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('rtBox')) return; const box = section(), anchor = $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }
   const menu = $('indMenu');
   if (menu) { new MutationObserver(() => mount()).observe(menu, { childList: true }); menu.addEventListener('click', e => { const wb = e.target.closest('[data-rtwin]'); if (wb) { cfg.win = +wb.dataset.rtwin; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); loadSrv(); O.markDirty(); return; } const rb = e.target.closest('[data-rtres]'); if (rb) { cfg.res = +rb.dataset.rtres; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); return; } if (!e.target.closest('[data-rt]')) return; cfg.on = !cfg.on; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); O.markDirty(); }); }
+  if (menu) menu.addEventListener('change', e => { const inp = e.target.closest('[data-rtwinin]'); if (!inp) return; cfg.win = normH(inp.value); inp.value = cfg.win; saveCfg(); const b = $('rtBox'); if (b) b.remove(); mount(); loadSrv(); O.markDirty(); });
   setInterval(() => { if (cfg.on && live()) O.markDirty(); }, 30000);
 
   window.OI_retail = { zones, rows, trapZones, freshZones, compute, get server() { return srvOk() ? SZ : null; }, save, needFull, get bins() { return bins; }, get cfg() { return cfg; } };

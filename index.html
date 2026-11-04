@@ -535,6 +535,10 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     wickUpColor: C('--up'), wickDownColor: C('--down'),
     priceFormat: { type: 'price', precision: SC.dec, minMove: SC.tick },
   });
+  // V4.9.40: ล็อกซูมแนวตั้ง → เส้นอินดี้อื่นบนแกนขวา (VWAP ฯลฯ) ไม่ดึงช่วงราคาให้กว้างออก
+  let vRange = null;
+  ['addLineSeries', 'addHistogramSeries', 'addAreaSeries'].forEach(fn => { const o = chart[fn].bind(chart); chart[fn] = (opt = {}) => { const sr2 = o(opt), user = opt.autoscaleInfoProvider, onRight = !opt.priceScaleId || opt.priceScaleId === 'right';
+    try { sr2.applyOptions({ autoscaleInfoProvider: orig => (vRange && onRight) ? null : (user ? user(orig) : orig()) }); } catch (e) {} return sr2; }; });
 
   // $25 grid from $1,000 below through $1,000 above the live gold price.
   const quarterGridLines = [];
@@ -1649,7 +1653,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   });
   // V4.9.40: ล็อกการซูมแนวตั้ง — ถ้าผู้ใช้ลาก/ซูมแกนราคาเอง จำช่วงราคา (ขนาดซูม) + ตำแหน่งราคาล่าสุดบนจอ (ต่อ TF)
   //          ราคาวิ่งจนเกือบตกขอบบน/ล่าง (เหลือ 6%) → เลื่อนให้ราคาล่าสุดกลับมาที่ตำแหน่งเดิม โดยคงขนาดซูมไว้ · แตะสองครั้งที่กราฟ = ยกเลิกล็อก (กลับปรับอัตโนมัติ)
-  const VSKEY = 'oi_vspan' + PSFX; let vRange = null, vLock = null, vCapT = null;
+  const VSKEY = 'oi_vspan' + PSFX; let vLock = null, vCapT = null;
   const vAll = () => { try { return JSON.parse(localStorage.getItem(VSKEY) || '{}') || {}; } catch (e) { return {}; } };
   const vGet = () => { const v = vAll()[tf]; return v && v.S > 0 && v.yf >= 0 && v.yf <= 1 ? v : null; };
   const vSet = v => { try { const o = vAll(); if (v) o[tf] = v; else delete o[tf]; localStorage.setItem(VSKEY, JSON.stringify(o)); } catch (e) {} };

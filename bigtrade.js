@@ -13,6 +13,9 @@
   const KEY = 'oi_bigtr' + (O.psfx || '');
   let cfg = Object.assign({}, DEF);
   let saved0 = {}; try { saved0 = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; Object.assign(cfg, saved0); } catch (e) {}
+  // V4.9.53: share ingestion with Volume Profile without enabling whale overlays/alerts.
+  const collecting = () => cfg.on || !!(window.OI_volumeProfile && window.OI_volumeProfile.cfg.on);
+  const historyHours = () => Math.max(cfg.on ? cfg.hours : 0, window.OI_volumeProfile && window.OI_volumeProfile.cfg.on ? window.OI_volumeProfile.cfg.win : 0) || cfg.hours;
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   if (saved0.v !== 2) { cfg.hours = 24; cfg.v = 2; save(); } // V4.3.3: ค่าเริ่มย้อนหลัง 24 ชม.
 
@@ -23,7 +26,7 @@
   const RING = 20000; let sizes = new Float32Array(RING), sN = 0, thrCache = 5, thrAt = 0;
   let delta = new Map();      // เวลาแท่ง (วินาทีแกนกราฟ) → { b, s } ปริมาณไล่ซื้อ/ไล่ขาย
   let pxOff = new Map();      // เวลาแท่ง → ราคา perp − ราคาบนกราฟ (แปลงราคาไม้ให้ตรงแกน)
-  let curTf = null, busy = false, ws = null, wsTimer = null, status = '';
+  let curTf = null, busy = false, ws = null, wsTimer = null, status = '', pendingCollection = false;
   const thr = () => { if (!cfg.auto) return Math.max(0.01, +cfg.thr || 5); if (Date.now() - thrAt > 20000) { thrAt = Date.now(); thrCache = autoThr(); } return thrCache; };
   function autoThr() { const n = Math.min(sN, RING); if (n < 200) return 5; const a = sizes.slice(0, n).sort(); return Math.max(1, Math.round(a[Math.floor(n * 0.995)] * 10) / 10); }
   const barOf = ms => { const sec = TFS[O.tf] || 60; return Math.floor(ms / 1000 / sec) * sec + TZ; };
@@ -66,6 +69,7 @@
 
   // ---------- ย้อนหลังไม้ใหญ่ ----------
   function addTrade(t, p, q, s, keepAll, id) {
+    if (id !== undefined && window.OIVolumeSink) window.OIVolumeSink('binance', id, t, p, q, s);
     sizes[sN % RING] = q; sN++;
     if (window.OIRetailSink) window.OIRetailSink(t, p, q, s, id); // V4.9.12: 👥 โซนรายย่อย (ไม้เล็ก)
     if (src === 'bitget') { const bt = barOf(t), d = delta.get(bt) || { b: 0, s: 0 }; if (s > 0) d.b += q; else d.s += q; delta.set(bt, d); }
@@ -94,7 +98,7 @@
   // ดึงช่วง id (lo..hi] จากใหม่ไปเก่า ครั้งละ 3 หน้าพร้อมกัน
   async function pullRange(lo, hi, since, label) {
     let to = hi, done = 0; const total = Math.max(1, Math.ceil((hi - lo) / 1000));
-    while (to > lo) {
+    while (to > lo && collecting()) {
       const batch = [];
       for (let k = 0; k < 4 && to > lo; k++) { const from = Math.max(lo + 1, to - 999); batch.push(page(from)); to = from - 1; }
       const res = (await Promise.all(batch.map(p => p.catch(e => { if (/HTTP 400/.test(e.message)) return null; throw e; })))).filter(Boolean);
@@ -127,7 +131,7 @@
   }
   async function backfill() {
     trades = []; sN = 0; thrAt = 0; limited = false;
-    const A = anchorMs(), since = A.end - cfg.hours * 3600e3; closedAnchor = A.closed;
+    const A = anchorMs(), since = A.end - historyHours() * 3600e3; closedAnchor = A.closed;
     sinceT = since;
     if (src !== 'bitget') {
       try {
@@ -140,7 +144,7 @@
         const hiNeed = A.closed ? await idAt(A.end, top) : low - 1;
         const c = loadCache();
         let loNeed = null;
-        if (c && c.hiId && c.rows.length && !(window.OI_retail && OI_retail.cfg.on && OI_retail.needFull(since)) && (c.rows[0][0] <= since + 3600e3 || (c.lim && c.since <= since + 3600e3)) && c.hiId > top - 3000000) {
+        if (c && c.hiId && c.rows.length && !(window.OI_volumeProfile && OI_volumeProfile.cfg.on && OI_volumeProfile.needFull(since)) && !(window.OI_retail && OI_retail.cfg.on && OI_retail.needFull(since)) && (c.rows[0][0] <= since + 3600e3 || (c.lim && c.since <= since + 3600e3)) && c.hiId > top - 3000000) {
           c.rows.forEach(([t, p, q, s]) => { if (t >= since && t < head[0].T) trades.push({ t, p, q, s }); });
           loNeed = c.hiId; // มีของเดิมแล้ว ดึงเฉพาะช่วงที่ขาด
         }
@@ -155,9 +159,10 @@
     }
     // Bitget: ไล่ย้อนจากล่าสุดทีละ 1000 (ไม้ย่อยเวลาเดียวกัน ฝั่งเดียวกัน = ออเดอร์เดียว → รวมกัน)
     let idLess = null, calls = 0; const raw = [];
-    while (calls < Math.min(150, 10 + cfg.hours * 6)) {
+    while (collecting() && calls < Math.min(150, 10 + historyHours() * 6)) {
       const j = await fetchJ(`https://api.bitget.com/api/v2/mix/market/fills-history?symbol=${SYM}&productType=usdt-futures&limit=1000${idLess ? '&idLessThan=' + idLess : ''}`); calls++;
       const d = j.data || []; if (!d.length) break;
+      d.forEach(x => { if (window.OIVolumeSink) window.OIVolumeSink('bitget', x.tradeId, +x.ts, +x.price, +x.size, /buy/i.test(x.side) ? 1 : -1); });
       d.forEach(x => raw.push([+x.ts, +x.price, +x.size, /buy/i.test(x.side) ? 1 : -1]));
       idLess = d[d.length - 1].tradeId;
       if (+d[d.length - 1].ts < since) break;
@@ -178,9 +183,9 @@
       } else {
         ws = new WebSocket('wss://ws.bitget.com/v2/ws/public');
         ws.onopen = () => { ws.send(JSON.stringify({ op: 'subscribe', args: [{ instType: 'USDT-FUTURES', channel: 'trade', instId: SYM }] })); wsTimer = setInterval(() => { try { ws.send('ping'); } catch (e) {} }, 25000); };
-        ws.onmessage = e => { lastMsg = Date.now(); if (e.data === 'pong') return; const m = JSON.parse(e.data); (m.data || []).forEach(x => { addTrade(+x.ts, +x.price, +x.size, /buy/i.test(x.side) ? 1 : -1); live(+x.ts); }); };
+        ws.onmessage = e => { lastMsg = Date.now(); if (e.data === 'pong') return; const m = JSON.parse(e.data); (m.data || []).forEach(x => { if (window.OIVolumeSink) window.OIVolumeSink('bitget', x.tradeId, +x.ts, +x.price, +x.size, /buy/i.test(x.side) ? 1 : -1); addTrade(+x.ts, +x.price, +x.size, /buy/i.test(x.side) ? 1 : -1); live(+x.ts); }); };
       }
-      ws.onclose = () => { if (cfg.on) setTimeout(() => { if (cfg.on && (!ws || ws.readyState > 1)) openWS(); }, 5000); };
+      ws.onclose = () => { if (collecting()) setTimeout(() => { if (collecting() && (!ws || ws.readyState > 1)) openWS(); }, 5000); };
     } catch (e) {}
   }
   function closeWS() { clearInterval(wsTimer); if (ws) { ws.onclose = null; try { ws.close(); } catch (e) {} ws = null; } }
@@ -188,7 +193,7 @@
   function live(t) {
     // ไม้ใหม่ใหญ่มาก (≥ 3 เท่าเกณฑ์) → แจ้งในแอป
     const x = trades[trades.length - 1];
-    if (x && x.t === t && x.q >= thrCache * 3 && Date.now() - lastAlert > 20000 && (!window.OIAlerts || OIAlerts.on('whale'))) { lastAlert = Date.now(); O.showToast && O.showToast(`🐋 ไม้ใหญ่ ${x.s > 0 ? '<b style="color:#2fe3a6">ไล่ซื้อ</b>' : '<b style="color:#ff6b82">ไล่ขาย</b>'} ${x.q.toFixed(2)} oz @ ${(x.p - offAt(barOf(x.t))).toFixed(2)}`, 6000); }
+    if (cfg.on && x && x.t === t && x.q >= thrCache * 3 && Date.now() - lastAlert > 20000 && (!window.OIAlerts || OIAlerts.on('whale'))) { lastAlert = Date.now(); O.showToast && O.showToast(`🐋 ไม้ใหญ่ ${x.s > 0 ? '<b style="color:#2fe3a6">ไล่ซื้อ</b>' : '<b style="color:#ff6b82">ไล่ขาย</b>'} ${x.q.toFixed(2)} oz @ ${(x.p - offAt(barOf(x.t))).toFixed(2)}`, 6000); }
     if (x && x.t === t && x.q >= thrCache && Date.now() - lastLive > 500) { lastLive = Date.now(); O.markDirty(); }
   }
   // V4.3.3: เติมไม้ที่หายระหว่างสายหลุด/แอปอยู่เบื้องหลัง (ไล่จาก id ล่าสุดที่มี ไปข้างหน้า)
@@ -206,25 +211,26 @@
     } catch (e) {} finally { filling = false; }
   }
   // สายเงียบ > 45 วิ (ตลาด perp เปิด 24 ชม. แต่ช่วงเงียบมีไม้น้อย) → ต่อใหม่ + เติมช่วงที่ขาด
-  setInterval(() => { if (!cfg.on || busy || document.visibilityState === 'hidden') return; if (lastMsg && Date.now() - lastMsg > 45000) { lastMsg = Date.now(); openWS(); gapFill(); } }, 15000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cfg.on && !busy) { if (!ws || ws.readyState > 1) openWS(); gapFill(); loadKlines().then(() => O.markDirty()); } });
-  setInterval(() => { if (cfg.on && !busy) saveCache(); }, 5 * 60e3);
+  setInterval(() => { if (!collecting() || busy || document.visibilityState === 'hidden') return; if (lastMsg && Date.now() - lastMsg > 45000) { lastMsg = Date.now(); openWS(); gapFill(); } }, 15000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && collecting() && !busy) { if (!ws || ws.readyState > 1) openWS(); gapFill(); loadKlines().then(() => O.markDirty()); } });
+  setInterval(() => { if (collecting() && !busy) saveCache(); }, 5 * 60e3);
   // ตัดไม้เล็ก/เก่าทิ้งเป็นระยะ ไม่ให้หน่วยความจำโต
-  setInterval(() => { if (!cfg.on) return; const T = thr() * 0.5, since = Math.min(Date.now() - (cfg.hours + 1) * 3600e3, sinceT || Infinity); trades = trades.filter(x => x.q >= Math.min(T, MINQ) && x.t >= since); }, 60000);
+  setInterval(() => { if (!collecting()) return; const T = thr() * 0.5, since = Math.min(Date.now() - (cfg.hours + 1) * 3600e3, sinceT || Infinity); trades = trades.filter(x => x.q >= Math.min(T, MINQ) && x.t >= since); }, 60000);
 
   async function reload() {
-    if (busy || !cfg.on) return; busy = true; curTf = O.tf;
+    if (busy || !collecting()) return; busy = true; curTf = O.tf;
     status = 'กำลังโหลด…'; paintInfo();
-    try { await loadKlines(); await backfill(); thrAt = 0; thr(); openWS(); status = ''; } catch (e) { status = 'โหลดไม่ได้: ' + (e.message || e); }
+    try { await loadKlines(); await backfill(); thrAt = 0; thr(); if (collecting()) openWS(); status = ''; } catch (e) { status = 'โหลดไม่ได้: ' + (e.message || e); }
     busy = false; paintInfo(); O.markDirty();
+    if (pendingCollection) { pendingCollection = false; if (collecting()) setTimeout(reload, 0); }
   }
   // Delta/ราคาอ้างอิงอัปเดตทุก 30 วินาที · เปลี่ยน TF → โหลด klines ใหม่ (ไม้ใหญ่ใช้ชุดเดิม)
   setInterval(async () => {
-    if (!cfg.on || busy) return;
+    if (!collecting() || busy) return;
     if (curTf !== O.tf) { curTf = O.tf; await loadKlines(); O.markDirty(); paintInfo(); return; }
     if (src === 'binance') { await loadKlines(); O.markDirty(); paintInfo(); }
   }, 3000 * 10);
-  setInterval(() => { if (cfg.on && curTf !== O.tf && !busy) { curTf = O.tf; loadKlines().then(() => { O.markDirty(); paintInfo(); }); } }, 1500);
+  setInterval(() => { if (collecting() && curTf !== O.tf && !busy) { curTf = O.tf; loadKlines().then(() => { O.markDirty(); paintInfo(); }); } }, 1500);
 
   // ---------- วาด ----------
   O.hooks.push((ctx, w, h) => {
@@ -298,7 +304,7 @@
     menu.addEventListener('click', e => {
       const t = e.target.closest('[data-btt]'); if (!t) return;
       const k = t.dataset.btt; cfg[k] = !cfg[k]; save();
-      if (k === 'on') { if (cfg.on) reload(); else { closeWS(); trades = []; delta = new Map(); O.markDirty(); } }
+      if (k === 'on') { if (cfg.on) reload(); else if (!collecting()) { closeWS(); trades = []; delta = new Map(); O.markDirty(); } }
       O.markDirty(); remount();
       if (cfg.on) $('indBtn').classList.add('has');
     });
@@ -310,7 +316,8 @@
       inp.value = v; O.markDirty(); paintInfo();
     });
   }
-  if (cfg.on) setTimeout(reload, 3500);
+  if (collecting()) setTimeout(reload, 3500);
   if (window.OIAlerts) OIAlerts.reg('whale', 'ไม้ใหญ่ 🐋 Big Traders', { desc: 'ไม้ไล่ซื้อ/ไล่ขายใหญ่กว่าเกณฑ์ 3 เท่า', active: () => cfg.on });
-  window.OI_bigtr = { get pxOff() { return pxOff; }, offAt, get cfg() { return cfg; }, get trades() { return trades; }, get delta() { return delta; }, get src() { return src; }, thr, reload };
+  window.OI_bigtr = { get pxOff() { return pxOff; }, offAt, anchorMs, get busy() { return busy; }, get status() { return status; }, get limited() { return limited; }, syncCollection() { if (collecting()) { if (busy) pendingCollection = true; else reload(); } else closeWS(); }, get cfg() { return cfg; }, get trades() { return trades; }, get delta() { return delta; }, get src() { return src; }, thr, reload };
 })();
+

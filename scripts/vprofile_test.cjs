@@ -72,3 +72,14 @@ assert.equal(v.profile().rows[0].p, 4000.1);
 console.log('PASS: true $0.1 rows, decimal grouping/volume conservation, fine cache restore/dedup, coarse cache rejected and raw history rebuild;');
 console.log('PASS: custom row/window values, persistence, aggregation, reload on window expansion, invalid/bounds normalization;');
 console.log('PASS: all sizes/actual quantity, sides/delta/POC, time windows, venue isolation, large IDs, overlap dedup, persistence, toggle collection, render at 320/390/1440px.');
+
+v.cfg.on = true; change('res', '0.1'); change('win', '2.3');
+put('9001', 4200, 1e9, 1); // dominant volume far above mobile price viewport
+put('9002', 4000.21, 0.001, -1);
+for (const size of [320, 390, 430]) {
+  width = size; fills = []; hooks.at(-1)(ctx, width, 500);
+  assert(fills.some(([x,y,b,h]) => b >= width * 0.3), 'Visible bars must not vanish because of offscreen volume');
+  assert(fills.some(([x,y,b,h]) => b >= 1 && h >= 1), 'Fine rows remain at least one CSS pixel');
+  assert(fills.every(([x,y,b,h]) => x >= 0 && x + b <= width + 1e-6 && Number.isInteger(y)));
+}
+console.log('PASS: $0.1 mobile rows at 320/390/430px survive huge offscreen volume and subpixel scaling.');

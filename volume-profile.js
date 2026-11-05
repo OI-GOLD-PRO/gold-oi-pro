@@ -86,16 +86,21 @@
     if (!cfg.on || !feed() || !feed().pxOff.size) return;
     const P = profile(); if (!P.rows.length) return;
     const ts = O.chart.timeScale(), width = ts.width(), height = h - ts.height(), shift = offset();
-    const maxWidth = Math.min(180, width * 0.32), max = Math.max(...P.rows.map(r => cfg.mode === 'delta' ? Math.abs(r.delta) : r.total), 1e-9);
+    const maxWidth = Math.min(180, width * 0.32);
+    const visible = P.rows.map(r => {
+      const p = r.p - shift;
+      return { r, p, a: O.series.priceToCoordinate(p + cfg.res / 2), b: O.series.priceToCoordinate(p - cfg.res / 2) };
+    }).filter(v => v.a !== null && v.b !== null && Number.isFinite(v.a) && Number.isFinite(v.b) && v.b >= 0 && v.a <= height);
+    // Scale against visible rows; a large trade outside the mobile viewport must not hide every bar.
+    const max = visible.reduce((m, v) => Math.max(m, cfg.mode === 'delta' ? Math.abs(v.r.delta) : v.r.total), 1e-9);
     if (width <= 0 || height <= 0) return;
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
     ctx.font = 'bold 9px monospace'; ctx.textBaseline = 'middle';
-    P.rows.forEach(r => {
-      const p = r.p - shift, a = O.series.priceToCoordinate(p + cfg.res / 2), b = O.series.priceToCoordinate(p - cfg.res / 2);
-      if (a === null || b === null || b < 0 || a > height) return;
-      const y = Math.max(0, a), bottom = Math.min(height, b), barH = Math.max(1, bottom - y - 1);
-      const amount = cfg.mode === 'delta' ? Math.abs(r.delta) : r.total, len = maxWidth * amount / max;
-      if (len < 0.5) return;
+    visible.forEach(({ r, p, a, b }) => {
+      const y = Math.max(0, Math.floor(a)), bottom = Math.min(height, b), barH = Math.max(1, Math.floor(bottom - y - 1));
+      const amount = cfg.mode === 'delta' ? Math.abs(r.delta) : r.total;
+      if (!(amount > 0)) return;
+      const len = Math.min(maxWidth, Math.max(1, maxWidth * amount / max));
       const x = width - len, strong = P.poc === r;
       ctx.globalAlpha = strong ? 0.95 : 0.72;
       if (cfg.mode === 'all') { const buyW = len * r.buy / r.total;
@@ -123,6 +128,7 @@
     if (!f) return 'กำลังรอระบบรับข้อมูล…';
     const status = f.busy ? (f.status || 'กำลังโหลดย้อนหลัง…') : f.status;
     if (!p.rows.length) return status || 'รอธุรกรรมจริงจาก ' + (source() || 'ตลาด') + '…';
+    if (!f.pxOff.size) return 'รับธุรกรรมแล้ว · กำลังโหลดราคาอ้างอิงกราฟ…';
     const hrs = Math.max(0, (p.end - p.first) / 3600e3);
     return (source() || '') + ' · ' + fmt(p.total) + ' oz · ข้อมูลที่รับได้ ' + Math.min(cfg.win, hrs).toFixed(1) + '/' + cfg.win + ' ชม.' + (status ? ' · ' + status : '') + (f.limited ? ' · ประวัติจากตลาดมีจำกัด' : '');
   }

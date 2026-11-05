@@ -33,7 +33,13 @@
   const fetchJ = async (u, ms) => { const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms || 8000); try { const r = await fetch(u, { signal: ac.signal, cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); } finally { clearTimeout(t); } };
 
   // ---------- Delta + ราคาอ้างอิงต่อแท่ง (Binance klines: k[9] = taker buy volume) ----------
-  async function loadKlines() {
+  let referenceLoad = null;
+  function loadKlines() {
+    if (referenceLoad) return referenceLoad;
+    referenceLoad = loadPriceReference().finally(() => { referenceLoad = null; });
+    return referenceLoad;
+  }
+  async function loadPriceReference() {
     const B = O.series.data() || []; if (B.length < 3) return;
     // กราฟยังเป็นแท่งของ TF เดิม (เพิ่งกดเปลี่ยน) → รอแล้วลองใหม่ ไม่งั้นจับคู่ราคาผิดแท่ง
     const step = TFS[O.tf] || 60;
@@ -137,6 +143,7 @@
       try {
         const head = await fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&limit=1000`);
         if (!head.length) throw new Error('no data');
+        src = 'binance';
         head.forEach(x => addTrade(x.T, +x.p, +x.q, x.m ? -1 : 1, true, x.a));
         const top = head[head.length - 1].a, low = head[0].a;
         lastId = top; lastMsg = Date.now(); thrAt = 0; thr(); O.markDirty();
@@ -228,9 +235,17 @@
   setInterval(async () => {
     if (!collecting() || busy) return;
     if (curTf !== O.tf) { curTf = O.tf; await loadKlines(); O.markDirty(); paintInfo(); return; }
-    if (src === 'binance') { await loadKlines(); O.markDirty(); paintInfo(); }
+    if (src === 'binance' || !pxOff.size) { await loadKlines(); O.markDirty(); paintInfo(); }
   }, 3000 * 10);
-  setInterval(() => { if (collecting() && curTf !== O.tf && !busy) { curTf = O.tf; loadKlines().then(() => { O.markDirty(); paintInfo(); }); } }, 1500);
+  setInterval(() => {
+    // Mobile cold start/resume: raw trades can arrive before chart bars or price reference.
+    // Retry the reference even during history backfill, for either exchange.
+    if (!collecting() || document.visibilityState === 'hidden') return;
+    if ((!busy && curTf !== O.tf) || !pxOff.size) {
+      if ((O.series.data() || []).length < 3) return;
+      curTf = O.tf; loadKlines().then(() => { O.markDirty(); paintInfo(); });
+    }
+  }, 1500);
 
   // ---------- วาด ----------
   O.hooks.push((ctx, w, h) => {

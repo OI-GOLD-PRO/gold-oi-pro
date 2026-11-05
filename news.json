@@ -45,7 +45,9 @@
       "i": "M",
       "title": "Unemployment Claims",
       "forecast": "197K",
-      "previous": "194K"
+      "previous": "194K",
+      "actual": "189K",
+      "better": true
     },
     {
       "date": "2026-11-06T08:30:00-05:00",

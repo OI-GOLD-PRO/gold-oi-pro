@@ -8,8 +8,11 @@
   const cfg = { on: false, res: 1, win: 8, mode: 'all', poc: true };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (_) {}
   const RES = [1, 2, 5, 10], WINS = [1, 4, 8, 24], MODES = ['all', 'delta'];
-  if (!RES.includes(+cfg.res)) cfg.res = 1;
-  if (!WINS.includes(+cfg.win)) cfg.win = 8;
+  // Custom values survive reload; source price buckets have $1 resolution.
+  const normRes = v => Number.isFinite(+v) && +v > 0 ? Math.min(1000, Math.max(1, Math.round(+v))) : null;
+  const normWin = v => Number.isFinite(+v) && +v > 0 ? Math.min(24, Math.max(0.1, Math.round(+v * 10) / 10)) : null;
+  cfg.res = normRes(cfg.res) ?? 1;
+  cfg.win = normWin(cfg.win) ?? 8;
   if (!MODES.includes(cfg.mode)) cfg.mode = 'all';
   const MINUTE = 60000, KEEP = 72 * 3600e3, BUY = '#38bdf8', SELL = '#f97316';
   // Per exchange/minute: price -> [buy oz, sell oz], and exact trade-id ranges for dedup.
@@ -125,7 +128,7 @@
   function section() {
     const d = document.createElement('div'); d.id = 'vpBox'; d.className = 'gsbox';
     d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-vp="on"><i style="background:linear-gradient(90deg,${BUY} 50%,${SELL} 50%)"></i>Volume Profile · ซื้อขายทั้งหมด</button><span class="gsinfo" id="vpInfo">${cfg.on ? info() : ''}</span></div>` +
-      (cfg.on ? `<div class="row ps"><span class="gsinfo">แถวราคา</span>${RES.map(r => `<button class="gsb${cfg.res === r ? ' on' : ''}" data-vpres="${r}">$${r}</button>`).join('')}</div><div class="row ps"><span class="gsinfo">ย้อนหลัง</span>${WINS.map(h => `<button class="gsb${cfg.win === h ? ' on' : ''}" data-vpwin="${h}">${h} ชม.</button>`).join('')}</div><div class="row ps">${MODES.map(m => `<button class="gsb${cfg.mode === m ? ' on' : ''}" data-vpmode="${m}">${m === 'all' ? 'ซื้อ + ขาย' : 'Δ ซื้อ−ขาย'}</button>`).join('')}<button class="gsb${cfg.poc ? ' on' : ''}" data-vp="poc">POC</button></div><div class="row ps"><span class="gsinfo">ทุกขนาดไม้ · ปริมาณ oz · ไม่ถ่วงอายุ · ฟ้าซื้อ / ส้มขาย · แสดงทีละตลาด perp<br>ช่วงเวลาปัดเป็นนาที · ราคาต้นทางรวมทีละ $1 · POC = แถวที่วอลลุ่มรวมสูงสุด<br>แสดงเฉพาะข้อมูลที่รับได้ อาจไม่ครบช่วงที่เลือก ไม่ใช่วอลลุ่มรวมทุกตลาดหรือ CME</span></div>` : ''); return d;
+      (cfg.on ? `<div class="row ps"><label>ขนาดแถว ($)<input type="number" inputmode="numeric" min="1" max="1000" step="1" data-vpin="res" value="${cfg.res}" style="width:76px;max-width:100%"></label></div><div class="row ps"><span class="gsinfo">เลือกเร็ว</span>${RES.map(r => `<button class="gsb${cfg.res === r ? ' on' : ''}" data-vpres="${r}">$${r}</button>`).join('')}</div><div class="row ps"><label>ย้อนหลัง (ชม.)<input type="number" inputmode="decimal" min="0.1" max="24" step="0.1" data-vpin="win" value="${cfg.win}" style="width:76px;max-width:100%"></label></div><div class="row ps"><span class="gsinfo">เลือกเร็ว</span>${WINS.map(h => `<button class="gsb${cfg.win === h ? ' on' : ''}" data-vpwin="${h}">${h} ชม.</button>`).join('')}</div><div class="row ps">${MODES.map(m => `<button class="gsb${cfg.mode === m ? ' on' : ''}" data-vpmode="${m}">${m === 'all' ? 'ซื้อ + ขาย' : 'Δ ซื้อ−ขาย'}</button>`).join('')}<button class="gsb${cfg.poc ? ' on' : ''}" data-vp="poc">POC</button></div><div class="row ps"><span class="gsinfo">ทุกขนาดไม้ · ปริมาณ oz · ไม่ถ่วงอายุ · ฟ้าซื้อ / ส้มขาย · แสดงทีละตลาด perp<br>ช่วงเวลาปัดเป็นนาที · ราคาต้นทางรวมทีละ $1 · POC = แถวที่วอลลุ่มรวมสูงสุด<br>แสดงเฉพาะข้อมูลที่รับได้ อาจไม่ครบช่วงที่เลือก ไม่ใช่วอลลุ่มรวมทุกตลาดหรือ CME</span></div>` : ''); return d;
   }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('vpBox')) return; const a = $('rtBox') || m.querySelector('.t'), d = section(); a ? a.after(d) : m.prepend(d); }
   function remount() { const d = $('vpBox'); if (d) d.remove(); mount(); }
@@ -143,6 +146,17 @@
       if (sync && feed()) feed().syncCollection();
     });
   }
+  if (menu) menu.addEventListener('change', e => {
+    const input = e.target.closest('[data-vpin]'); if (!input) return;
+    const key = input.dataset.vpin;
+    if (key !== 'res' && key !== 'win') return;
+    const value = key === 'res' ? normRes(input.value) : normWin(input.value);
+    if (value === null) { input.value = cfg[key]; return; }
+    const sync = key === 'win' && value > cfg.win;
+    cfg[key] = value; input.value = value;
+    saveCfg(); cache = null; remount(); O.markDirty();
+    if (sync && cfg.on && feed()) feed().syncCollection();
+  });
   setInterval(() => { if (!cfg.on || O.paused || document.visibilityState !== 'visible') return; O.markDirty(); const e = $('vpInfo'); if (e) e.textContent = info(); }, 1000);
   setInterval(saveData, 60000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveData(); });

@@ -35,4 +35,21 @@ for (const size of [320, 390, 1440]) { width = size; fills = []; lines = []; hoo
 v.cfg.mode = 'delta'; fills = []; hooks.at(-1)(ctx, width, 500); assert.equal(fills.length, 2);
 events.click({ target: { closest: () => ({ dataset: { vp: 'on' } }) } }); assert.equal(v.cfg.on, false); assert.equal(sync, 1);
 events.click({ target: { closest: () => ({ dataset: { vp: 'on' } }) } }); assert.equal(v.cfg.on, true); assert.equal(sync, 2);
+function change(key, value) {
+  const input = { dataset: { vpin: key }, value };
+  events.change({ target: { closest: () => input } }); return input.value;
+}
+assert.equal(change('res', '3'), 3); assert.equal(v.cfg.res, 3);
+assert.equal(v.profile().total, 122.01); assert.equal(v.profile().rows[0].p, 3999);
+const syncBefore = sync; change('win', '2.3'); assert.equal(v.cfg.win, 2.3); assert.equal(sync, syncBefore);
+change('win', '9.5'); assert.equal(sync, syncBefore + 1); assert.equal(v.profile().total, 322.01);
+change('res', '7'); change('win', '2.3');
+w = runtime(); v = w.OI_volumeProfile; assert.equal(v.cfg.res, 7); assert.equal(v.cfg.win, 2.3);
+assert.equal(change('res', ''), 7); assert.equal(change('win', 'NaN'), 2.3);
+assert.equal(change('res', '-2'), 7); assert.equal(change('win', 'Infinity'), 2.3);
+assert.equal(change('res', '5000'), 1000); assert.equal(change('win', '99'), 24);
+assert.equal(change('res', '0.2'), 1); assert.equal(change('win', '0.01'), 0.1);
+assert.equal(change('res', '2.8'), 3); assert.equal(change('win', '2.34'), 2.3);
+v.cfg.on = false; const pausedSync = sync; change('win', '10.5'); assert.equal(sync, pausedSync);
+console.log('PASS: custom row/window values, persistence, aggregation, reload on window expansion, invalid/bounds normalization;');
 console.log('PASS: all sizes/actual quantity, sides/delta/POC, time windows, venue isolation, large IDs, overlap dedup, persistence, toggle collection, render at 320/390/1440px.');

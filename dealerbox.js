@@ -1,24 +1,26 @@
 // 🛡 กรอบขาว "ดีลเลอร์รับ": หาราคาที่ดีลเลอร์ถือ gamma บวก (strike GEX บวก = ขายตอนขึ้น ซื้อตอนลง → ตรึงราคา)
-// แล้วราคาวิ่งเข้าไปทดสอบแต่ "ปิดผ่านไม่ได้" อย่างน้อย 2 ครั้ง → ตีกรอบสี่เหลี่ยมเส้นขาวคลุมจุดนั้น
+// แล้วราคาวิ่งเข้าไปทดสอบแต่ "ปิดผ่านไม่ได้" ตามจำนวนครั้งที่ตั้ง (ค่าเริ่ม 3 ครั้ง) → ตีกรอบสี่เหลี่ยมเส้นขาวคลุมจุดนั้น
 //  - แนว: strike ที่ GEX บวก 8 อันดับแรก (ห่างราคาไม่เกิน 3%) จากข้อมูลออปชันสด (live.js)
 //    V4.9.38: เก็บแนวของแต่ละวันไว้ที่เซิร์ฟเวอร์ (/gexlog) → กรอบย้อนหลังใช้แนวของวันนั้น (วันที่ยังไม่มีประวัติ ใช้แนววันนี้แทน = โดยประมาณ)
 //  - ทดสอบ: ไส้แท่ง M5 แตะแนว (ห่างไม่เกิน tol) แต่ราคาปิดกลับฝั่งเดิม · นับครั้งที่ห่างกันอย่างน้อย 2 แท่ง
 //  - แตก: ราคาปิดเลยแนวเกิน $2 → เส้นประจาง · V4.9.38 วัดว่าทะลุแล้ววิ่งต่อไกลแค่ไหน (4 ชม.) และกลับเข้ามาไหม (1 ชม. = หลอก)
 //  - V4.9.38 หลักฐานดีลเลอร์รับจริง (ต่อครั้งที่ทดสอบ): Absorption (Volume สูง ตัวแท่งเล็ก) · 🐋 ไม้ใหญ่สวนทาง · 👥 รายย่อยไล่เข้าใส่แนวแต่ราคาไม่ผ่าน (กรอบที่ยังยืน)
-//    หลักฐาน ≥ 2 = กรอบเส้นหนา · ย้อนหลังได้ ~5 วัน (M5 1,500 แท่ง)
+//    หลักฐาน ≥ 2 แสดงในรายละเอียดกรอบ · ย้อนหลังได้ ~5 วัน (M5 1,500 แท่ง)
 (() => {
   'use strict';
   const O = window.OI;
   if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
   const $ = id => document.getElementById(id);
   const KEY = 'oi_dbox' + (O.psfx || '');
-  const cfg = { on: !window.OI_NEWDEV }; // V4.9.29 เครื่องใหม่ปิดเป็นค่าเริ่ม
+  const cfg = { on: !window.OI_NEWDEV, minTests: 3 }; // V4.9.29 เครื่องใหม่ปิดเป็นค่าเริ่ม
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+  const normTests = v => Number.isFinite(+v) && +v > 0 ? Math.max(1, Math.min(20, Math.round(+v))) : null;
+  cfg.minTests = normTests(cfg.minTests) ?? 3;
   let requestFrameUpdate = () => {};
   const invalidate = () => { O.markDirty(); requestFrameUpdate(); };
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
-  const BRK = 2, MIN_TEST = 2, GAP = 2, NBARS = 1500, AHEAD = 48, FAKE = 12, TZ = 7 * 3600;
+  const BRK = 2, GAP = 2, NBARS = 1500, AHEAD = 48, FAKE = 12, TZ = 7 * 3600;
   let boxes = [], bars = [], busy = false, lastRun = 0, hist = {}, histAt = 0, logAt = 0;
   // วันเทรด: รอบ CME เปิด ~05:00–06:00 ไทย → ตัดวันที่ 05:00 (เวลาแท่งเป็นเวลาไทยแล้ว)
   const dayKey = t => new Date((t - 5 * 3600) * 1000).toISOString().slice(0, 10);
@@ -66,6 +68,9 @@
   }
 
   function scan(B, cur) {
+    // Only closed M5 candles can confirm a failed test.
+    const formingTime = Math.floor((Date.now() / 1000 + TZ) / 300) * 300;
+    B = B.filter(b => b.time < formingTime);
     const n = B.length; if (n < 40) return [];
     const TR = B.map((b, i) => i ? Math.max(b.high - b.low, Math.abs(b.high - B[i - 1].close), Math.abs(b.low - B[i - 1].close)) : b.high - b.low), PS = [0]; TR.forEach(v => PS.push(PS[PS.length - 1] + v));
     const ATR = TR.map((v, i) => Math.max(0.8, (PS[i + 1] - PS[Math.max(0, i - 29)]) / Math.min(30, i + 1)));
@@ -74,7 +79,7 @@
     const ks = new Set(); DL.forEach(m => m.forEach((v, k) => ks.add(k)));
     const out = [];
     ks.forEach(k => {
-      let cur = null; const fin = () => { if (cur && cur.tests.length >= MIN_TEST) out.push(cur); cur = null; };
+      let cur = null; const fin = () => { if (cur && cur.tests.length >= cfg.minTests) out.push(cur); cur = null; };
       for (let i = 1; i < n; i++) {
         const L = DL.get(days.get(i)).get(k); if (!L) { fin(); continue; }
         // V4.9.39: แนว GEX ใหญ่ ราคามักหยุดก่อนถึง strike (ดีลเลอร์เริ่มขาย/ซื้อก่อน) → ระยะแตะกว้างขึ้นตามขนาด GEX (ตัวใหญ่สุดวันนั้น +$3.5)
@@ -128,7 +133,7 @@
     const latestX = lastBar ? ts.timeToCoordinate(lastBar.time) : X(bars.length - 1);
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, plotW, plotH); ctx.clip();
-    boxes.forEach(bx => { // V4.9.7: แตกแล้วยังวาด (เส้นประ จาง) · V4.9.38: หลักฐาน ≥ 2 = เส้นหนา
+    boxes.forEach(bx => { // Broken frames retain faint dashed outlines.
       let x0 = X(bx.start), x1 = bx.live ? (latestX === null ? null : latestX + 3 * step) : X(bx.end);
       if (x1 === null || x0 === null) { if (x0 === null && x1 !== null) x0 = 0; else return; }
       x0 -= step / 2; if (!bx.live) x1 += step / 2;
@@ -136,14 +141,14 @@
       // V4.9.39: กรอบคลุมตั้งแต่ไส้ที่ทดสอบ (ซึ่งอาจหยุดก่อนถึง strike) ถึง strike
       const pad = 0.6, top = bx.side < 0 ? Math.max(bx.ext, bx.p) + pad : Math.max(bx.p, bx.near) + pad, bot = bx.side < 0 ? Math.min(bx.p, bx.near) - pad : Math.min(bx.ext, bx.p) - pad;
       const yt = Y(top), yb = Y(bot); if (yt === null || yb === null || yb < 0 || yt > plotH) return;
-      const broke = bx.broke !== undefined, strong = bx.ev.length >= 2;
+      const broke = bx.broke !== undefined;
       if (!broke) {
         ctx.globalAlpha = 1;
         ctx.fillStyle = 'rgba(255,255,255,.1)';
         ctx.fillRect(Math.max(0, x0), yt, Math.min(plotW, x1) - Math.max(0, x0), yb - yt);
       }
       ctx.globalAlpha = broke ? 0.45 : 1;
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = broke ? 1 : strong ? 2.4 : 1.4; ctx.setLineDash(broke ? [4, 3] : bx.est ? [6, 2] : []);
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = broke ? 0.75 : 1; ctx.setLineDash(broke ? [4, 3] : bx.est ? [6, 2] : []);
       ctx.strokeRect(Math.max(0, x0) + 0.5, yt + 0.5, Math.min(plotW, x1) - Math.max(0, x0), yb - yt);
       ctx.setLineDash([]);
       hit.push({ x0: Math.max(0, x0), x1: Math.min(plotW, x1), y1: yt - 3, y2: yb + 3, bx });
@@ -194,7 +199,7 @@
   function section() {
     const d = document.createElement('div'); d.id = 'dbBox'; d.className = 'gsbox';
     d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-db="on"><i style="background:#fff"></i>🛡 กรอบดีลเลอร์รับ (ราคาผ่านไม่ได้)</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>` +
-      (cfg.on ? `<div class="row ps"><span class="gsinfo">เส้นหนา = มีหลักฐานรับจริง ≥ 2 · ประยาว = แนววันนั้นยังไม่มีประวัติ (ใช้แนววันนี้) · ประจาง = แตกแล้ว · แตะกรอบดูรายละเอียด/ทะลุไปไกลแค่ไหน</span></div>` : '');
+      (cfg.on ? `<div class="row ps"><label>ชนไม่ผ่านก่อนแสดง (ครั้ง)<input type="number" inputmode="numeric" min="1" max="20" step="1" data-dbtests value="${cfg.minTests}" style="width:64px"></label></div><div class="row ps"><span class="gsinfo">นับแท่ง M5 ที่ปิดกลับฝั่งเดิม ห่างจากครั้งก่อนอย่างน้อย 3 แท่ง · หลักฐานรับจริงดูได้เมื่อแตะกรอบ · ประยาว = แนววันนั้นยังไม่มีประวัติ (ใช้แนววันนี้) · ประจาง = แตกแล้ว · แตะกรอบดูรายละเอียด/ทะลุไปไกลแค่ไหน</span></div>` : '');
     return d;
   }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('dbBox')) return; const box = section(), anchor = $('dhBox') || $('s3Box') || $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }
@@ -203,5 +208,14 @@
     new MutationObserver(() => mount()).observe(menu, { childList: true });
     menu.addEventListener('click', e => { if (!e.target.closest('[data-db]')) return; cfg.on = !cfg.on; save(); boxes = []; invalidate(); const b = $('dbBox'); if (b) b.remove(); mount(); run(true); });
   }
-  window.OI_dbox = { get boxes() { return boxes; }, get hist() { return hist; }, levels, scan, run, dayKey };
+  if (menu) menu.addEventListener('change', e => {
+    const input = e.target.closest('[data-dbtests]'); if (!input) return;
+    const value = normTests(input.value);
+    if (value === null) { input.value = cfg.minTests; return; }
+    cfg.minTests = value; input.value = value; save();
+    boxes = bars.length ? scan(bars, levels()) : [];
+    invalidate(); const b = $('dbBox'); if (b) b.remove(); mount();
+    if (!bars.length) run(true);
+  });
+  window.OI_dbox = { get cfg() { return cfg; }, get boxes() { return boxes; }, get hist() { return hist; }, levels, scan, run, dayKey };
 })();

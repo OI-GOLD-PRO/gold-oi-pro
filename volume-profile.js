@@ -80,12 +80,31 @@
     cache = { key, value }; return value;
   }
   const fmt = n => n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n.toFixed(2);
-  const offset = () => { const b = O.series.data() || []; return b.length && feed() ? feed().offAt(b[b.length - 1].time) : 0; };
+  // Lock the price basis from paired CLOSED candles, never from the moving last close.
+  // A new TF or refreshed klines must not drag historical volume with each live tick.
+  let alignment = null;
+  function offset() {
+    const f = feed(); if (!f || !f.src) return null;
+    const key = [f.src, O.src || '', O.sym].join('|');
+    const adj = O.sym === 'gold' && Number.isFinite(O.adj) ? O.adj : 0;
+    if (alignment && alignment.key === key) return alignment.shift + adj - alignment.adj;
+    const bars = O.series.data() || [], differences = [];
+    for (let i = bars.length - 2; i >= 0 && differences.length < 5; i--) {
+      const b = bars[i], reference = f.pxOff.get(b.time);
+      if (Number.isFinite(reference) && Number.isFinite(b.close)) differences.push(reference - b.close);
+    }
+    if (!differences.length) return null;
+    differences.sort((a, b) => a - b);
+    const mid = Math.floor(differences.length / 2);
+    const shift = differences.length % 2 ? differences[mid] : (differences[mid - 1] + differences[mid]) / 2;
+    alignment = { key, shift, adj }; return shift;
+  }
   (O.bgHooks || O.hooks).push((ctx, w, h) => {
     hit = [];
     if (!cfg.on || !feed() || !feed().pxOff.size) return;
     const P = profile(); if (!P.rows.length) return;
     const ts = O.chart.timeScale(), width = ts.width(), height = h - ts.height(), shift = offset();
+    if (shift === null) return;
     const maxWidth = Math.min(180, width * 0.32);
     const visible = P.rows.map(r => {
       const p = r.p - shift;
@@ -128,7 +147,7 @@
     if (!f) return 'กำลังรอระบบรับข้อมูล…';
     const status = f.busy ? (f.status || 'กำลังโหลดย้อนหลัง…') : f.status;
     if (!p.rows.length) return status || 'รอธุรกรรมจริงจาก ' + (source() || 'ตลาด') + '…';
-    if (!f.pxOff.size) return 'รับธุรกรรมแล้ว · กำลังโหลดราคาอ้างอิงกราฟ…';
+    if (offset() === null) return 'รับธุรกรรมแล้ว · รอราคาอ้างอิงจากแท่งปิด…';
     const hrs = Math.max(0, (p.end - p.first) / 3600e3);
     return (source() || '') + ' · ' + fmt(p.total) + ' oz · ข้อมูลที่รับได้ ' + Math.min(cfg.win, hrs).toFixed(1) + '/' + cfg.win + ' ชม.' + (status ? ' · ' + status : '') + (f.limited ? ' · ประวัติจากตลาดมีจำกัด' : '');
   }

@@ -4,10 +4,11 @@ const now = Math.floor(Date.now() / 60000) * 60000 + 30000;
 const values = new Map(), events = {}, chartEvents = {}, timers = [], hooks = [], boxes = new Map();
 const menu = { hidden: false, addEventListener(k, f) { events[k] = f; }, querySelector() { return null; }, prepend(d) { boxes.set(d.id, d); } };
 let src = 'binance', width = 320, sync = 0;
-const feed = { get src() { return src; }, anchorMs: () => ({ end: now }), offAt: () => 10, pxOff: new Map([[1, 10]]), busy: false, status: '', syncCollection() { sync++; } };
+let chartBars = [{ time: 1, close: 3990 }, { time: 2, close: 3990 }];
+const feed = { get src() { return src; }, anchorMs: () => ({ end: now }), offAt: () => 10, pxOff: new Map([[1, 4000], [2, 4000]]), busy: false, status: '', syncCollection() { sync++; } };
 function runtime() {
   const O = { sym: 'gold', hooks, bgHooks: hooks, chart: { timeScale: () => ({ width: () => width, height: () => 20 }) },
-    series: { data: () => [{ time: 1 }], priceToCoordinate: p => (4010 - p) * 10 },
+    series: { data: () => chartBars, priceToCoordinate: p => (4010 - p) * 10 },
     chartEl: { addEventListener(k, f) { chartEvents[k] = f; }, getBoundingClientRect: () => ({ left: 0, top: 0 }) }, markDirty() {}, showToast() {} };
   const document = { visibilityState: 'visible', getElementById: id => id === 'indMenu' ? menu : boxes.get(id), addEventListener() {}, createElement() { return { remove() { boxes.delete(this.id); } }; } };
   const window = { OI: O, OI_bigtr: feed };
@@ -83,3 +84,26 @@ for (const size of [320, 390, 430]) {
   assert(fills.every(([x,y,b,h]) => x >= 0 && x + b <= width + 1e-6 && Number.isInteger(y)));
 }
 console.log('PASS: $0.1 mobile rows at 320/390/430px survive huge offscreen volume and subpixel scaling.');
+
+values.delete('oi_vprofile_data_v1');
+chartBars = Array.from({length:6},(_,i)=>({time:i+1,close:3990}));
+feed.pxOff = new Map(chartBars.map(b=>[b.time,4000]));
+feed.offAt = time => feed.pxOff.get(time) - chartBars.find(b=>b.time===time).close;
+w=runtime(); v=w.OI_volumeProfile; v.cfg.on=true; v.cfg.res=0.1; w.OI.src='bybit'; w.OI.adj=0;
+put('9100',4000,3,1); put('9101',4000.1,1,-1);
+function renderStable() { fills=[];texts=[];hooks.at(-1)(ctx,width,500);return { ys:fills.map(r=>r[1]).join(','), poc:texts.find(r=>r[0].startsWith('VP POC '))?.[0] }; }
+const initial=renderStable();assert.equal(initial.poc,'VP POC 3990.00');
+for(const delta of [0.16,-0.08,0.13,-0.5,1]) {
+  chartBars.at(-1).close+=delta; feed.pxOff.set(6,feed.pxOff.get(6)+0.25);
+  assert.deepEqual(renderStable(),initial,'live ticks must not drag profile or POC');
+}
+feed.pxOff.set(5,4002);assert.deepEqual(renderStable(),initial,'kline refresh must preserve calibrated basis');
+w.OI.tf='15m';assert.deepEqual(renderStable(),initial,'TF change must preserve basis');
+w.OI.adj=1;assert.equal(renderStable().poc,'VP POC 3989.00','explicit chart adjustment shifts profile with chart');
+w.OI.src='bitget';chartBars.slice(0,-1).forEach(b=>feed.pxOff.set(b.time,4002));
+assert.equal(renderStable().poc,'VP POC 3988.00','new chart provider recalibrates');
+values.delete('oi_vprofile_data_v1');feed.pxOff=new Map([[6,4000]]);
+w=runtime();v=w.OI_volumeProfile;v.cfg.on=true;
+put('9200',4000,1,1);fills=[];hooks.at(-1)(ctx,width,500);assert.equal(fills.length,0,'never calibrate from forming candle only');
+feed.pxOff.set(1,4000);fills=[];hooks.at(-1)(ctx,width,500);assert(fills.length>0,'recover once a paired closed candle arrives');
+console.log('PASS: stable profile/POC through live ticks, reference refresh and TF changes; chart-basis/provider changes; wait for paired closed candle.');

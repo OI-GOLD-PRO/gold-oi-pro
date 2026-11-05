@@ -7,9 +7,9 @@
   const $ = id => document.getElementById(id), KEY = 'oi_vprofile' + (O.psfx || ''), STORE = 'oi_vprofile_data_v1';
   const cfg = { on: false, res: 1, win: 8, mode: 'all', poc: true };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (_) {}
-  const RES = [1, 2, 5, 10], WINS = [1, 4, 8, 24], MODES = ['all', 'delta'];
-  // Custom values survive reload; source price buckets have $1 resolution.
-  const normRes = v => Number.isFinite(+v) && +v > 0 ? Math.min(1000, Math.max(1, Math.round(+v))) : null;
+  const RES = [0.1, 0.5, 1, 2, 5, 10], WINS = [1, 4, 8, 24], MODES = ['all', 'delta'];
+  // Keep raw price cents as integer ticks so custom $0.1 rows do not inherit coarse $1 rounding.
+  const normRes = v => Number.isFinite(+v) && +v > 0 ? Math.min(1000, Math.max(0.1, Math.round(+v * 10) / 10)) : null;
   const normWin = v => Number.isFinite(+v) && +v > 0 ? Math.min(24, Math.max(0.1, Math.round(+v * 10) / 10)) : null;
   cfg.res = normRes(cfg.res) ?? 1;
   cfg.win = normWin(cfg.win) ?? 8;
@@ -37,7 +37,7 @@
     let b = buckets.get(key);
     if (!b) { b = { source, time, ids: [], prices: new Map(), first: t, last: t }; buckets.set(key, b); }
     if (seen(b.ids, id)) return;
-    const price = Math.round(p), v = b.prices.get(price) || [0, 0];
+    const price = Math.round(p * 100), v = b.prices.get(price) || [0, 0];
     v[side > 0 ? 0 : 1] += q; b.prices.set(price, v);
     b.first = Math.min(b.first, t); b.last = Math.max(b.last, t);
     dirty = true; revision++;
@@ -49,12 +49,13 @@
       const data = [];
       buckets.forEach((b, k) => { if (b.time < Date.now() - KEEP) { buckets.delete(k); return; }
         data.push({ source: b.source, time: b.time, first: b.first, last: b.last, ids: b.ids.map(a => a.map(String)), prices: [...b.prices] }); });
-      localStorage.setItem(STORE, JSON.stringify({ v: 1, data })); dirty = false;
+      localStorage.setItem(STORE, JSON.stringify({ v: 2, data })); dirty = false;
     } catch (_) {} // Quota failure keeps the in-memory profile; never erase another indicator's data.
   }
   try {
     const j = JSON.parse(localStorage.getItem(STORE) || 'null');
-    if (j && j.v === 1) (j.data || []).forEach(b => { if (b.time < Date.now() - KEEP || !['binance', 'bitget'].includes(b.source)) return;
+    // Old $1 buckets cannot be split into true $0.1 data: rebuild from raw history.
+    if (j && j.v === 2) (j.data || []).forEach(b => { if (b.time < Date.now() - KEEP || !['binance', 'bitget'].includes(b.source)) return;
       buckets.set(b.source + '|' + b.time, { ...b, ids: b.ids.map(a => a.map(BigInt)), prices: new Map(b.prices) }); });
   } catch (_) { buckets = new Map(); }
   const feed = () => window.OI_bigtr;
@@ -69,10 +70,10 @@
     const src = source(), end = endTime(), start = Math.floor((end - cfg.win * 3600e3) / MINUTE) * MINUTE;
     const key = [src, start, Math.floor(end / MINUTE), cfg.res, revision].join('|');
     if (cache && cache.key === key) return cache.value;
-    const prices = new Map(); let first = Infinity, last = 0;
+    const prices = new Map(), rowTicks = Math.round(cfg.res * 100); let first = Infinity, last = 0;
     buckets.forEach(b => { if (b.source !== src || b.time < start || b.time >= end) return;
       first = Math.min(first, b.first); last = Math.max(last, b.last);
-      b.prices.forEach((v, p) => { const k = Math.round(p / cfg.res) * cfg.res, a = prices.get(k) || [0, 0]; a[0] += v[0]; a[1] += v[1]; prices.set(k, a); }); });
+      b.prices.forEach((v, p) => { const k = Math.round(p / rowTicks) * rowTicks / 100, a = prices.get(k) || [0, 0]; a[0] += v[0]; a[1] += v[1]; prices.set(k, a); }); });
     const rows = [...prices].map(([p, v]) => ({ p, buy: v[0], sell: v[1], total: v[0] + v[1], delta: v[0] - v[1] })).sort((a, b) => a.p - b.p);
     const total = rows.reduce((s, r) => s + r.total, 0), poc = rows.reduce((a, r) => !a || r.total > a.total ? r : a, null);
     const value = { rows, total, poc, source: src, first, last, start, end };
@@ -128,7 +129,7 @@
   function section() {
     const d = document.createElement('div'); d.id = 'vpBox'; d.className = 'gsbox';
     d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-vp="on"><i style="background:linear-gradient(90deg,${BUY} 50%,${SELL} 50%)"></i>Volume Profile · ซื้อขายทั้งหมด</button><span class="gsinfo" id="vpInfo">${cfg.on ? info() : ''}</span></div>` +
-      (cfg.on ? `<div class="row ps"><label>ขนาดแถว ($)<input type="number" inputmode="numeric" min="1" max="1000" step="1" data-vpin="res" value="${cfg.res}" style="width:76px;max-width:100%"></label></div><div class="row ps"><span class="gsinfo">เลือกเร็ว</span>${RES.map(r => `<button class="gsb${cfg.res === r ? ' on' : ''}" data-vpres="${r}">$${r}</button>`).join('')}</div><div class="row ps"><label>ย้อนหลัง (ชม.)<input type="number" inputmode="decimal" min="0.1" max="24" step="0.1" data-vpin="win" value="${cfg.win}" style="width:76px;max-width:100%"></label></div><div class="row ps"><span class="gsinfo">เลือกเร็ว</span>${WINS.map(h => `<button class="gsb${cfg.win === h ? ' on' : ''}" data-vpwin="${h}">${h} ชม.</button>`).join('')}</div><div class="row ps">${MODES.map(m => `<button class="gsb${cfg.mode === m ? ' on' : ''}" data-vpmode="${m}">${m === 'all' ? 'ซื้อ + ขาย' : 'Δ ซื้อ−ขาย'}</button>`).join('')}<button class="gsb${cfg.poc ? ' on' : ''}" data-vp="poc">POC</button></div><div class="row ps"><span class="gsinfo">ทุกขนาดไม้ · ปริมาณ oz · ไม่ถ่วงอายุ · ฟ้าซื้อ / ส้มขาย · แสดงทีละตลาด perp<br>ช่วงเวลาปัดเป็นนาที · ราคาต้นทางรวมทีละ $1 · POC = แถวที่วอลลุ่มรวมสูงสุด<br>แสดงเฉพาะข้อมูลที่รับได้ อาจไม่ครบช่วงที่เลือก ไม่ใช่วอลลุ่มรวมทุกตลาดหรือ CME</span></div>` : ''); return d;
+      (cfg.on ? `<div class="row ps"><label>ขนาดแถว ($)<input type="number" inputmode="decimal" min="0.1" max="1000" step="0.1" data-vpin="res" value="${cfg.res}" style="width:76px;max-width:100%"></label></div><div class="row ps"><span class="gsinfo">เลือกเร็ว</span>${RES.map(r => `<button class="gsb${cfg.res === r ? ' on' : ''}" data-vpres="${r}">$${r}</button>`).join('')}</div><div class="row ps"><label>ย้อนหลัง (ชม.)<input type="number" inputmode="decimal" min="0.1" max="24" step="0.1" data-vpin="win" value="${cfg.win}" style="width:76px;max-width:100%"></label></div><div class="row ps"><span class="gsinfo">เลือกเร็ว</span>${WINS.map(h => `<button class="gsb${cfg.win === h ? ' on' : ''}" data-vpwin="${h}">${h} ชม.</button>`).join('')}</div><div class="row ps">${MODES.map(m => `<button class="gsb${cfg.mode === m ? ' on' : ''}" data-vpmode="${m}">${m === 'all' ? 'ซื้อ + ขาย' : 'Δ ซื้อ−ขาย'}</button>`).join('')}<button class="gsb${cfg.poc ? ' on' : ''}" data-vp="poc">POC</button></div><div class="row ps"><span class="gsinfo">ทุกขนาดไม้ · ปริมาณ oz · ไม่ถ่วงอายุ · ฟ้าซื้อ / ส้มขาย · แสดงทีละตลาด perp<br>ช่วงเวลาปัดเป็นนาที · แถวราคาละเอียดได้ถึง $0.1 · POC = แถวที่วอลลุ่มรวมสูงสุด<br>แสดงเฉพาะข้อมูลที่รับได้ อาจไม่ครบช่วงที่เลือก ไม่ใช่วอลลุ่มรวมทุกตลาดหรือ CME</span></div>` : ''); return d;
   }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('vpBox')) return; const a = $('rtBox') || m.querySelector('.t'), d = section(); a ? a.after(d) : m.prepend(d); }
   function remount() { const d = $('vpBox'); if (d) d.remove(); mount(); }

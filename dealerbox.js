@@ -3,7 +3,7 @@
 //  - แนว: strike ที่ GEX บวก 8 อันดับแรก (ห่างราคาไม่เกิน 3%) จากข้อมูลออปชันสด (live.js)
 //    V4.9.38: เก็บแนวของแต่ละวันไว้ที่เซิร์ฟเวอร์ (/gexlog) → กรอบย้อนหลังใช้แนวของวันนั้น (วันที่ยังไม่มีประวัติ ใช้แนววันนี้แทน = โดยประมาณ)
 //  - ทดสอบ: ไส้แท่ง M5 แตะแนว (ห่างไม่เกิน tol) แต่ราคาปิดกลับฝั่งเดิม · นับครั้งที่ห่างกันอย่างน้อย 2 แท่ง
-//  - แตก: ราคาปิดเลยแนวเกิน $2 → เส้นประจาง · V4.9.38 วัดว่าทะลุแล้ววิ่งต่อไกลแค่ไหน (4 ชม.) และกลับเข้ามาไหม (1 ชม. = หลอก)
+//  - แตก: แท่ง M5 ปิดพ้นขอบกรอบที่ล็อกไว้ → เส้นประจาง · V4.9.38 วัดว่าทะลุแล้ววิ่งต่อไกลแค่ไหน (4 ชม.) และกลับเข้ามาไหม (1 ชม. = หลอก)
 //  - V4.9.38 หลักฐานดีลเลอร์รับจริง (ต่อครั้งที่ทดสอบ): Absorption (Volume สูง ตัวแท่งเล็ก) · 🐋 ไม้ใหญ่สวนทาง · 👥 รายย่อยไล่เข้าใส่แนวแต่ราคาไม่ผ่าน (กรอบที่ยังยืน)
 //    หลักฐาน ≥ 2 แสดงในรายละเอียดกรอบ · ย้อนหลังได้ ~5 วัน (M5 1,500 แท่ง)
 (() => {
@@ -67,6 +67,14 @@
     return [];
   }
 
+  function bounds(bx) {
+    if (Number.isFinite(bx.top) && Number.isFinite(bx.bot)) return { top: bx.top, bot: bx.bot };
+    const pad = 0.6;
+    return {
+      top: bx.side < 0 ? Math.max(bx.ext, bx.p) + pad : Math.max(bx.p, bx.near) + pad,
+      bot: bx.side < 0 ? Math.min(bx.p, bx.near) - pad : Math.min(bx.ext, bx.p) - pad,
+    };
+  }
   function scan(B, cur) {
     // Only closed M5 candles can confirm a failed test.
     const formingTime = Math.floor((Date.now() / 1000 + TZ) / 300) * 300;
@@ -85,10 +93,11 @@
         // V4.9.39: แนว GEX ใหญ่ ราคามักหยุดก่อนถึง strike (ดีลเลอร์เริ่มขาย/ซื้อก่อน) → ระยะแตะกว้างขึ้นตามขนาด GEX (ตัวใหญ่สุดวันนั้น +$3.5)
         const p = L.p, b = B[i], pc = B[i - 1].close, tol = Math.max(0.8, ATR[i] * 0.25) + 3.5 * (L.w || 0);
         if (cur && Math.abs(cur.p - p) > 3) fin(); // offset เปลี่ยนมาก (ข้ามวัน/เปลี่ยนสัญญา) = แนวใหม่
-        // ราคาปิดเลยแนวเกิน BRK = แตก → วัดว่าวิ่งต่อไกลแค่ไหน
-        if (cur && (cur.side < 0 ? b.close > p + BRK : b.close < p - BRK)) {
-          const dir = cur.side < 0 ? 1 : -1; let mfe = 0, back = false, end = Math.min(n, i + AHEAD + 1);
-          for (let q = i + 1; q < end; q++) { mfe = Math.max(mfe, dir > 0 ? B[q].high - p : p - B[q].low); if (q <= i + FAKE && (dir > 0 ? B[q].close < p : B[q].close > p)) back = true; }
+        // Once confirmed, compare the close against the ORIGINAL frame edge, never a moving strike.
+        const confirmed = cur && Number.isFinite(cur.top) && Number.isFinite(cur.bot);
+        if (cur && (cur.side < 0 ? b.close > (confirmed ? cur.top : p + BRK) : b.close < (confirmed ? cur.bot : p - BRK))) {
+          const dir = cur.side < 0 ? 1 : -1, breakLevel = confirmed ? (cur.side < 0 ? cur.top : cur.bot) : p; let mfe = 0, back = false, end = Math.min(n, i + AHEAD + 1);
+          for (let q = i + 1; q < end; q++) { mfe = Math.max(mfe, dir > 0 ? B[q].high - breakLevel : breakLevel - B[q].low); if (q <= i + FAKE && (dir > 0 ? B[q].close < breakLevel : B[q].close > breakLevel)) back = true; }
           cur.broke = i; cur.end = i; cur.run = { usd: mfe, atr: mfe / ATR[i], back, bars: end - i - 1 }; fin(); continue;
         }
         let side = 0;
@@ -98,7 +107,13 @@
         if (cur && cur.side !== side) fin();
         if (!cur) cur = { k, p, side, tests: [], ev: [], ext: side < 0 ? b.high : b.low, near: side < 0 ? b.high : b.low, start: i, end: i, est: L.est, day: days.get(i), g: L.g };
         if (!cur.tests.length || i - cur.tests[cur.tests.length - 1] > GAP) { cur.tests.push(i); cur.ev.push(...evAt(B, i, side, p)); }
-        cur.ext = side < 0 ? Math.max(cur.ext, b.high) : Math.min(cur.ext, b.low); cur.near = side < 0 ? Math.min(cur.near, b.high) : Math.max(cur.near, b.low); cur.end = i; cur.p = p;
+        if (!Number.isFinite(cur.top)) {
+          cur.ext = side < 0 ? Math.max(cur.ext, b.high) : Math.min(cur.ext, b.low);
+          cur.near = side < 0 ? Math.min(cur.near, b.high) : Math.max(cur.near, b.low);
+          cur.p = p;
+          if (cur.tests.length >= cfg.minTests) Object.assign(cur, bounds(cur), { confirmed: i });
+        }
+        cur.end = i;
       }
       if (cur) { cur.live = true; cur.ev.push(...retailEv(cur.side, cur.p)); fin(); }
     });
@@ -140,7 +155,7 @@
       x0 -= step / 2; if (inactive) x1 += step / 2;
       if (x1 < 0 || x0 > plotW) return;
       // V4.9.39: กรอบคลุมตั้งแต่ไส้ที่ทดสอบ (ซึ่งอาจหยุดก่อนถึง strike) ถึง strike
-      const pad = 0.6, top = bx.side < 0 ? Math.max(bx.ext, bx.p) + pad : Math.max(bx.p, bx.near) + pad, bot = bx.side < 0 ? Math.min(bx.p, bx.near) - pad : Math.min(bx.ext, bx.p) - pad;
+      const { top, bot } = bounds(bx);
       const yt = Y(top), yb = Y(bot); if (yt === null || yb === null || yb < 0 || yt > plotH) return;
       if (!inactive) {
         ctx.globalAlpha = 1;

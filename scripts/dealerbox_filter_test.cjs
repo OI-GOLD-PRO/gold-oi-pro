@@ -44,10 +44,10 @@ function change(value){const input={value,dataset:{}};handlers.change({target:{c
  fetched=candles([10,20,30]);fetched[40]={...fetched[40],close:103,high:104};await d.run(true);
  assert.equal(d.boxes[0].broke,40);strokes=[];fills=[];draw();assert.equal(strokes[0].width,0.75);assert.equal(fills.length,0,'broken frames retain no fill');
  assert.deepEqual(strokes[0].dash,[4,3]);
- // Price changes side without crossing the $2 breakout threshold: old frame ends, not breaks.
+ // Price changes side without closing beyond the locked frame edge: old frame ends, not breaks.
  fetched=candles([10,20,30]);
- fetched[34]={...fetched[34],close:101,high:102};
- fetched[35]={...fetched[35],open:101,close:101,low:99,high:102};
+ fetched[34]={...fetched[34],close:100.3,high:100.4};
+ fetched[35]={...fetched[35],open:100.3,close:100.3,low:99,high:100.4};
  await d.run(true);assert.equal(d.boxes.length,1);assert.equal(d.boxes[0].live,undefined);assert.equal(d.boxes[0].broke,undefined);
  d.boxes[0].est=false;strokes=[];fills=[];draw();assert.deepEqual(strokes[0].dash,[4,3],'ended frame must use dashes even without a breakout');
  assert.equal(strokes[0].alpha,0.45);assert.equal(strokes[0].width,0.75);assert.equal(fills.length,0,'ended frame must not retain white fill');
@@ -57,6 +57,20 @@ function change(value){const input={value,dataset:{}};handlers.change({target:{c
  fetched=candles([10,20,30]);await d.run(true);
  d.boxes[0].est=false;strokes=[];fills=[];draw();assert.deepEqual(strokes[0].dash,[],'confirmed active frame keeps solid thin line');assert.equal(strokes[0].width,1);assert.equal(fills.length,1);
  d.boxes[0].est=true;strokes=[];draw();assert.deepEqual(strokes[0].dash,[6,2],'estimated active history keeps distinct long dashes');
+ // Lock at third rejection. Later wicks must not enlarge an already-confirmed frame.
+ fetched=candles([10,20,30,34]);fetched[34].high=101.5;
+ b=d.scan(fetched,L);assert.equal(b[0].top,100.6);assert.equal(b[0].confirmed,30);assert.equal(b[0].ext,100);
+ const initialTop=b[0].top, initialBot=b[0].bot;
+ fetched[40]={...fetched[40],close:100.8,high:101};
+ b=d.scan(fetched,L);assert.equal(b[0].broke,40,'close above old top breaks even below strike + $2');
+ assert.equal(b[0].top,initialTop);assert.equal(b[0].bot,initialBot);
+ fetched.push(...Array.from({length:5},(_,i)=>({...fetched[49],time:fetched[49].time+(i+1)*300,high:110,close:100})));
+ b=d.scan(fetched,L);assert.equal(b[0].top,initialTop);assert.equal(b[0].end,40);
+ fetched=candles([10,20,30,34],1);fetched[34].low=98.5;
+ b=d.scan(fetched,L);assert.equal(b[0].bot,99.4);assert.equal(b[0].ext,100);
+ fetched[40]={...fetched[40],close:99.2,low:99};
+ b=d.scan(fetched,L);assert.equal(b[0].broke,40,'close below original bottom breaks even above strike - $2');assert.equal(b[0].bot,99.4);
+ console.log('PASS: frozen confirmation bounds, later wick does not widen, original-edge breakout both directions, no extension after break.');
  assert(updates>0);
  console.log('PASS: ended and broken frames dashed with no fill, active/estimated styles preserved, default/custom rejection threshold, support/resistance, gap spacing, closed candles, immediate rescan, persistence, thin outlines, bottom layer, 10% live-only fill and latest +3 endpoint.');
 })().catch(e=>{console.error(e);process.exit(1);});

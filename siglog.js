@@ -21,9 +21,10 @@
       const S = window.OI_step3, B = S && S.bars, tf = S && S.cfg ? S.cfg.tf : '';
       if (S && B && B.length) S.setups.filter(s => s.ei !== undefined && s.st >= 3).forEach(s => {
         const R = Math.abs(s.entry - s.sl), endC = s.end !== undefined ? B[s.end].close : null;
-        out.push({ id: `S3|${tf}|${B[s.ci].time}|${s.z.k}`, ind: '🎯 สูตร 3 ขั้น', side: s.dir > 0 ? 'BUY' : 'SELL', tf: tf === '1m' ? 'M1' : 'M5',
+        const ty = s.type || 'rev'; // V4.9.59 แยกท่า
+        out.push({ id: `S3|${tf}|${B[s.ci].time}|${s.z.k}` + (ty !== 'rev' ? '|' + ty : ''), ind: ty === 'rev' ? '🎯 สูตร 3 ขั้น' : '🎯 ' + ((S.TYPE_LAB || {})[ty] || ty), side: s.dir > 0 ? 'BUY' : 'SELL', tf: tf === '1m' ? 'M1' : 'M5',
           sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(s.tp), tp2: null, risk: r2(R), score: null,
-          reason: `โซน ${s.z.lab} · CHoCH ${s.lvl ? s.lvl.toFixed(1) : ''} · เข้า ${s.fvg ? 'FVG' : 'OB'}`, evidence: '', status: ST[s.st] || 'open',
+          reason: ty === 'rev' ? `โซน ${s.z.lab} · CHoCH ${s.lvl ? s.lvl.toFixed(1) : ''} · เข้า ${s.fvg ? 'FVG' : 'OB'}` : `${s.z.lab} · ยอดแรก ${s.lvl ? s.lvl.toFixed(1) : ''} · เข้า ${ty === 'rng1' ? 'ทดสอบขอบกรอบ' : s.fvg ? 'FVG' : 'OB'}`, evidence: '', status: ST[s.st] || 'open',
           exit_th: s.end !== undefined ? th(B[s.end].time) : '', result_r: s.st === 4 ? r2(Math.abs(s.tp - s.entry) / R) : s.st === 5 ? -1 : s.st === 6 && endC !== null ? r2((endC - s.entry) * (s.dir > 0 ? 1 : -1) / R) : null });
       });
     } catch (e) {}

@@ -133,22 +133,22 @@
     const latestX = lastBar ? ts.timeToCoordinate(lastBar.time) : X(bars.length - 1);
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, plotW, plotH); ctx.clip();
-    boxes.forEach(bx => { // Broken frames retain faint dashed outlines.
-      let x0 = X(bx.start), x1 = bx.live ? (latestX === null ? null : latestX + 3 * step) : X(bx.end);
+    boxes.forEach(bx => { // Every ended/broken frame uses the same faint dashed outline.
+      const inactive = bx.live !== true || bx.broke !== undefined;
+      let x0 = X(bx.start), x1 = !inactive ? (latestX === null ? null : latestX + 3 * step) : X(bx.end);
       if (x1 === null || x0 === null) { if (x0 === null && x1 !== null) x0 = 0; else return; }
-      x0 -= step / 2; if (!bx.live) x1 += step / 2;
+      x0 -= step / 2; if (inactive) x1 += step / 2;
       if (x1 < 0 || x0 > plotW) return;
       // V4.9.39: กรอบคลุมตั้งแต่ไส้ที่ทดสอบ (ซึ่งอาจหยุดก่อนถึง strike) ถึง strike
       const pad = 0.6, top = bx.side < 0 ? Math.max(bx.ext, bx.p) + pad : Math.max(bx.p, bx.near) + pad, bot = bx.side < 0 ? Math.min(bx.p, bx.near) - pad : Math.min(bx.ext, bx.p) - pad;
       const yt = Y(top), yb = Y(bot); if (yt === null || yb === null || yb < 0 || yt > plotH) return;
-      const broke = bx.broke !== undefined;
-      if (!broke) {
+      if (!inactive) {
         ctx.globalAlpha = 1;
         ctx.fillStyle = 'rgba(255,255,255,.1)';
         ctx.fillRect(Math.max(0, x0), yt, Math.min(plotW, x1) - Math.max(0, x0), yb - yt);
       }
-      ctx.globalAlpha = broke ? 0.45 : 1;
-      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = broke ? 0.75 : 1; ctx.setLineDash(broke ? [4, 3] : bx.est ? [6, 2] : []);
+      ctx.globalAlpha = inactive ? 0.45 : 1;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = inactive ? 0.75 : 1; ctx.setLineDash(inactive ? [4, 3] : bx.est ? [6, 2] : []);
       ctx.strokeRect(Math.max(0, x0) + 0.5, yt + 0.5, Math.min(plotW, x1) - Math.max(0, x0), yb - yt);
       ctx.setLineDash([]);
       hit.push({ x0: Math.max(0, x0), x1: Math.min(plotW, x1), y1: yt - 3, y2: yb + 3, bx });
@@ -199,7 +199,7 @@
   function section() {
     const d = document.createElement('div'); d.id = 'dbBox'; d.className = 'gsbox';
     d.innerHTML = `<div class="row"><button class="gsb${cfg.on ? ' on' : ''}" data-db="on"><i style="background:#fff"></i>🛡 กรอบดีลเลอร์รับ (ราคาผ่านไม่ได้)</button><span class="gsinfo">${cfg.on ? info() : ''}</span></div>` +
-      (cfg.on ? `<div class="row ps"><label>ชนไม่ผ่านก่อนแสดง (ครั้ง)<input type="number" inputmode="numeric" min="1" max="20" step="1" data-dbtests value="${cfg.minTests}" style="width:64px"></label></div><div class="row ps"><span class="gsinfo">นับแท่ง M5 ที่ปิดกลับฝั่งเดิม ห่างจากครั้งก่อนอย่างน้อย 3 แท่ง · หลักฐานรับจริงดูได้เมื่อแตะกรอบ · ประยาว = แนววันนั้นยังไม่มีประวัติ (ใช้แนววันนี้) · ประจาง = แตกแล้ว · แตะกรอบดูรายละเอียด/ทะลุไปไกลแค่ไหน</span></div>` : '');
+      (cfg.on ? `<div class="row ps"><label>ชนไม่ผ่านก่อนแสดง (ครั้ง)<input type="number" inputmode="numeric" min="1" max="20" step="1" data-dbtests value="${cfg.minTests}" style="width:64px"></label></div><div class="row ps"><span class="gsinfo">นับแท่ง M5 ที่ปิดกลับฝั่งเดิม ห่างจากครั้งก่อนอย่างน้อย 3 แท่ง · หลักฐานรับจริงดูได้เมื่อแตะกรอบ · ประยาว = แนววันนั้นยังไม่มีประวัติ (ใช้แนววันนี้) · ประจาง = จบหรือแตกแล้ว · แตะกรอบดูรายละเอียด/ทะลุไปไกลแค่ไหน</span></div>` : '');
     return d;
   }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('dbBox')) return; const box = section(), anchor = $('dhBox') || $('s3Box') || $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }

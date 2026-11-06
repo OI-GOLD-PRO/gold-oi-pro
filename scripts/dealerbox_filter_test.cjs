@@ -32,7 +32,7 @@ function change(value){const input={value,dataset:{}};handlers.change({target:{c
  clock+=300000;assert.equal(d.scan(candles([10,20,49],-1,true),L).length,1);clock-=300000;
  fetched=candles([10,20,30]);await d.run(true);assert.equal(d.boxes.length,1);
  assert.equal(primitive.paneViews()[0].zOrder(),'bottom');
- let strokes=[],fills=[];const ctx=new Proxy({strokeRect:(...a)=>strokes.push({width:ctx.lineWidth,a}),fillRect:(...a)=>fills.push({color:ctx.fillStyle,a})},{get:(o,k)=>k in o?o[k]:()=>{},set:(o,k,v)=>(o[k]=v,true)});
+ let strokes=[],fills=[];const ctx=new Proxy({setLineDash:a=>{ctx.dash=Array.from(a);},strokeRect:(...a)=>strokes.push({width:ctx.lineWidth,alpha:ctx.globalAlpha,dash:Array.from(ctx.dash||[]),a}),fillRect:(...a)=>fills.push({color:ctx.fillStyle,a})},{get:(o,k)=>k in o?o[k]:()=>{},set:(o,k,v)=>(o[k]=v,true)});
  const draw=()=>primitive.paneViews()[0].renderer().draw({useMediaCoordinateSpace:f=>f({context:ctx,mediaSize:{width:320,height:480}})});
  draw();assert.equal(strokes[0].width,1);assert.equal(fills[0].color,'rgba(255,255,255,.1)');
  const end=strokes[0].a[0]+strokes[0].a[2];assert(Math.abs(end-312.5)<1,'live endpoint stays at latest +3 bars');
@@ -43,6 +43,20 @@ function change(value){const input={value,dataset:{}};handlers.change({target:{c
  await new Promise(setImmediate);
  fetched=candles([10,20,30]);fetched[40]={...fetched[40],close:103,high:104};await d.run(true);
  assert.equal(d.boxes[0].broke,40);strokes=[];fills=[];draw();assert.equal(strokes[0].width,0.75);assert.equal(fills.length,0,'broken frames retain no fill');
+ assert.deepEqual(strokes[0].dash,[4,3]);
+ // Price changes side without crossing the $2 breakout threshold: old frame ends, not breaks.
+ fetched=candles([10,20,30]);
+ fetched[34]={...fetched[34],close:101,high:102};
+ fetched[35]={...fetched[35],open:101,close:101,low:99,high:102};
+ await d.run(true);assert.equal(d.boxes.length,1);assert.equal(d.boxes[0].live,undefined);assert.equal(d.boxes[0].broke,undefined);
+ d.boxes[0].est=false;strokes=[];fills=[];draw();assert.deepEqual(strokes[0].dash,[4,3],'ended frame must use dashes even without a breakout');
+ assert.equal(strokes[0].alpha,0.45);assert.equal(strokes[0].width,0.75);assert.equal(fills.length,0,'ended frame must not retain white fill');
+ assert(strokes[0].a[0]+strokes[0].a[2]<200,'ended frame must stop at its own endpoint');
+ fetched=candles([10,20,30],1);fetched[40]={...fetched[40],close:97,low:96};
+ await d.run(true);assert.equal(d.boxes[0].broke,40);strokes=[];fills=[];draw();assert.deepEqual(strokes[0].dash,[4,3]);assert.equal(fills.length,0);
+ fetched=candles([10,20,30]);await d.run(true);
+ d.boxes[0].est=false;strokes=[];fills=[];draw();assert.deepEqual(strokes[0].dash,[],'confirmed active frame keeps solid thin line');assert.equal(strokes[0].width,1);assert.equal(fills.length,1);
+ d.boxes[0].est=true;strokes=[];draw();assert.deepEqual(strokes[0].dash,[6,2],'estimated active history keeps distinct long dashes');
  assert(updates>0);
- console.log('PASS: default/custom rejection threshold, support/resistance, gap spacing, closed candles, immediate rescan, persistence, thin outlines, bottom layer, 10% live-only fill and latest +3 endpoint.');
+ console.log('PASS: ended and broken frames dashed with no fill, active/estimated styles preserved, default/custom rejection threshold, support/resistance, gap spacing, closed candles, immediate rescan, persistence, thin outlines, bottom layer, 10% live-only fill and latest +3 endpoint.');
 })().catch(e=>{console.error(e);process.exit(1);});

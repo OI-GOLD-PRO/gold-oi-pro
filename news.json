@@ -55,7 +55,9 @@
       "i": "H",
       "title": "Average Hourly Earnings m/m",
       "forecast": "0.3%",
-      "previous": "0.1%"
+      "previous": "0.1%",
+      "actual": "0.4%",
+      "better": true
     },
     {
       "date": "2026-11-06T08:30:00-05:00",
@@ -63,7 +65,9 @@
       "i": "H",
       "title": "Non-Farm Employment Change",
       "forecast": "65K",
-      "previous": "29K"
+      "previous": "29K",
+      "actual": "165K",
+      "better": true
     },
     {
       "date": "2026-11-06T08:30:00-05:00",
@@ -71,7 +75,9 @@
       "i": "H",
       "title": "Unemployment Rate",
       "forecast": "4.2%",
-      "previous": "4.2%"
+      "previous": "4.2%",
+      "actual": "4.1%",
+      "better": true
     },
     {
       "date": "2026-11-06T10:00:00-05:00",

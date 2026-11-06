@@ -103,7 +103,8 @@
     const ATR = i => Math.max(0.3, (PS[i + 1] - PS[Math.max(0, i - 29)]) / Math.min(30, i + 1));
     const pivH = i => i >= PIV && i + PIV < n && B.slice(i - PIV, i).every(b => b.high < B[i].high) && B.slice(i + 1, i + 1 + PIV).every(b => b.high <= B[i].high);
     const pivL = i => i >= PIV && i + PIV < n && B.slice(i - PIV, i).every(b => b.low > B[i].low) && B.slice(i + 1, i + 1 + PIV).every(b => b.low >= B[i].low);
-    const tpOf = (dir, entry, risk) => { const nx = dir > 0 ? Z.find(q => q.lo >= entry + risk) : [...Z].reverse().find(q => q.hi <= entry - risk); return nx ? { tp: dir > 0 ? nx.lo : nx.hi, lab: nx.lab } : { tp: entry + dir * 2 * risk, lab: '2R' }; };
+    // TP = โซนถัดไปที่อยู่ระหว่าง 1R–3R (ไกลกว่านั้นมักหมดเวลาก่อนถึง) ไม่มี = 2R
+    const tpOf = (dir, entry, risk) => { const nx = dir > 0 ? Z.find(q => q.lo >= entry + risk) : [...Z].reverse().find(q => q.hi <= entry - risk); return nx && Math.abs((dir > 0 ? nx.lo : nx.hi) - entry) <= 3 * risk ? { tp: dir > 0 ? nx.lo : nx.hi, lab: nx.lab } : { tp: entry + dir * 2 * risk, lab: '2R' }; };
     // หลัง BOS: หา OB/FVG ในขาที่ทำ BOS (จากจุดย่อ L ถึงแท่ง BOS) → แผนเข้า
     const planBos = (s, i, L) => {
       const dir = s.dir; let fvg = null, ob = null;
@@ -128,6 +129,7 @@
         else if (i - s.ei > lim.fill * 4) { s.st = 6; s.end = i; s.why = 'หมดเวลา'; }
       }
     };
+    const cool = new Map(); // โซน+ทิศ → แท่งที่จบรอบก่อน (กันเบรกซ้ำโซนเดิมตอนราคาแกว่ง)
     let act = []; // ตัวแม่ (เบรก) ระหว่างรอยอดแรก/BOS: {kind:'zb'|'rng', dir, z, bi, box, ph, L, children:[]}
     const kids = [];
     for (let i = 2; i < n; i++) {
@@ -136,6 +138,7 @@
       if (cfg.zb) Z.forEach(z => {
         const dir = pc <= z.hi + BRK && b.close > z.hi + BRK ? 1 : pc >= z.lo - BRK && b.close < z.lo - BRK ? -1 : 0; if (!dir) return;
         if (act.some(a => a.kind === 'zb' && a.dir === dir)) return; // ทิศเดียวกันมีตัวที่รออยู่แล้ว
+        if (cool.has(z.k + dir) && i - cool.get(z.k + dir) < lim.pk) return; // โซนเดิมเพิ่งเบรกไปแล้ว
         act.push({ kind: 'zb', dir, z, bi: i, st: 'pk' });
       });
       if (cfg.rng && i > lim.W) {
@@ -165,6 +168,7 @@
           }
         }
       });
+      act.forEach(a => { if (a.done && a.kind === 'zb') cool.set(a.z.k + a.dir, i); });
       act = act.filter(a => !a.done);
       kids.forEach(s => { if (s.st === 2 || s.st === 3) { if (i > s.ci) track(s, i); } });
     }

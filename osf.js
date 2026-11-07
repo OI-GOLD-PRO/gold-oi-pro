@@ -164,7 +164,7 @@
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height();
     const X = t => ts.timeToCoordinate(toChart(t)), Y = p => sr.priceToCoordinate(p), bw = Math.max(2, (X(bars.length ? bars[bars.length - 1].time : 0) || 0) - (X((bars.length ? bars[bars.length - 1].time : 0) - csec()) || 0));
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
-    ctx.save(); ctx.font = `bold 9px ${mono}`; ctx.textBaseline = 'middle';
+    ctx.save(); ctx.font = `bold 10px ${mono}`; ctx.textBaseline = 'middle';
     // โซนของช่วงที่เทรดได้ตอนนี้ (Asia เช้า / London) = แถบจาง ๆ
     const S = fresh() ? sessOf(bars[bars.length - 1].time) : null;
     if (S && S.real) lv.forEach(z => {
@@ -181,15 +181,15 @@
       if (x0 === null) x0 = 0; if (x1 === null) x1 = plotW;
       x1 = Math.max(x1 + bw, x0 + 6); if (x1 < 0 || x0 > plotW) return;
       const ye = Y(s.entry), yt = Y(s.tp), ys = Y(s.sl); if (ye === null || yt === null || ys === null) return;
-      const a = (s.real ? 1 : 0.4) * (s.tf === 'M5' ? 0.5 : 1);
-      ctx.globalAlpha = 0.16 * a; ctx.fillStyle = '#22e39a'; ctx.fillRect(x0, Math.min(ye, yt), x1 - x0, Math.abs(yt - ye));
+      const a = (s.real ? 1 : 0.55) * (s.tf === 'M5' ? 0.75 : 1); // V4.9.76 เข้มขึ้น
+      ctx.globalAlpha = 0.32 * a; ctx.fillStyle = '#22e39a'; ctx.fillRect(x0, Math.min(ye, yt), x1 - x0, Math.abs(yt - ye));
       ctx.fillStyle = '#ff4d6a'; ctx.fillRect(x0, Math.min(ye, ys), x1 - x0, Math.abs(ys - ye));
-      ctx.globalAlpha = 0.9 * a; ctx.lineWidth = 1;
+      ctx.globalAlpha = a; ctx.lineWidth = 1.5;
       ctx.strokeStyle = '#22e39a'; ctx.beginPath(); ctx.moveTo(x0, yt); ctx.lineTo(x1, yt); ctx.stroke();
       ctx.strokeStyle = '#ff4d6a'; ctx.beginPath(); ctx.moveTo(x0, ys); ctx.lineTo(x1, ys); ctx.stroke();
       ctx.strokeStyle = '#7fd0ff'; ctx.beginPath(); ctx.moveTo(x0, ye); ctx.lineTo(x1, ye); ctx.stroke();
       // จุดออก
-      if (s.t1 !== null && s.exit !== undefined) { const yx = Y(s.exit); if (yx !== null) { ctx.fillStyle = s.pnl > 0 ? '#22e39a' : s.pnl < 0 ? '#ff4d6a' : '#e0b44c'; ctx.beginPath(); ctx.arc(x1 - bw / 2, yx, 2.5, 0, 7); ctx.fill(); } }
+      if (s.t1 !== null && s.exit !== undefined) { const yx = Y(s.exit); if (yx !== null) { ctx.fillStyle = s.pnl > 0 ? '#22e39a' : s.pnl < 0 ? '#ff4d6a' : '#e0b44c'; ctx.beginPath(); ctx.arc(x1 - bw / 2, yx, 3.5, 0, 7); ctx.fill(); } }
       // ป้าย: ทิศ · ครั้งที่แตะ · ผล
       const res = s.st === 3 ? 'เปิดอยู่' : `${s.st === 4 ? '✓' : s.st === 5 ? '✗' : s.why === 'ปิดก่อนข่าว' ? '📰' : '⏱'} ${s.pnl > 0 ? '+' : ''}${s.pnl}$`;
       const lab = `${s.tf === 'M5' ? '≈' : ''}${s.real ? '🌏' : '·'}${s.dir > 0 ? 'B' : 'S'}${s.k}${s.tf === 'M5' ? '' : ' ' + res}`;

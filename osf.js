@@ -124,13 +124,15 @@
         const d0 = dayStart(A1[A1.length - 1].time), oldKeys = new Set(today.map(key));
         // วันนี้: M1 + OI สด (มีเกรด A จาก volume)
         const i0 = A1.findIndex(b => b.time >= d0);
+        // V4.9.78: ตลาดปิด/ข้อมูลเก่า (แท่งล่าสุดเกิน 3 ชม.) → OI สดในแอปเป็นสัญญาณถัดไปแล้ว ใช้ไม่ได้กับแท่งวันนั้น → คิดวันนั้นจาก OI ย้อนหลังแทน
+        const live = Date.now() / 1000 + 7 * 3600 - A1[A1.length - 1].time < 3 * 3600;
         bars = i0 >= 0 ? A1.slice(Math.max(0, i0 - ATR_N - 10)) : []; // +70 แท่งก่อน 06:00 ไว้คำนวณ ATR
-        lv = i0 >= 0 ? levels(A1[i0].open) : [];
-        today = bars.length ? scan(bars, lv, news, { from: d0 }).map(s => Object.assign(s, { day: ymd(d0), tf: 'M1', live: true })) : [];
+        lv = i0 >= 0 && live ? levels(A1[i0].open) : [];
+        today = bars.length && live ? scan(bars, lv, news, { from: d0 }).map(s => Object.assign(s, { day: ymd(d0), tf: 'M1', live: true })) : [];
         // ย้อนหลัง: วันที่มี OI ในชีต · ใช้ M1 ถ้ามีครบวัน ไม่งั้น M5 (ประมาณ) · เกรด A ย้อนหลังไม่มี (ไม่มี volume รายวัน) = เกรด B ทั้งหมด
-        const past = [], dl = [{ day: ymd(d0), tf: 'M1', n: today.length }];
+        const past = [], dl = live ? [{ day: ymd(d0), tf: 'M1', n: today.length }] : [];
         [...hist.keys()].sort().forEach(dt => {
-          const ds = Date.parse(dt + 'T06:00:00Z') / 1000; if (!(ds < d0)) return;
+          const ds = Date.parse(dt + 'T06:00:00Z') / 1000; if (!(live ? ds < d0 : ds <= d0)) return;
           const de = ds + 86400, m1 = A1[0].time <= ds, src = m1 ? A1 : (A5 && A5.length && A5[0].time <= ds + 3600 ? A5 : null);
           if (!src) return;
           const j0 = src.findIndex(b => b.time >= ds), j1 = src.findIndex(b => b.time >= de);
@@ -263,10 +265,11 @@
     const r1 = real.filter(s => s.tf === 'M1'), r5 = real.filter(s => s.tf === 'M5');
     const lines = [`<b>แบ็กเทส M1 ${nd - n5} วัน</b>: ${fmt(sum(r1))}`,
       `Asia เช้า: ${fmt(sum(r1.filter(s => s.S.id === 'AM')))}`, `London: ${fmt(sum(r1.filter(s => s.S.id === 'LDN')))}`,
-      `วันนี้: ${t.n ? fmt(t) : 'ยังไม่มีไม้จริงจบ'}`];
+      `วันนี้: ${t.n ? fmt(t) : (bars.length && Date.now() / 1000 + 7 * 3600 - bars[bars.length - 1].time >= 3 * 3600 ? 'ตลาดปิด' : 'ยังไม่มีไม้จริงจบ')}`];
     const f1 = setups.filter(s => s.fast && s.tf === 'M1'); if (f1.length) lines.push(`<span style="color:#ff6b82">⚡ กรองพุ่ง >${MOM_MAX}×ATR (Asia เช้า): ข้าม ${fmt(sum(f1))}</span>`);
     if (n5) lines.push(`<span style="opacity:.7">อีก ${n5} วันไม่มีแท่ง M1 ครบ: วาดจาก M5 เป็นกรอบจาง ≈ ไว้ดูตำแหน่งเท่านั้น ไม่คิดผล (M5 ทำให้ผลดีเกินจริง)</span>`);
-    if (cfg.paper) lines.push(`ไม้บันทึก: ${fmt(sum(setups.filter(s => !s.real)))}`);
+    if (cfg.paper) { const pp = setups.filter(s => !s.real && !s.fast && s.tf === 'M1');
+      lines.push(`ไม้บันทึก M1 (ไม้ที่กฎไม่เข้า: แตะครั้งอื่น / Asia สาย / NY): ${fmt(sum(pp))}`); }
     if (histMsg) lines.push(histMsg); else if (!hist.size) lines.push('ยังไม่มี OI ย้อนหลัง (ต้องเข้าสู่ระบบ)');
     return lines.join('<br>') + '<br><small>ยังไม่หักสเปรด · ย้อนหลังเป็นเกรด B ทั้งหมด (ไม่มี volume รายวัน)</small>';
   }

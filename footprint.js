@@ -40,6 +40,16 @@
     O.markDirty();
   });
 
+  function drawCandle(ctx, bar, x, colors) {
+    const [open, high, low, close] = ['open', 'high', 'low', 'close'].map(key => O.series.priceToCoordinate(bar[key]));
+    if (![open, high, low, close].every(Number.isFinite)) return;
+    const up = bar.close >= bar.open;
+    ctx.fillStyle = up ? colors.wickUpColor : colors.wickDownColor;
+    ctx.fillRect(x, high, 1, Math.max(1, low - high));
+    ctx.fillStyle = up ? colors.upColor : colors.downColor;
+    ctx.fillRect(x - 3, Math.min(open, close), 7, Math.max(1, Math.abs(close - open)));
+  }
+
   function drawBar(ctx, bar, x, half, height, shift, seconds) {
     const start = (bar.time - O.tzShift) * 1000;
     const rows = volume.footprint(start, start + seconds * 1000);
@@ -108,17 +118,21 @@
     ctx.clip();
     ctx.textBaseline = 'middle';
     ctx.font = '10px monospace';
-    if (shift !== null && seconds) {
-      for (const bar of O.series.data()) {
-        const x = scale.timeToCoordinate(bar.time);
-        if (x === null || x < -half || x > width + half) continue;
-        if (drawBar(ctx, bar, Math.round(x), half, height, shift, seconds)) drawn = true;
-      }
+    for (const bar of O.series.data()) {
+      const x = scale.timeToCoordinate(bar.time);
+      if (x === null || x < -half || x > width + half) continue;
+      const reference = feed?.pxOff.get(bar.time);
+      const basis = Number.isFinite(reference) ? reference - bar.close : shift;
+      if (basis !== null && seconds && drawBar(ctx, bar, Math.round(x), half, height, basis, seconds)) drawn = true;
+      else drawCandle(ctx, bar, Math.round(x), previous.candleColors);
     }
     const venue = { binance: 'Binance', bitget: 'Bitget' }[feed?.src];
     const source = venue ? venue + ' XAUUSDT' : 'XAUUSDT';
-    const caption = drawn ? source + ' · oz · เท่าที่รับได้'
-      : source + ' · ' + (feed?.busy ? 'กำลังโหลด…' : shift === null ? 'รอข้อมูลและราคาอ้างอิง' : 'ไม่มีข้อมูลในช่วงที่เห็น');
+    const detail = feed?.busy ? 'กำลังโหลดย้อนหลัง…'
+      : drawn ? 'oz · เท่าที่รับได้'
+      : feed?.status?.startsWith('โหลดไม่ได้') ? 'โหลด Footprint ไม่สำเร็จ'
+      : 'ไม่มี Footprint ในช่วงที่เห็น';
+    const caption = source + ' · ' + detail;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillStyle = '#0b1728e8';

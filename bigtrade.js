@@ -45,11 +45,12 @@
     // กราฟยังเป็นแท่งของ TF เดิม (เพิ่งกดเปลี่ยน) → รอแล้วลองใหม่ ไม่งั้นจับคู่ราคาผิดแท่ง
     const step = TFS[O.tf] || 60;
     if (O.tf !== '1d' && B[B.length - 1].time - B[B.length - 2].time !== step && B[B.length - 2].time - B[B.length - 3].time !== step) { setTimeout(() => loadKlines().then(() => O.markDirty()), 1500); return; }
-    const disp = new Map(B.map(b => [b.time, b.close]));
+    const anchor = anchorMs();
+    const endTime = anchor.closed ? '&endTime=' + (anchor.end - 1) : '';
     const n = Math.min(1500, Math.max(100, B.length));
     if (src !== 'bitget') {
       try {
-        const k = await fetchJ(`https://fapi.binance.com/fapi/v1/klines?symbol=${SYM}&interval=${O.tf}&limit=${n}`);
+        const k = await fetchJ(`https://fapi.binance.com/fapi/v1/klines?symbol=${SYM}&interval=${O.tf}&limit=${n}${endTime}`);
         const dm = new Map(), om = new Map();
         k.forEach(x => { const t = Math.floor(x[0] / 1000) + TZ, v = +x[5], tb = +x[9]; dm.set(t, { b: tb, s: v - tb }); om.set(t, +x[4]); });
         delta = dm; if (om.size >= 5) pxOff = om; src = 'binance'; return;
@@ -58,7 +59,7 @@
     // สำรอง: Bitget klines (ไม่มีฝั่ง taker) → ใช้แค่ราคาอ้างอิง ส่วน Delta คิดจากไม้ที่ดึงได้
     try {
       const G = { '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m', '1h': '1H', '4h': '4H', '1d': '1D' };
-      const j = await fetchJ(`https://api.bitget.com/api/v2/mix/market/candles?symbol=${SYM}&productType=usdt-futures&granularity=${G[O.tf]}&limit=${Math.min(1000, n)}`);
+      const j = await fetchJ(`https://api.bitget.com/api/v2/mix/market/candles?symbol=${SYM}&productType=usdt-futures&granularity=${G[O.tf]}&limit=${Math.min(1000, n)}${endTime}`);
       const om = new Map(); (j.data || []).forEach(x => { const t = Math.floor(+x[0] / 1000) + TZ; om.set(t, +x[4]); });
       if (om.size >= 5) pxOff = om;
     } catch (e) {}
@@ -149,6 +150,19 @@
         const top = head[head.length - 1].a, low = head[0].a;
         lastId = top; lastMsg = Date.now(); thrAt = 0; thr(); O.markDirty();
         status = 'กำลังหาช่วงเวลา…'; paintInfo();
+        // Seed the last chart bars before resolving the full history range.
+        // The latest exchange trades may be hours ahead of a closed chart.
+        if (A.closed && window.OI_footprint?.active) {
+          try {
+            const start = Math.max(since, A.end - 5 * 60000);
+            const recent = await fetchJ(`https://fapi.binance.com/fapi/v1/aggTrades?symbol=${SYM}&startTime=${start}&endTime=${A.end - 1}&limit=1000`);
+            for (const x of recent) {
+              // Seed only the deduplicated sink. The full backfill also feeds Whale and Retail.
+              window.OIVolumeSink?.('binance', x.a, x.T, +x.p, +x.q, x.m ? -1 : 1);
+            }
+            O.markDirty();
+          } catch (_) { /* Continue with the existing ID-based history. */ }
+        }
         const hiNeed = A.closed ? await idAt(A.end, top) : low - 1;
         const c = loadCache();
         let loNeed = null;

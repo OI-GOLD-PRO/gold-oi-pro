@@ -19,7 +19,7 @@
   let buckets = new Map(), dirty = false, revision = 0, cache = null, hit = [], down = null;
   let footprintOn = false, repaint = null;
   const collecting = () => cfg.on || footprintOn;
-  const historyHours = () => Math.max(cfg.on ? cfg.win : 0, footprintOn ? 8 : 0);
+  const historyHours = () => Math.max(cfg.on ? cfg.win : 0, footprintOn ? 24 : 0);
   const saveCfg = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (_) {} };
   function seen(ranges, id) {
     const n = BigInt(id); let lo = 0, hi = ranges.length;

@@ -100,7 +100,7 @@
 
   // ---------- OI ย้อนหลังรายวัน (API เดียวกับ Historical OI Zones: oi_backup + oi_recovered) ----------
   let hist = new Map(), histAt = 0, histMsg = '';
-  const m1Cache = new Map(), HIST_DAYS = 10; // แคชแท่ง M1 รายวันที่จบแล้ว (ไม่ต้องดึงซ้ำ) · แบ็กเทสย้อนหลังสูงสุด 10 วัน
+  const m1Cache = new Map(), HIST_DAYS = 20; // แคชแท่ง M1 รายวันที่จบแล้ว (ไม่ต้องดึงซ้ำ) · แบ็กเทสย้อนหลังสูงสุด 10 วัน
   async function loadHist() {
     if (Date.now() - histAt < 30 * 60e3 || !window.OIHistoryZonesAPI) return;
     histAt = Date.now();
@@ -134,7 +134,7 @@
         // ย้อนหลัง: วันที่มี OI ในชีต · ใช้ M1 ถ้ามีครบวัน ไม่งั้น M5 (ประมาณ) · เกรด A ย้อนหลังไม่มี (ไม่มี volume รายวัน) = เกรด B ทั้งหมด
         const past = [], dl = live ? [{ day: ymd(d0), tf: 'M1', n: today.length }] : [];
         // V4.9.79: วันที่ M1 ในกราฟไม่ครบ → ดึง M1 ย้อนหลังรายวัน (Bybit/Binance ไล่หน้า) เก็บแคชไว้ · ไม่ได้จริง ๆ ค่อยใช้ M5 (≈ ไม่คิดผล)
-        const dts = [...hist.keys()].sort().filter(dt => { const ds = Date.parse(dt + 'T06:00:00Z') / 1000; return live ? ds < d0 : ds <= d0; }).slice(-HIST_DAYS);
+        const dts = [...hist.keys()].sort().filter(dt => { const ds = Date.parse(dt + 'T06:00:00Z') / 1000, wd = new Date(ds * 1000).getUTCDay(); return wd >= 1 && wd <= 5 && (live ? ds < d0 : ds <= d0); }).slice(-HIST_DAYS); // V4.9.81: ข้ามเสาร์-อาทิตย์ (เดิมกินโควตาวัน)
         for (const dt of dts) {
           const ds = Date.parse(dt + 'T06:00:00Z') / 1000, de = ds + 86400;
           let src = null, m1 = false;
@@ -278,7 +278,8 @@
     const real = setups.filter(s => s.real), t = sum(today.filter(s => s.real));
     const nd = days.length, n5 = days.filter(d => d.tf === 'M5').length;
     const r1 = real.filter(s => s.tf === 'M1'), r5 = real.filter(s => s.tf === 'M5');
-    const lines = [`<b>แบ็กเทส M1 ${nd - n5} วัน</b>: ${fmt(sum(r1))}`,
+    const dd = days.filter(d => d.tf === 'M1').map(d => d.day).sort(), rng = dd.length ? ` (${dd[0].slice(5)} → ${dd[dd.length - 1].slice(5)})` : '';
+    const lines = [`<b>แบ็กเทส M1 ${nd - n5} วัน${rng}</b>: ${fmt(sum(r1))}`,
       `Asia เช้า: ${fmt(sum(r1.filter(s => s.S.id === 'AM')))}`, `London: ${fmt(sum(r1.filter(s => s.S.id === 'LDN')))}`,
       `วันนี้: ${t.n ? fmt(t) : (bars.length && Date.now() / 1000 + 7 * 3600 - bars[bars.length - 1].time >= 3 * 3600 ? 'ตลาดปิด' : 'ยังไม่มีไม้จริงจบ')}`];
     const f1 = setups.filter(s => s.fast && s.tf === 'M1'); if (f1.length) lines.push(`<span style="color:#ff6b82">⚡ กรองพุ่ง >${MOM_MAX}×ATR (Asia เช้า): ข้าม ${fmt(sum(f1))}</span>`);
@@ -286,7 +287,7 @@
     if (cfg.paper) { const pp = setups.filter(s => !s.real && !s.fast && s.tf === 'M1');
       lines.push(`ไม้บันทึก M1 (ไม้ที่กฎไม่เข้า: แตะครั้งอื่น / Asia สาย / NY): ${fmt(sum(pp))}`); }
     if (histMsg) lines.push(histMsg); else if (!hist.size) lines.push('ยังไม่มี OI ย้อนหลัง (ต้องเข้าสู่ระบบ)');
-    return lines.join('<br>') + '<br><small>ยังไม่หักสเปรด · ย้อนหลังเป็นเกรด B ทั้งหมด (ไม่มี volume รายวัน)</small>';
+    return lines.join('<br>') + `<br><small>ย้อนหลังได้เท่าวันที่มี OI ในชีต (oi_backup/oi_recovered: ${hist.size ? [...hist.keys()].sort()[0].slice(5) : '–'} เป็นต้นไป) · ยังไม่หักสเปรด · ย้อนหลังเป็นเกรด B ทั้งหมด</small>`;
   }
   function section() {
     const d = document.createElement('div'); d.id = 'sfBox'; d.className = 'gsbox';

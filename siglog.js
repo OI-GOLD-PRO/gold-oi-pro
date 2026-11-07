@@ -41,6 +41,17 @@
           result_r: s.st === 4 ? r2(Math.abs(s.tp1 - s.entry) / s.R) : s.st === 5 ? -1 : s.st === 6 && endC !== null ? r2((endC - s.entry) * s.side / s.R) : null });
       });
     } catch (e) {}
+    // 🌏 OI Session Fade (V4.9.72) — ไม้จริง + ไม้บันทึก (forward test) · evidence บอกว่าเป็นไม้ไหน
+    try {
+      const F = window.OI_sfade, B = F && F.bars;
+      if (F && F.isOn() && B && B.length) F.setups.forEach(s => {
+        const SS = { 3: 'open', 4: 'TP', 5: 'SL', 6: 'timeout', 7: 'news' };
+        out.push({ id: `SF|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}`, ind: '🌏 OI Session Fade' + (s.real ? '' : ' (บันทึก)'), side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+          sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(s.tp), tp2: null, risk: r2(s.R), score: null,
+          reason: `${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k} เกรด ${s.z.grade} · โซน ±${s.S.half}`, evidence: s.real ? 'ไม้จริง v0.4' : 'ไม้บันทึก v0.4',
+          status: SS[s.st] || 'open', exit_th: s.end !== undefined ? th(B[s.end].time) : '', result_r: s.res !== undefined ? s.res : null });
+      });
+    } catch (e) {}
     return out;
   }
   let busy = false;

@@ -14,8 +14,9 @@
   let cfg = Object.assign({}, DEF);
   let saved0 = {}; try { saved0 = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; Object.assign(cfg, saved0); } catch (e) {}
   // V4.9.53: share ingestion with Volume Profile without enabling whale overlays/alerts.
-  const collecting = () => cfg.on || !!(window.OI_volumeProfile && window.OI_volumeProfile.cfg.on);
-  const historyHours = () => Math.max(cfg.on ? cfg.hours : 0, window.OI_volumeProfile && window.OI_volumeProfile.cfg.on ? window.OI_volumeProfile.cfg.win : 0) || cfg.hours;
+  const profileHours = () => window.OI_volumeProfile?.historyHours?.() ?? (window.OI_volumeProfile?.cfg.on ? window.OI_volumeProfile.cfg.win : 0);
+  const collecting = () => cfg.on || profileHours() > 0;
+  const historyHours = () => Math.max(cfg.on ? cfg.hours : 0, profileHours()) || cfg.hours;
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   if (saved0.v !== 2) { cfg.hours = 24; cfg.v = 2; save(); } // V4.3.3: ค่าเริ่มย้อนหลัง 24 ชม.
 
@@ -151,7 +152,7 @@
         const hiNeed = A.closed ? await idAt(A.end, top) : low - 1;
         const c = loadCache();
         let loNeed = null;
-        if (c && c.hiId && c.rows.length && !(window.OI_volumeProfile && OI_volumeProfile.cfg.on && OI_volumeProfile.needFull(since)) && !(window.OI_retail && OI_retail.cfg.on && OI_retail.needFull(since)) && (c.rows[0][0] <= since + 3600e3 || (c.lim && c.since <= since + 3600e3)) && c.hiId > top - 3000000) {
+        if (c && c.hiId && c.rows.length && !(window.OI_volumeProfile?.needFull(since)) && !(window.OI_retail && OI_retail.cfg.on && OI_retail.needFull(since)) && (c.rows[0][0] <= since + 3600e3 || (c.lim && c.since <= since + 3600e3)) && c.hiId > top - 3000000) {
           c.rows.forEach(([t, p, q, s]) => { if (t >= since && t < head[0].T) trades.push({ t, p, q, s }); });
           loNeed = c.hiId; // มีของเดิมแล้ว ดึงเฉพาะช่วงที่ขาด
         }

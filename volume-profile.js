@@ -17,6 +17,9 @@
   const MINUTE = 60000, KEEP = 72 * 3600e3, BUY = '#38bdf8', SELL = '#f97316';
   // Per exchange/minute: price -> [buy oz, sell oz], and exact trade-id ranges for dedup.
   let buckets = new Map(), dirty = false, revision = 0, cache = null, hit = [], down = null;
+  let footprintOn = false, repaint = null;
+  const collecting = () => cfg.on || footprintOn;
+  const historyHours = () => Math.max(cfg.on ? cfg.win : 0, footprintOn ? 8 : 0);
   const saveCfg = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (_) {} };
   function seen(ranges, id) {
     const n = BigInt(id); let lo = 0, hi = ranges.length;
@@ -30,7 +33,7 @@
     return false;
   }
   function sink(source, id, t, p, q, side) {
-    if (!cfg.on || !['binance', 'bitget'].includes(source) || !Number.isFinite(t) || !Number.isFinite(p) || !Number.isFinite(q) || !(p > 0 && q > 0) || ![1, -1].includes(side) || t < Date.now() - KEEP || t > Date.now() + MINUTE) return;
+    if (!collecting() || !['binance', 'bitget'].includes(source) || !Number.isFinite(t) || !Number.isFinite(p) || !Number.isFinite(q) || !(p > 0 && q > 0) || ![1, -1].includes(side) || t < Date.now() - KEEP || t > Date.now() + MINUTE) return;
     // Never count unidentified/replayed fills as new volume.
     if (id === undefined || !/^\d+$/.test(String(id))) return;
     const time = Math.floor(t / MINUTE) * MINUTE, key = source + '|' + time;
@@ -41,6 +44,10 @@
     v[side > 0 ? 0 : 1] += q; b.prices.set(price, v);
     b.first = Math.min(b.first, t); b.last = Math.max(b.last, t);
     dirty = true; revision++;
+    if (footprintOn && repaint === null) repaint = setTimeout(() => {
+      repaint = null;
+      if (footprintOn && !O.paused && document.visibilityState === 'visible') O.markDirty();
+    }, 100);
   }
   window.OIVolumeSink = sink;
   function saveData() {
@@ -64,7 +71,30 @@
   function needFull(since) {
     // Whale cache contains large trades only; always request raw pages for a profile.
     // Dedup ranges make repeated backfills safe, including after restoring local data.
-    return cfg.on;
+    return collecting();
+  }
+  function footprint(start, end) {
+    const src = source();
+    if (!src) return [];
+    const prices = new Map(), floor = Math.max(start, Math.ceil((Date.now() - KEEP) / MINUTE) * MINUTE);
+    for (let time = floor; time < end; time += MINUTE) {
+      const bucket = buckets.get(src + '|' + time);
+      if (!bucket) continue;
+      bucket.prices.forEach(([buy, sell], price) => {
+        const key = Math.round(price / 10);
+        const row = prices.get(key) || { price: key / 10, buy: 0, sell: 0 };
+        row.buy += buy;
+        row.sell += sell;
+        prices.set(key, row);
+      });
+    }
+    return [...prices.values()].sort((a, b) => b.price - a.price);
+  }
+  function setFootprint(on) {
+    const previous = historyHours();
+    footprintOn = on;
+    if (historyHours() > previous || !collecting()) feed()?.syncCollection();
+    if (!collecting()) saveData();
   }
   function profile() {
     const src = source(), end = endTime(), start = Math.floor((end - cfg.win * 3600e3) / MINUTE) * MINUTE;
@@ -186,5 +216,5 @@
   setInterval(() => { if (!cfg.on || O.paused || document.visibilityState !== 'visible') return; O.markDirty(); const e = $('vpInfo'); if (e) e.textContent = info(); }, 1000);
   setInterval(saveData, 60000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveData(); });
-  window.OI_volumeProfile = { cfg, profile, needFull, save: saveData };
+  window.OI_volumeProfile = { cfg, profile, needFull, historyHours, footprint, setFootprint, offset, save: saveData };
 })();

@@ -662,7 +662,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.78';
+  const APP_VER = '4.9.79';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5)
   // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5
@@ -2788,6 +2788,27 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       ftCache.set(k, { at: Date.now(), p: pr });
       const v = await pr; if (!v) ftCache.delete(k); return v ? v.slice(-n) : null;
     },
+    // V4.9.79: ดึงแท่งย้อนหลังเป็นช่วงเวลา (ไล่หน้าละ 1000 แท่ง) สำหรับแบ็กเทสในอินดี้ · Bybit → Binance · ราคาปรับ offset รอบนั้นเหมือนกราฟ
+    fetchHist: async (t, fromMs, toMs) => {
+      if (SYMBOL !== 'XAUUSDT') return null;
+      const step = (tfSec[t] || 60) * 1000, srcs = [
+        async end => { const j = await (await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${SYMBOL}&interval=${BYBIT_TF[t]}&end=${end}&limit=1000`, { cache: 'no-store' })).json(); if (j.retCode !== 0) throw new Error(j.retMsg); return j.result.list.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4], +k[5] || 0]); },
+        async end => { const j = await (await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${SYMBOL}&interval=${t}&endTime=${end}&limit=1000`, { cache: 'no-store' })).json(); if (!Array.isArray(j)) throw new Error(j.msg || 'bad'); return j.map(k => [+k[0], +k[1], +k[2], +k[3], +k[4], +k[5] || 0]); },
+      ];
+      for (const get of srcs) {
+        try {
+          const all = new Map(); let end = toMs;
+          for (let g = 0; g < 40 && end > fromMs; g++) {
+            const rows = await get(end); if (!rows.length) break;
+            rows.forEach(k => { if (k[0] >= fromMs && k[0] < toMs) all.set(k[0], k); });
+            const mn = Math.min(...rows.map(k => k[0])); if (!(mn < end)) break; end = mn - step;
+          }
+          if (!all.size) continue;
+          return [...all.values()].sort((a, b) => a[0] - b[0]).filter(k => !cmeClosed(k[0])).map(k => Object.assign(toBar(k), { volume: k[5] || 0 }));
+        } catch (e) {}
+      }
+      return null;
+    },
     get paused() { return paused; },
     get unlimited() { return !!authCode && (!authExpire || String(authExpire) >= '9999'); }, // V4.9.32 รหัสไม่จำกัดวัน
     get tf() { return tf; }, tzShift: TZ_SHIFT, sym: SYM, cfg: SC, sfx: SYMSFX, psfx: PSFX,
@@ -2846,7 +2867,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <script src="dealer.js?v=40929"></script>
 <script src="ivbadge.js?v=40504"></script>
 <script src="oistep.js?v=40960"></script>
-<script src="osf.js?v=40978"></script>
+<script src="osf.js?v=40979"></script>
 <script src="squeeze.js?v=40316"></script>
 <script src="trap.js?v=40929"></script>
 <script src="volreg.js?v=40929"></script>

@@ -100,6 +100,7 @@
 
   // ---------- OI ย้อนหลังรายวัน (API เดียวกับ Historical OI Zones: oi_backup + oi_recovered) ----------
   let hist = new Map(), histAt = 0, histMsg = '';
+  const m1Cache = new Map(), HIST_DAYS = 10; // แคชแท่ง M1 รายวันที่จบแล้ว (ไม่ต้องดึงซ้ำ) · แบ็กเทสย้อนหลังสูงสุด 10 วัน
   async function loadHist() {
     if (Date.now() - histAt < 30 * 60e3 || !window.OIHistoryZonesAPI) return;
     histAt = Date.now();
@@ -131,16 +132,25 @@
         today = bars.length && live ? scan(bars, lv, news, { from: d0 }).map(s => Object.assign(s, { day: ymd(d0), tf: 'M1', live: true })) : [];
         // ย้อนหลัง: วันที่มี OI ในชีต · ใช้ M1 ถ้ามีครบวัน ไม่งั้น M5 (ประมาณ) · เกรด A ย้อนหลังไม่มี (ไม่มี volume รายวัน) = เกรด B ทั้งหมด
         const past = [], dl = live ? [{ day: ymd(d0), tf: 'M1', n: today.length }] : [];
-        [...hist.keys()].sort().forEach(dt => {
-          const ds = Date.parse(dt + 'T06:00:00Z') / 1000; if (!(live ? ds < d0 : ds <= d0)) return;
-          const de = ds + 86400, m1 = A1[0].time <= ds, src = m1 ? A1 : (A5 && A5.length && A5[0].time <= ds + 3600 ? A5 : null);
-          if (!src) return;
-          const j0 = src.findIndex(b => b.time >= ds), j1 = src.findIndex(b => b.time >= de);
-          const B = src.slice(Math.max(0, j0 - ATR_N - 10), j1 < 0 ? src.length : j1); if (j0 < 0 || (j1 < 0 ? src.length : j1) - j0 < (m1 ? 300 : 60)) return;
-          const L = levels(src[j0].open, hist.get(dt)); if (!L.length) return;
+        // V4.9.79: วันที่ M1 ในกราฟไม่ครบ → ดึง M1 ย้อนหลังรายวัน (Bybit/Binance ไล่หน้า) เก็บแคชไว้ · ไม่ได้จริง ๆ ค่อยใช้ M5 (≈ ไม่คิดผล)
+        const dts = [...hist.keys()].sort().filter(dt => { const ds = Date.parse(dt + 'T06:00:00Z') / 1000; return live ? ds < d0 : ds <= d0; }).slice(-HIST_DAYS);
+        for (const dt of dts) {
+          const ds = Date.parse(dt + 'T06:00:00Z') / 1000, de = ds + 86400;
+          let src = null, m1 = false;
+          if (A1[0].time <= ds - (ATR_N + 10) * 60) { src = A1; m1 = true; }
+          else {
+            if (!m1Cache.has(dt) && O.fetchHist && de < A1[A1.length - 1].time) m1Cache.set(dt, await O.fetchHist('1m', (ds - 7 * 3600 - (ATR_N + 20) * 60 - (new Date(ds * 1000).getUTCDay() === 1 ? 3 * 86400 : 0)) * 1000, (de - 7 * 3600) * 1000)); // วันจันทร์: ย้อนถึงศุกร์ไว้คำนวณ ATR
+            const c = m1Cache.get(dt); if (c && c.length > 300) { src = c; m1 = true; }
+            else if (A5 && A5.length && A5[0].time <= ds + 3600) src = A5;
+          }
+          if (!src) continue;
+          const j0 = src.findIndex(b => b.time >= ds), j1 = src.findIndex(b => b.time >= de), je = j1 < 0 ? src.length : j1;
+          if (j0 < 0 || je - j0 < (m1 ? 300 : 60)) continue;
+          const B = src.slice(Math.max(0, j0 - ATR_N - 10), je);
+          const L = levels(src[j0].open, hist.get(dt)); if (!L.length) continue;
           const r = scan(B, L, news, { hold: m1 ? 240 : 48, from: ds }).map(s => Object.assign(s, { day: dt, tf: m1 ? 'M1' : 'M5' }));
           past.push(...r); dl.push({ day: dt, tf: m1 ? 'M1' : 'M5', n: r.length });
-        });
+        }
         setups = past.concat(today); days = dl;
         notify(oldKeys); O.markDirty();
       }
@@ -237,12 +247,15 @@
   }
 
   // ---------- ป้ายสถานะ ----------
-  // ป้ายแดงหน้าสุด: ราคาพุ่งเข้าหาเส้นเกิน 3×ATR ใน 5 แท่ง M1 (Asia เช้า = ข้ามไม้ตามกฎ v0.5)
+  // ป้ายโมเมนตัม หน้าสุดของแถบป้าย (โชว์ค้างตลอดเมื่อเปิดอินดี้) · ≤2×ATR เทา · 2–3× เหลือง · >3× แดง (Asia เช้า = ข้ามไม้ตามกฎ v0.5)
+  let lastMom = null;
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
-    if (!isOn() || !fresh()) return null;
-    const m = liveMom(); if (!m || m.mv <= MOM_MAX) return null;
-    const S = sessOf(bars[bars.length - 1].time);
-    return [`⚡ พุ่ง${m.dn ? 'ลง' : 'ขึ้น'} ${m.mv}×ATR (${m.usd}$/5น.)${m.z ? ` → ${m.z.side}${m.z.k}` : ''}${S && S.mom ? ' · ข้ามไม้' : ''}`, '#ff3b5c', 'sfmom', 'rgba(255,59,92,.18)', 'first']; // key sfmom = หน้าสุดของแถบป้าย (live.js ORD)
+    if (!isOn() || !bars.length) return null;
+    const m = liveMom() || lastMom; if (!m) return ['⚡ โมเมนตัม –', '#8fa3c8', 'sfmom', null, 'first'];
+    lastMom = m;
+    const open = fresh(), S = open ? sessOf(bars[bars.length - 1].time) : null, hot = m.mv > MOM_MAX, warm = m.mv > 2;
+    const t = `⚡ ${m.dn ? 'ลง' : 'ขึ้น'} ${m.mv}×ATR (${m.usd}$/5น.)${m.z ? ` → ${m.z.side}${m.z.k}` : ''}${!open ? ' · ตลาดปิด' : hot && S && S.mom ? ' · ข้ามไม้' : ''}`;
+    return [t, hot ? '#ff3b5c' : warm ? '#e0b44c' : '#8fa3c8', 'sfmom', hot && open ? 'rgba(255,59,92,.18)' : null, 'first'];
   });
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     if (!isOn() || !fresh()) return null;
@@ -285,7 +298,7 @@
     new MutationObserver(() => mount()).observe(menu, { childList: true });
     menu.addEventListener('click', e => {
       const a = e.target.closest('[data-sf]'); if (!a) return;
-      if (a.dataset.sf === 'on') cfg.on = !isOn(); else if (a.dataset.sf === 'reload') histAt = 0; else cfg.paper = !cfg.paper;
+      if (a.dataset.sf === 'on') cfg.on = !isOn(); else if (a.dataset.sf === 'reload') { histAt = 0; m1Cache.forEach((v, k) => { if (!v) m1Cache.delete(k); }); } else cfg.paper = !cfg.paper;
       save(); O.markDirty(); const b = $('sfBox'); if (b) b.remove(); mount(); run(true);
     });
   }

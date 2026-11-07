@@ -648,7 +648,6 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const SYMS = {
     gold: { name: 'XAUUSD', label: 'ทองคำ', ico: '🥇', perp: 'XAUUSDT', dec: 2, tick: 0.01, tol: 1.5, rearm: 8, mult: 100, carry: true, zone: 2.5, note: 'GC' },
     gcy: { name: 'GC·Y', label: 'ทอง GC (Yahoo)', ico: '📉', perp: null, yahoo: 'GC', yfile: 'gcy.json', dataSym: 'gold', dec: 2, tick: 0.01, tol: 1.5, rearm: 8, mult: 100, carry: false, zone: 2.5, note: 'GC' },
-    oil: { name: 'WTI', label: 'น้ำมัน', ico: '🛢️', perp: 'CLUSDT', dec: 2, tick: 0.01, tol: 0.15, rearm: 0.8, mult: 1000, carry: false, zone: 0.15, note: 'CL' },
   };
   // ---- เลย์เอาต์ 2 กราฟ: กราฟที่ 2 = iframe ของแอปเดียวกัน (?pane=b) แยก TF/อินดิเคเตอร์/OI/วาด ด้วย key ต่อท้าย _b ----
   const QS = new URLSearchParams(location.search);
@@ -663,9 +662,9 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.74';
+  const APP_VER = '4.9.75';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
-  const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
+  const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5)
   // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5
   const zoneHalf = () => {
     if (SC.note !== 'GC') return ZONE_HALF;
@@ -2713,7 +2712,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   $('loginVer').textContent = 'V' + APP_VER;
   let saved = null;
   try { saved = localStorage.getItem('oi_code'); } catch (e) {}
-  // ---------- เลือกสัญลักษณ์ (ทอง / น้ำมัน) ----------
+  // ---------- เลือกสัญลักษณ์ (ทอง XAUUSD / GC Yahoo) · V4.9.75 ตัดน้ำมันออก ----------
   $('symName').textContent = SC.name;
   $('symMenu').innerHTML = Object.keys(SYMS).map(k => `<button data-sym="${k}" class="${k === SYM ? 'on' : ''}"><em>${SYMS[k].ico}</em>${SYMS[k].label}<small>${SYMS[k].name}</small></button>`).join('');
   $('symBtn').addEventListener('click', e => { e.stopPropagation(); $('symMenu').hidden = !$('symMenu').hidden; });

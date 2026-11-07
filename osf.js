@@ -120,7 +120,8 @@
     busy = true; lastRun = Date.now();
     try {
       await loadHist();
-      const [A1, A5] = await Promise.all([O.fetchTF('1m', 6000), O.fetchTF('5m', 1500)]);
+      let [A1, A5] = await Promise.all([O.fetchTF('1m', 6000), O.fetchTF('5m', 1500)]);
+      if ((!A1 || A1.length < 300) && O.fetchHist) { const h = await O.fetchHist('1m', Date.now() - 3.5 * 86400e3, Date.now() + 60e3); if (h && h.length > 300) A1 = h; } // เสาร์-อาทิตย์
       if (A1 && A1.length > 30) {
         const d0 = dayStart(A1[A1.length - 1].time), oldKeys = new Set(today.map(key));
         // วันนี้: M1 + OI สด (มีเกรด A จาก volume)
@@ -203,9 +204,10 @@
     // ไม้ (แบ็กเทส + วันนี้): กรอบ TP เขียว / SL แดง จากแท่งเข้าถึงแท่งออก (ยังเปิด = ถึงแท่งล่าสุด)
     const lastT = bars.length ? bars[bars.length - 1].time : null;
     setups.filter(s => s.real || s.fast || cfg.paper).forEach(s => {
+      // V4.9.80: แท่งเข้าไม่อยู่ในกราฟ (เลื่อนเกิน/ข้อมูลกราฟไม่ถึง) = ไม่วาด · แท่งออกไม่อยู่ในกราฟ: ไม้เปิดอยู่ = ถึงขอบขวา, ไม้จบแล้ว = ไม่วาด (เดิมยืดเต็มจอ ทับกันทั้งกราฟ)
       let x0 = X(s.t0), x1 = X(s.t1 !== null ? s.t1 : (lastT || s.t0));
-      if (x0 === null && x1 === null) return;
-      if (x0 === null) x0 = 0; if (x1 === null) x1 = plotW;
+      if (x0 === null) return;
+      if (x1 === null) { if (s.t1 !== null) return; x1 = plotW; }
       x1 = Math.max(x1 + bw, x0 + 6); if (x1 < 0 || x0 > plotW) return;
       const ye = Y(s.entry), yt = Y(s.tp), ys = Y(s.sl); if (ye === null || yt === null || ys === null) return;
       const a = (s.real ? 1 : 0.55) * (s.tf === 'M5' ? 0.75 : 1); // V4.9.76 เข้มขึ้น · ไม้กรองพุ่ง = จางแบบไม้บันทึก + ป้ายแดง
@@ -237,7 +239,7 @@
 
   // ---------- โมเมนตัมสด: ราคากำลังพุ่งเข้าหาเส้นไหน (ใช้แท่งที่ปิดแล้ว) ----------
   function liveMom() {
-    const n = bars.length; if (n < ATR_N + MOM_N + 3 || !lv.length) return null;
+    const n = bars.length; if (n < ATR_N + MOM_N + 3) return null; // V4.9.80: คิดได้แม้ไม่มีเส้น (ตลาดปิด)
     const A = atrArr(bars), i = n - 1, a = A[i]; if (!(a > 0)) return null;
     const mvDown = (bars[i - 1 - MOM_N].close - bars[i - 1].close) / a, P = bars[i - 1].close;
     const dn = mvDown > 0, mv = Math.abs(mvDown);

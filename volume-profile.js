@@ -19,7 +19,8 @@
   let buckets = new Map(), dirty = false, revision = 0, cache = null, hit = [], down = null;
   let footprintOn = false, repaint = null;
   const collecting = () => cfg.on || footprintOn;
-  const historyHours = () => Math.max(cfg.on ? cfg.win : 0, footprintOn ? 24 : 0);
+  const FOOTPRINT_HOURS = 24;
+  const historyHours = () => Math.max(cfg.on ? cfg.win : 0, footprintOn ? FOOTPRINT_HOURS : 0);
   const saveCfg = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (_) {} };
   function seen(ranges, id) {
     const n = BigInt(id); let lo = 0, hi = ranges.length;
@@ -73,11 +74,16 @@
     // Dedup ranges make repeated backfills safe, including after restoring local data.
     return collecting();
   }
+  function footprintWindow() {
+    const end = feed()?.anchorMs(true).end ?? Date.now();
+    return { start: end - FOOTPRINT_HOURS * 3600e3, end };
+  }
   function footprint(start, end) {
     const src = source();
     if (!src) return [];
-    const prices = new Map(), floor = Math.max(start, Math.ceil((Date.now() - KEEP) / MINUTE) * MINUTE);
-    for (let time = floor; time < end; time += MINUTE) {
+    const prices = new Map();
+    const firstMinute = Math.ceil(Math.max(start, Date.now() - KEEP) / MINUTE) * MINUTE;
+    for (let time = firstMinute; time < end; time += MINUTE) {
       const bucket = buckets.get(src + '|' + time);
       if (!bucket) continue;
       bucket.prices.forEach(([buy, sell], price) => {
@@ -91,9 +97,9 @@
     return [...prices.values()].sort((a, b) => b.price - a.price);
   }
   function setFootprint(on) {
-    const previous = historyHours();
+    if (footprintOn === on) return;
     footprintOn = on;
-    if (historyHours() > previous || !collecting()) feed()?.syncCollection();
+    if (on || !collecting()) feed()?.syncCollection();
     if (!collecting()) saveData();
   }
   function profile() {
@@ -216,5 +222,5 @@
   setInterval(() => { if (!cfg.on || O.paused || document.visibilityState !== 'visible') return; O.markDirty(); const e = $('vpInfo'); if (e) e.textContent = info(); }, 1000);
   setInterval(saveData, 60000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveData(); });
-  window.OI_volumeProfile = { cfg, profile, needFull, historyHours, footprint, setFootprint, offset, save: saveData };
+  window.OI_volumeProfile = { cfg, profile, needFull, historyHours, footprintWindow, footprint, setFootprint, offset, save: saveData };
 })();

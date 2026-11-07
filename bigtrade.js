@@ -45,7 +45,7 @@
     // กราฟยังเป็นแท่งของ TF เดิม (เพิ่งกดเปลี่ยน) → รอแล้วลองใหม่ ไม่งั้นจับคู่ราคาผิดแท่ง
     const step = TFS[O.tf] || 60;
     if (O.tf !== '1d' && B[B.length - 1].time - B[B.length - 2].time !== step && B[B.length - 2].time - B[B.length - 3].time !== step) { setTimeout(() => loadKlines().then(() => O.markDirty()), 1500); return; }
-    const anchor = anchorMs();
+    const anchor = collectionAnchor();
     const endTime = anchor.closed ? '&endTime=' + (anchor.end - 1) : '';
     const n = Math.min(1500, Math.max(100, B.length));
     if (src !== 'bitget') {
@@ -132,14 +132,17 @@
     return T(lo).then(t => t === -Infinity ? hi : lo);
   }
   // V4.3.6: ตลาด CME ปิด (เสาร์–อาทิตย์/ช่วงพัก) → นับย้อนหลังจากแท่งสุดท้ายบนกราฟ ไม่ใช่เวลาปัจจุบัน และดึงเฉพาะช่วงที่มีแท่ง
-  function anchorMs() {
-    const B = O.series.data() || []; if (!B.length) return { end: Date.now(), closed: false };
-    const sec = TFS[O.tf] || 60, end = (B[B.length - 1].time - TZ + sec) * 1000;
-    return Date.now() - end > 30 * 60e3 ? { end, closed: true } : { end: Date.now(), closed: false };
+  function anchorMs(fromLastBar = false) {
+    const now = Date.now(), bars = O.series.data() || [];
+    if (!bars.length) return { end: now, closed: false };
+    const seconds = TFS[O.tf] || 60, end = (bars.at(-1).time - TZ + seconds) * 1000;
+    const closed = now - end > (fromLastBar ? 0 : 30 * 60e3);
+    return { end: closed ? end : now, closed };
   }
+  const collectionAnchor = () => anchorMs(window.OI_footprint?.active);
   async function backfill() {
     trades = []; sN = 0; thrAt = 0; limited = false;
-    const A = anchorMs(), since = A.end - historyHours() * 3600e3; closedAnchor = A.closed;
+    const A = collectionAnchor(), since = A.end - historyHours() * 3600e3; closedAnchor = A.closed;
     sinceT = since;
     if (src !== 'bitget') {
       try {

@@ -50,9 +50,9 @@
     ctx.fillRect(x - 3, Math.min(open, close), 7, Math.max(1, Math.abs(close - open)));
   }
 
-  function drawBar(ctx, bar, x, half, height, shift, seconds) {
+  function drawBar(ctx, bar, x, half, height, shift, seconds, windowStart, windowEnd) {
     const start = (bar.time - O.tzShift) * 1000;
-    const rows = volume.footprint(start, start + seconds * 1000);
+    const rows = volume.footprint(Math.max(start, windowStart), Math.min(start + seconds * 1000, windowEnd));
     if (!rows.length) return false;
 
     const yAt = price => O.series.priceToCoordinate(price - shift);
@@ -111,6 +111,7 @@
     const feed = window.OI_bigtr, shift = volume.offset();
     const half = Math.max(2, Math.min(57, scale.options().barSpacing / 2 - 5));
     const seconds = TFS[O.tf];
+    const { start: windowStart, end: windowEnd } = volume.footprintWindow();
     let drawn = false;
     ctx.save();
     ctx.beginPath();
@@ -123,7 +124,7 @@
       if (x === null || x < -half || x > width + half) continue;
       const reference = feed?.pxOff.get(bar.time);
       const basis = Number.isFinite(reference) ? reference - bar.close : shift;
-      if (basis !== null && seconds && drawBar(ctx, bar, Math.round(x), half, height, basis, seconds)) drawn = true;
+      if (basis !== null && seconds && drawBar(ctx, bar, Math.round(x), half, height, basis, seconds, windowStart, windowEnd)) drawn = true;
       else drawCandle(ctx, bar, Math.round(x), previous.candleColors);
     }
     const venue = { binance: 'Binance', bitget: 'Bitget' }[feed?.src];

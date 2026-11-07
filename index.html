@@ -399,10 +399,11 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       <svg class="intro-chart" viewBox="0 0 310 104" aria-hidden="true">
         <rect x=".5" y=".5" width="309" height="103" rx="14" fill="#0a1222" stroke="#33415a"/>
         <path d="M17 26h276M17 52h276M17 78h276M58 15v74m52-74v74m52-74v74m52-74v74m52-74v74" stroke="#273750" opacity=".65"/>
-        <path id="spTrend" d="M18 77l32-10 27 4 34-26 29 8 37-25 27 8" fill="none" stroke="#eac377" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs><clipPath id="spTrailClip"><rect x="17" y="10" width="278" height="84"/></clipPath></defs>
+        <path clip-path="url(#spTrailClip)" id="spTrend" d="M18 77l32-10 27 4 34-26 29 8 37-25 27 8" fill="none" stroke="#eac377" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M17 52h276" stroke="#a898cd" stroke-opacity=".65" stroke-dasharray="3 5"/>
-        <g fill="#47c6a2"><rect x="250" y="25" width="43" height="6" rx="3"/><rect x="222" y="36" width="71" height="6" rx="3"/></g>
-        <g fill="#e27387"><rect x="231" y="62" width="62" height="6" rx="3"/><rect x="260" y="73" width="33" height="6" rx="3"/></g>
+        <g fill="#47c6a2"><rect x="250" y="25" width="43" height="6" rx="3"/><rect id="spCallWall" x="222" y="36" width="71" height="6" rx="3" stroke="#bdfff0" stroke-width="1.5" stroke-opacity="0"/></g>
+        <g fill="#e27387"><rect id="spPutWall" x="231" y="62" width="62" height="6" rx="3" stroke="#ffd1dc" stroke-width="1.5" stroke-opacity="0"/><rect x="260" y="73" width="33" height="6" rx="3"/></g>
         <defs>
           <radialGradient id="spHeadGlow">
             <stop offset="0" stop-color="#ffe49b" stop-opacity=".95"/>
@@ -455,22 +456,37 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       var motion = window.matchMedia('(prefers-reduced-motion: reduce)');
       if (motion.matches) return;
       var line = document.getElementById('spTrend'), head = document.getElementById('spTrendHead');
-      var xs = [18, 50, 77, 111, 140, 177, 204];
-      var levels = [77, 67, 71, 45, 53, 28, 36, 29, 46, 39, 57, 49, 61, 40, 31, 44, 25, 38, 52, 43];
-      var startedAt;
+      var callWall = document.getElementById('spCallWall'), putWall = document.getElementById('spPutWall');
+      // At contact, the glowing tip's 3.6px core touches the left edge of the OI bar.
+      var route = [[204, 36], [208, 46], [218.4, 39], [207, 48], [210, 57],
+        [227.4, 65], [214, 57], [205, 45], [211, 32], [205, 42]];
+      var interval = 135, scroll = 0.19, history = 10, startedAt;
+      function point(tick) { return route[((tick % route.length) + route.length) % route.length]; }
+      function flash(step, contact) {
+        var age = (step - contact + route.length) % route.length;
+        return Math.max(0, 1 - age);
+      }
       function frame(now) {
         if (closed || !running || g !== gen || motion.matches) return;
         if (startedAt === undefined) startedAt = now;
-        var elapsed = now - startedAt, step = elapsed / 135;
-        var tick = Math.floor(step), fraction = step - tick, endY;
-        var points = xs.map(function (x, i) {
-          var a = levels[(tick + i) % levels.length], b = levels[(tick + i + 1) % levels.length];
-          endY = (a + (b - a) * fraction).toFixed(2);
-          return x + ' ' + endY;
-        });
-        line.setAttribute('d', 'M' + points.join('L'));
-        head.setAttribute('transform', 'translate(204 ' + endY + ')');
-        head.firstElementChild.setAttribute('r', (13 + 2 * Math.sin(elapsed / 75)).toFixed(2));
+        var elapsed = now - startedAt, step = elapsed / interval;
+        var tick = Math.floor(step), fraction = step - tick;
+        var a = point(tick), b = point(tick + 1);
+        var x = a[0] + (b[0] - a[0]) * fraction;
+        var y = a[1] + (b[1] - a[1]) * fraction;
+        var trail = [];
+        // Each past point retains its price height and moves left as time advances.
+        for (var i = tick - history; i <= tick; i++) {
+          var p = point(i), pastX = p[0] - (step - i) * interval * scroll;
+          trail.push(pastX.toFixed(2) + ' ' + p[1]);
+        }
+        trail.push(x.toFixed(2) + ' ' + y.toFixed(2));
+        line.setAttribute('d', 'M' + trail.join('L'));
+        head.setAttribute('transform', 'translate(' + x.toFixed(2) + ' ' + y.toFixed(2) + ')');
+        var callFlash = flash(step, 2), putFlash = flash(step, 5);
+        callWall.setAttribute('stroke-opacity', callFlash.toFixed(2));
+        putWall.setAttribute('stroke-opacity', putFlash.toFixed(2));
+        head.firstElementChild.setAttribute('r', (13 + 2 * Math.sin(elapsed / 75) + 4 * Math.max(callFlash, putFlash)).toFixed(2));
         requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);
@@ -623,7 +639,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.69';
+  const APP_VER = '4.9.70';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา

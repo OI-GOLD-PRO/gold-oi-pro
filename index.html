@@ -662,7 +662,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.81';
+  const APP_VER = '4.9.82';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5)
   // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5
@@ -2115,6 +2115,30 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     $('msg').textContent = 'ดึงราคาไม่ได้จากทุกแหล่ง (' + errs.join(' / ') + ') ลองกดเปลี่ยนไทม์เฟรมอีกครั้ง';
     window.OISplash && OISplash.done();
   }
+
+  // V4.9.82: เลื่อนกราฟไปซ้ายจนเกือบสุด → โหลดแท่งเก่าเพิ่มทีละ ~1000 แท่ง (Bybit → Binance ไล่หน้า) ต่อหน้าแท่งเดิม · ทอง XAUUSD เท่านั้น · สูงสุด 30,000 แท่ง
+  let olderBusy = false, olderEnd = false, olderTF = null;
+  async function loadOlder() {
+    if (olderBusy || SYMBOL !== 'XAUUSDT' || SC.yahoo || !rawBars.length || rawBars.length >= 30000) return;
+    if (olderTF !== tf) { olderTF = tf; olderEnd = false; }
+    if (olderEnd) return;
+    olderBusy = true; const myTF = tf, step = (tfSec[tf] || 60) * 1000, first = rawBars[0][0];
+    try {
+      let rows = null;
+      for (let span = 1500; span <= 6000 && !(rows && rows.length); span *= 2) { // ข้ามช่วงตลาดปิด (เสาร์-อาทิตย์/พักรายวัน)
+        const r = await fetchRangeRaw(myTF, first - span * step, first);
+        if (myTF !== tf || !rawBars.length || rawBars[0][0] !== first) return; // เปลี่ยน TF ระหว่างโหลด
+        rows = r ? r.filter(k => k[0] < first && !cmeClosed(k[0])) : null;
+      }
+      if (!rows || !rows.length) { olderEnd = true; return; }
+      const ts = chart.timeScale(), vr = ts.getVisibleLogicalRange();
+      rawBars = rows.concat(rawBars);
+      series.setData(rawBars.map(toBar));
+      if (vr) ts.setVisibleLogicalRange({ from: vr.from + rows.length, to: vr.to + rows.length });
+      indRefresh(); dirty = true;
+    } catch (e) {} finally { olderBusy = false; }
+  }
+  try { chart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r && r.from < 30) loadOlder(); }); } catch (e) {}
 
   // V3.5.6: วาดแท่งจากข้อมูลสด/ที่ดึงมาเติม — อัปเดตเฉพาะแท่งล่าสุดหรือใหม่กว่า (snapshot บางแหล่งส่งแท่งเก่ามาด้วย)
   function applyRows(rows) {

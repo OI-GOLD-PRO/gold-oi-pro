@@ -44,7 +44,7 @@
     // 🌏 OI Session Fade (V4.9.72) — ไม้จริง + ไม้บันทึก (forward test) · evidence บอกว่าเป็นไม้ไหน
     try {
       const F = window.OI_sfade, B = F && F.bars;
-      if (F && F.isOn() && B && B.length) F.setups.forEach(s => {
+      if (F && F.isOn() && B && B.length) (F.today || []).forEach(s => { // เฉพาะวันนี้ (M1 สด) · แบ็กเทสย้อนหลังไม่ส่ง
         const SS = { 3: 'open', 4: 'TP', 5: 'SL', 6: 'timeout', 7: 'news' };
         out.push({ id: `SF|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}`, ind: '🌏 OI Session Fade' + (s.real ? '' : ' (บันทึก)'), side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
           sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(s.tp), tp2: null, risk: r2(s.R), score: null,

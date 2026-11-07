@@ -109,7 +109,40 @@
   #splash .retry { margin-top: 10px; padding: 9px 22px; border: 0; border-radius: 10px; background: #e0b44c; color: #1a1405; font: 600 14px -apple-system, sans-serif; }
   #splash .tag { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); font-size: 11px; color: #8a93ad; letter-spacing: 1px; animation: spFade .5s ease 1.3s both; }
   @keyframes spFade { from { opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { #splash * { animation-duration: .01ms !important; animation-delay: 0s !important; } }
+  #splash .intro-modern, #splash .intro-cache, #splash .intro-skip { display: none; }
+  #splash.modern {
+    --intro-gold: #eac377;
+    background: radial-gradient(ellipse at 50% 34%, #192642 0%, #0b1426 43%, #070b14 79%);
+    padding: calc(env(safe-area-inset-top, 0px) + 16px) 24px calc(env(safe-area-inset-bottom, 0px) + 68px);
+  }
+  #splash.modern > .grid, #splash.modern > .logo, #splash.modern > .tag { display: none; }
+  #splash.modern .intro-modern { display: block; width: min(100%, 310px); text-align: center; }
+  #splash .intro-mark { display: block; width: 86px; height: 86px; margin: 0 auto 18px; filter: drop-shadow(0 8px 28px #d8ad5828); }
+  #splash .intro-title { margin: 0; color: #f6eedf; font: 750 clamp(26px, 7vw, 40px)/1.1 var(--sans, system-ui); letter-spacing: .08em; }
+  #splash .intro-title span { color: var(--intro-gold); }
+  #splash .intro-caption { margin: 10px 0 20px; color: #9eaec7; font: 600 10px/1.5 var(--sans, system-ui); letter-spacing: .13em; }
+  #splash .intro-chart { display: block; width: 100%; height: auto; }
+  #splash.modern .intro-cache:not([hidden]) { display: block; margin-top: 20px; color: #a6b4cb; font: 500 11px/1.4 var(--sans, system-ui); }
+  #splash.modern .px { margin-top: 6px; min-height: 0; color: var(--intro-gold); animation: none; }
+  #splash.modern .px:empty { display: none; }
+  #splash.modern .load { margin-top: 16px; width: min(62vw, 250px); animation: none; }
+  #splash.modern .ver { margin-top: 9px; color: #a6b4cb; animation: none; }
+  #splash.modern .intro-skip {
+    display: block; position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    min-height: 44px; padding: 0 18px; border: 1px solid #33415a; border-radius: 24px;
+    background: #111b2d; color: #dce4f0; font: 600 12px var(--sans, system-ui);
+  }
+  #splash.modern .intro-skip:focus-visible { outline: 2px solid var(--intro-gold); outline-offset: 3px; }
+  @media (max-height: 460px) {
+    #splash.modern .intro-chart { display: none; }
+    #splash.modern .intro-mark { width: 52px; height: 52px; margin-bottom: 8px; }
+    #splash.modern .intro-caption { margin-bottom: 6px; }
+    #splash.modern .intro-cache:not([hidden]) { margin-top: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #splash, #splash * { animation-duration: .01ms !important; animation-delay: 0s !important; }
+    #splash.modern .load i { animation: none; width: 100%; background: var(--intro-gold); }
+  }
   #login { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
   #login .card { width: 100%; max-width: 340px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px 20px; text-align: center; }
   #login h1 { margin: 0 0 4px; font: 600 22px var(--mono); color: var(--gold); letter-spacing: .03em; }
@@ -352,16 +385,50 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
         <rect class="bar b4" x="297" y="446" width="143" height="24" rx="12" fill="#e5576b"/>
       </svg>
     </div>
+    <div class="intro-modern">
+      <svg class="intro-mark" viewBox="0 0 88 88" aria-hidden="true">
+        <rect x="3" y="3" width="82" height="82" rx="23" fill="#121d30" stroke="#76613b"/>
+        <circle cx="44" cy="44" r="29" fill="none" stroke="#eac377" stroke-opacity=".3"/>
+        <path d="M24 54l10-10 8 5 17-20h8" fill="none" stroke="#eac377" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M57 29h10v10" fill="none" stroke="#eac377" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="24" cy="54" r="3" fill="#eac377"/>
+        <path d="M28 64h32" stroke="#6f5b3b" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <p class="intro-title"><span>OI</span> GOLD PRO</p>
+      <p class="intro-caption">OPTIONS · OPEN INTEREST · GAMMA</p>
+      <svg class="intro-chart" viewBox="0 0 310 104" aria-hidden="true">
+        <rect x=".5" y=".5" width="309" height="103" rx="14" fill="#0a1222" stroke="#33415a"/>
+        <path d="M17 26h276M17 52h276M17 78h276M58 15v74m52-74v74m52-74v74m52-74v74m52-74v74" stroke="#273750" opacity=".65"/>
+        <path d="M18 77l32-10 27 4 34-26 29 8 37-25 27 8" fill="none" stroke="#eac377" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M17 52h276" stroke="#a898cd" stroke-opacity=".65" stroke-dasharray="3 5"/>
+        <g fill="#47c6a2"><rect x="250" y="25" width="43" height="6" rx="3"/><rect x="222" y="36" width="71" height="6" rx="3"/></g>
+        <g fill="#e27387"><rect x="231" y="62" width="62" height="6" rx="3"/><rect x="260" y="73" width="33" height="6" rx="3"/></g>
+        <circle cx="204" cy="36" r="4" fill="#eac377"/>
+      </svg>
+    </div>
+    <div class="intro-cache" id="spCacheLabel" hidden>ราคาล่าสุดที่บันทึก</div>
     <div class="px" id="spPx"></div>
     <div class="load" id="spLoad"><i></i></div>
     <div class="ver" id="spVer"></div>
     <div class="st" id="spSt"></div>
     <div class="tag">OPTIONS · OPEN INTEREST · GAMMA</div>
+    <button type="button" class="intro-skip">ข้าม Intro</button>
   </div>
   <script>
   // อินโทร: ปิดเมื่อกราฟพร้อม (เล่นอย่างน้อย 1.2 วินาที) · เกิน 2.5 วินาทีแสดงสถานะ · เกิน 6 วินาทีเข้าแอปเลย · แตะเพื่อข้าม · ออฟไลน์มีปุ่มลองใหม่
   (function () {
     var el = document.getElementById('splash'), t0 = Date.now(), closed = false, pend = '', MIN = 1200, SHOW_ST = 2500, MAX = 6000;
+    var introKey = 'oi_intro_style', introStyle = 'modern';
+    try { if (localStorage.getItem(introKey) === 'classic') introStyle = 'classic'; } catch (e) {}
+    window.OIIntro = {
+      get: function () { return introStyle; },
+      set: function (value) {
+        introStyle = value === 'classic' ? 'classic' : 'modern';
+        el.classList.toggle('modern', introStyle === 'modern');
+        try { localStorage.setItem(introKey, introStyle); } catch (e) {}
+      }
+    };
+    el.classList.toggle('modern', introStyle === 'modern');
     if (/[?&]pane=b/.test(location.search)) { el.remove(); window.OISplash = { done: function () {}, status: function () {}, start: function () {} }; return; }
     var saved = null; try { saved = localStorage.getItem('oi_code'); } catch (e) {}
     var running = false, gen = 0, st = document.getElementById('spSt');
@@ -379,9 +446,15 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       el.style.display = '';
       // ราคาล่าสุดจากครั้งก่อน นับขึ้นให้ดูมีชีวิต
       var px = null; try { px = JSON.parse(localStorage.getItem('oi_splash_px') || 'null'); } catch (e) {}
-      if (px && isFinite(px.p)) {
-        var pel = document.getElementById('spPx'), s0 = t0 + 1200;
-        (function step() { var now = Date.now(), k = Math.min(1, Math.max(0, (now - s0) / 600)); if (now >= s0) pel.textContent = px.n + ' ' + (px.p - 60 * Math.pow(1 - k, 3)).toFixed(2); if (k < 1 && !closed) requestAnimationFrame(step); })();
+      if (px && Number.isFinite(px.p)) {
+        var pel = document.getElementById('spPx');
+        if (introStyle === 'modern') {
+          pel.textContent = (px.n || 'XAUUSD') + ' ' + Number(px.p).toFixed(2);
+          document.getElementById('spCacheLabel').hidden = false;
+        } else {
+          var s0 = t0 + 1200;
+          (function step() { var now = Date.now(), k = Math.min(1, Math.max(0, (now - s0) / 600)); if (now >= s0) pel.textContent = px.n + ' ' + (px.p - 60 * Math.pow(1 - k, 3)).toFixed(2); if (k < 1 && !closed) requestAnimationFrame(step); })();
+        }
       }
       setTimeout(paint, SHOW_ST);
       setTimeout(function () { if (g !== gen || !running || navigator.onLine === false) return; close(); }, MAX);
@@ -426,6 +499,14 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     <button class="icon" id="bell" aria-label="เปิดหรือปิดแจ้งเตือน">🔕</button>
     <div id="alertList"></div>
     <div class="note" id="alertNote"></div>
+    <h4>หน้าจอ Intro</h4>
+    <label class="row" for="introStyle">
+      <span class="tx">รูปแบบ Intro<small>ใช้เมื่อเปิดแอปครั้งถัดไป</small></span>
+      <select id="introStyle" style="max-width:50%;min-height:36px;border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:var(--panel);color:var(--fg);font:inherit">
+        <option value="modern">Gold Pulse</option>
+        <option value="classic">Classic</option>
+      </select>
+    </label>
     <h4>บัญชี</h4>
     <button class="icon" id="logout" aria-label="ออกจากระบบ">⏻ ออกจากระบบ</button>
     <div class="note" id="setVer"></div>
@@ -506,7 +587,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.67';
+  const APP_VER = '4.9.68';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
@@ -1503,6 +1584,8 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   function closeSettings() { $('setPanel').hidden = true; }
   $('setBtn').addEventListener('click', openSettings);
   $('setClose').addEventListener('click', closeSettings);
+  $('introStyle').value = window.OIIntro.get();
+  $('introStyle').addEventListener('change', e => window.OIIntro.set(e.target.value));
   $('setPanel').addEventListener('click', e => {
     if (e.target === $('setPanel')) { closeSettings(); return; }
     const sw = e.target.closest('[data-at]'); if (!sw || sw.disabled) return;

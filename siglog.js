@@ -48,7 +48,7 @@
         const SS = { 3: 'open', 4: 'TP', 5: 'SL', 6: 'timeout', 7: 'news' };
         out.push({ id: `SF|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}`, ind: '🌏 OI Session Fade' + (s.real ? '' : ' (บันทึก)'), side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
           sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(s.tp), tp2: null, risk: r2(s.R), score: null,
-          reason: `${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k} เกรด ${s.z.grade} · โซน ±${s.S.half}`, evidence: s.real ? 'ไม้จริง v0.4' : 'ไม้บันทึก v0.4',
+          reason: `${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k} เกรด ${s.z.grade} · โซน ±${s.S.half} · พุ่ง ${s.mv === null ? '-' : s.mv}×ATR`, evidence: s.real ? 'ไม้จริง v0.5' : s.fast ? 'ไม้บันทึก v0.5 (กรองพุ่ง)' : 'ไม้บันทึก v0.5',
           status: SS[s.st] || 'open', exit_th: s.end !== undefined ? th(B[s.end].time) : '', result_r: s.res !== undefined ? s.res : null });
       });
     } catch (e) {}

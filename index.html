@@ -399,11 +399,22 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       <svg class="intro-chart" viewBox="0 0 310 104" aria-hidden="true">
         <rect x=".5" y=".5" width="309" height="103" rx="14" fill="#0a1222" stroke="#33415a"/>
         <path d="M17 26h276M17 52h276M17 78h276M58 15v74m52-74v74m52-74v74m52-74v74m52-74v74" stroke="#273750" opacity=".65"/>
-        <path d="M18 77l32-10 27 4 34-26 29 8 37-25 27 8" fill="none" stroke="#eac377" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path id="spTrend" d="M18 77l32-10 27 4 34-26 29 8 37-25 27 8" fill="none" stroke="#eac377" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         <path d="M17 52h276" stroke="#a898cd" stroke-opacity=".65" stroke-dasharray="3 5"/>
         <g fill="#47c6a2"><rect x="250" y="25" width="43" height="6" rx="3"/><rect x="222" y="36" width="71" height="6" rx="3"/></g>
         <g fill="#e27387"><rect x="231" y="62" width="62" height="6" rx="3"/><rect x="260" y="73" width="33" height="6" rx="3"/></g>
-        <circle cx="204" cy="36" r="4" fill="#eac377"/>
+        <defs>
+          <radialGradient id="spHeadGlow">
+            <stop offset="0" stop-color="#ffe49b" stop-opacity=".95"/>
+            <stop offset=".45" stop-color="#f9c964" stop-opacity=".42"/>
+            <stop offset="1" stop-color="#eac377" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <g id="spTrendHead" transform="translate(204 36)">
+          <circle r="14" fill="url(#spHeadGlow)"/>
+          <circle r="3.6" fill="#ffe29a"/>
+          <circle r="1.5" fill="#fff9e7"/>
+        </g>
       </svg>
     </div>
     <div class="intro-cache" id="spCacheLabel" hidden>ราคาล่าสุดที่บันทึก</div>
@@ -440,10 +451,35 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       st.innerHTML = '📡 ไม่มีอินเทอร์เน็ต<br><button class="retry" id="spRetry">ลองใหม่</button>';
       document.getElementById('spRetry').onclick = function (e) { e.stopPropagation(); location.reload(); };
     }
+    function animateTrend(g) {
+      var motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      if (motion.matches) return;
+      var line = document.getElementById('spTrend'), head = document.getElementById('spTrendHead');
+      var xs = [18, 50, 77, 111, 140, 177, 204];
+      var levels = [77, 67, 71, 45, 53, 28, 36, 29, 46, 39, 57, 49, 61, 40, 31, 44, 25, 38, 52, 43];
+      var startedAt;
+      function frame(now) {
+        if (closed || !running || g !== gen || motion.matches) return;
+        if (startedAt === undefined) startedAt = now;
+        var elapsed = now - startedAt, step = elapsed / 135;
+        var tick = Math.floor(step), fraction = step - tick, endY;
+        var points = xs.map(function (x, i) {
+          var a = levels[(tick + i) % levels.length], b = levels[(tick + i + 1) % levels.length];
+          endY = (a + (b - a) * fraction).toFixed(2);
+          return x + ' ' + endY;
+        });
+        line.setAttribute('d', 'M' + points.join('L'));
+        head.setAttribute('transform', 'translate(204 ' + endY + ')');
+        head.firstElementChild.setAttribute('r', (13 + 2 * Math.sin(elapsed / 75)).toFixed(2));
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
     // เริ่มเล่น: เปิดแอปที่ล็อกอินค้างไว้ = เล่นทันที · ยังไม่ล็อกอิน = ซ่อนไว้ แล้วเล่นหลังกดเข้าสู่ระบบสำเร็จ
     function start() {
       if (running || closed) return; running = true; t0 = Date.now(); var g = ++gen;
       el.style.display = '';
+      if (introStyle === 'modern') animateTrend(g);
       // ราคาล่าสุดจากครั้งก่อน นับขึ้นให้ดูมีชีวิต
       var px = null; try { px = JSON.parse(localStorage.getItem('oi_splash_px') || 'null'); } catch (e) {}
       if (px && Number.isFinite(px.p)) {
@@ -587,7 +623,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.68';
+  const APP_VER = '4.9.69';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา

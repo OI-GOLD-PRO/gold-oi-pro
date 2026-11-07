@@ -663,9 +663,15 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.73';
+  const APP_VER = '4.9.74';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5, น้ำมัน ±0.15 = $0.3)
+  // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5
+  const zoneHalf = () => {
+    if (SC.note !== 'GC') return ZONE_HALF;
+    const m = Math.floor(((Date.now() / 1000 + 7 * 3600) % 86400) / 60);
+    return m >= 360 && m < 600 ? 2 : m >= 600 && m < 840 ? 1 : 1.5;
+  };
   const TZ_SHIFT = 7 * 3600; // แสดงเวลาไทยบนแกนเวลา
 
   const $ = id => document.getElementById(id);
@@ -867,6 +873,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   // ---------- overlay แท่ง OI ----------
   const ov = $('ov'), ctx = ov.getContext('2d');
   let dirty = true, lastKey = '';
+  { let zh0 = null; setInterval(() => { const z = zoneHalf(); if (z !== zh0) { zh0 = z; dirty = true; } }, 30000); } // เปลี่ยนช่วงเวลา → วาดโซนใหม่
   const overlayHooks = []; const bgHooks = []; // V4.9.20 ชั้นใต้แถบ OI // ส่วนเสริม (เช่น goldscalp.js) วาดทับกราฟได้
   window.OIHistoryZonesRedraw = () => { dirty = true; };
   window.OIHistoryZonesWide=()=>{ document.querySelector('.tfs button[data-tf="1H"]')?.click(); const b=[...document.querySelectorAll('.tfs button')].find(b=>b.textContent.trim()==='H1');b?.click();setTimeout(()=>{chart.timeScale().fitContent();dirty=true;},2500); };
@@ -1060,7 +1067,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       if (rC || rP) {
         const useC = rC && (!rP || r.c >= r.p);
         const rk = useC ? rC : rP;
-        const half = rk <= 5 ? ZONE_HALF : ZONE_HALF / 2;
+        const half = rk <= 5 ? zoneHalf() : zoneHalf() / 2;
         const rankT = Math.max(0, Math.min(1, (rk - 1) / 9));
         const wallFrom = useC ? [4,120,87] : [185,28,28], wallTo = useC ? [134,239,172] : [253,186,116];
         const wallRgb = wallFrom.map((v,i) => Math.round(v + (wallTo[i] - v) * rankT));
@@ -1405,7 +1412,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const isVolLine = r => !!(oi && oi.topV && oi.topV.includes(r.strike)); // เส้นเหลือง Volume วันนี้ 5 อันดับ
   const alertZones = () => (oi && oi.offset !== null) ? oi.rows.filter(r => zRank(r) > 0 || isVolLine(r)) : [];
   // ขอบโซนตรงกับที่วาด: อันดับ 1-5 โซนเต็ม, 6-10 ครึ่งความกว้าง
-  const zoneEdges = r => { const k = zRank(r), h = k && k <= 5 ? ZONE_HALF : ZONE_HALF / 2; return { lo: r.price - h, hi: r.price + h }; };
+  const zoneEdges = r => { const k = zRank(r), zh = zoneHalf(), h = k && k <= 5 ? zh : zh / 2; return { lo: r.price - h, hi: r.price + h }; };
   const sessDay = () => Math.floor((Date.now() / 1000 + TZ_SHIFT - 5 * 3600) / 86400); // วันเทรดเริ่ม 05:00 น.
 
   // จำสถานะโซนไว้ตลอด: ซิงก์ชีต/ปรับ offset ทุกนาทีจะไม่รีเซ็ตสถานะ

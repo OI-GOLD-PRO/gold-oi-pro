@@ -197,7 +197,7 @@
   const csec = () => TFS[O.tf] || 60, toChart = t => Math.floor(t / csec()) * csec();
   const fresh = () => bars.length && Date.now() / 1000 + 7 * 3600 - bars[bars.length - 1].time < 3 * 3600;
   O.hooks.push((ctx, w, h) => {
-    if (!isOn() || !setups.length && !lv.length) return;
+    if (!isOn()) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height();
     const X = t => ts.timeToCoordinate(toChart(t)), Y = p => sr.priceToCoordinate(p), bw = Math.max(2, (X(bars.length ? bars[bars.length - 1].time : 0) || 0) - (X((bars.length ? bars[bars.length - 1].time : 0) - csec()) || 0));
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
@@ -210,6 +210,17 @@
       ctx.globalAlpha = 0.85; ctx.fillStyle = '#7fd0ff'; ctx.textAlign = 'left'; ctx.fillText(`🌏 ${z.side}${z.k}${z.grade === 'A' ? ' A' : ''}`, 4, y1 - 5);
     });
     ctx.globalAlpha = 1;
+    // V4.9.90: โซนเกรด A = ขอบสีทองเข้ม (ทุกช่วงเวลา) · ความกว้างเท่าแถบโซน OI หลักตามช่วงเวลา
+    {
+      let LA = lv; if (!LA.length && O.lastClose != null) { const r0 = O.oi && O.oi.rows ? O.oi.rows.find(r => r.price != null) : null; LA = levels(O.lastClose - (r0 ? r0.price - r0.strike : 0)) || []; }
+      const m = Math.floor(((Date.now() / 1000 + 7 * 3600) % 86400) / 60), zh = m >= 360 && m < 600 ? 2 : m >= 600 && m < 840 ? 1 : 1.5;
+      LA.filter(z => z.grade === 'A').forEach(z => {
+        const y1 = Y(z.p + zh), y2 = Y(z.p - zh); if (y1 === null || y2 === null || y2 < 0 || y1 > plotH) return;
+        ctx.save(); ctx.strokeStyle = '#f2a900'; ctx.lineWidth = 2; ctx.shadowColor = 'rgba(242,169,0,.6)'; ctx.shadowBlur = 6;
+        ctx.strokeRect(1, Math.round(y1) + .5, plotW - 2, Math.max(2, Math.round(y2 - y1)));
+        ctx.shadowBlur = 0; ctx.fillStyle = '#f2a900'; ctx.textAlign = 'right'; ctx.fillText(`🌏A ${z.side}${z.k}`, plotW - 6, Math.round(y1) - 6); ctx.restore();
+      });
+    }
     // ไม้ (แบ็กเทส + วันนี้): กรอบ TP เขียว / SL แดง จากแท่งเข้าถึงแท่งออก (ยังเปิด = ถึงแท่งล่าสุด)
     const lastT = bars.length ? bars[bars.length - 1].time : null;
     setups.filter(s => s.real || s.fast || cfg.paper).forEach(s => {

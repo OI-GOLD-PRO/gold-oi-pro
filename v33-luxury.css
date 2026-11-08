@@ -236,7 +236,8 @@ body{padding-bottom:0!important}
 /* V4.9.87 คอลัมน์ท้าย: อันดับโซน + เกรด 🌏 */
 #v34oiChart .v34tag{font-style:normal;display:flex;gap:4px;align-items:center;justify-content:flex-end;font-size:10.5px;white-space:nowrap}
 #v34oiChart .v34tag b{font-weight:700}
-#v34oiChart .v34tag b.c{color:#29b995}
-#v34oiChart .v34tag b.p{color:#e95b76}
+#v34oiChart .v34tag b{padding:0 5px;border-radius:6px;color:#fff} /* V4.9.89 อันดับโซนเป็นป้ายทึบ */
+#v34oiChart .v34tag b.c{background:#138a6c}
+#v34oiChart .v34tag b.p{background:#c23552}
 #v34oiChart .v34tag i{font-style:normal;color:#7fd0ff;font-weight:700}
 #v34oiChart .v34tag i.gA{color:#1a1200;background:#f2a900;padding:0 5px;border-radius:6px;box-shadow:0 0 6px rgba(242,169,0,.55)} /* V4.9.88 เกรด A ป้ายทึบสีทองเข้ม */

@@ -161,6 +161,7 @@
           past.push(...r); dl.push({ day: dt, tf: m1 ? 'M1' : 'M5', n: r.length });
         }
         setups = past.concat(today); days = dl;
+        today.filter(s => s.real).forEach(s => { if (!fp.has(key(s))) fpFetch(s); }); // Δ5 ฟุตปริ้นท์ของไม้จริงวันนี้
         notify(oldKeys); O.markDirty();
       }
     } catch (e) {} finally { busy = false; }
@@ -247,6 +248,26 @@
     ctx.restore();
   });
 
+  // ---------- ฟุตปริ้นท์ Δ5 (V4.9.84, เก็บข้อมูล forward test แยกชุด) ----------
+  // แรงซื้อขายเชิงรุก (taker) จาก Binance XAUUSDT perp ใน 5 นาทีก่อนแท่งที่แตะ · push = (ซื้อ−ขาย)/(ซื้อ+ขาย) × ทิศที่ราคาวิ่งเข้าโซน
+  // push > 0 = มีแรงไล่ราคาเข้ากำแพง · เกณฑ์ชั่วคราว ≤ 0.08 = "ผ่าน Δ5" (จากแบ็กเทส tick-rule ต.ค. ยังไม่ใช่ volume จริง) · ยังไม่ใช้ตัดไม้ แค่บันทึก
+  const FP_WIN = 5 * 60, FP_MAX = 0.08, fp = new Map();
+  async function fpFetch(s) {
+    const id = key(s); if (fp.has(id)) return; fp.set(id, null);
+    const end = (s.t0 - 7 * 3600) * 1000, start = end - FP_WIN * 1000; let buy = 0, sell = 0, n = 0, from = null;
+    try {
+      for (let g = 0; g < 30; g++) {
+        const u = from === null ? `https://fapi.binance.com/fapi/v1/aggTrades?symbol=XAUUSDT&startTime=${start}&endTime=${end - 1}&limit=1000` : `https://fapi.binance.com/fapi/v1/aggTrades?symbol=XAUUSDT&fromId=${from}&limit=1000`;
+        const j = await (await fetch(u, { cache: 'no-store' })).json(); if (!Array.isArray(j)) throw new Error(j.msg || 'bad');
+        let done = j.length < 1000;
+        for (const t of j) { if (t.T >= end) { done = true; break; } if (t.T < start) continue; const q = +t.q; if (t.m) sell += q; else buy += q; n++; }
+        if (done || !j.length) break; from = j[j.length - 1].a + 1;
+      }
+      const tot = buy + sell, push = tot ? -s.dir * (buy - sell) / tot : null;
+      fp.set(id, { buy: Math.round(buy * 100) / 100, sell: Math.round(sell * 100) / 100, n, push: push === null ? null : Math.round(push * 1000) / 1000, pass: push !== null && push <= FP_MAX });
+    } catch (e) { fp.set(id, { err: String(e.message || e) }); }
+  }
+
   // ---------- โมเมนตัมสด: ราคากำลังพุ่งเข้าหาเส้นไหน (ใช้แท่งที่ปิดแล้ว) ----------
   function liveMom() {
     const n = bars.length; if (n < ATR_N + MOM_N + 3) return null; // V4.9.80: คิดได้แม้ไม่มีเส้น (ตลาดปิด)
@@ -317,5 +338,5 @@
     });
   }
   if (window.OIAlerts) OIAlerts.reg('sfade', '🌏 OI Session Fade (เข้า/ออกไม้จริง)', { desc: 'Asia เช้า + London · เตือนตอนแตะกำแพงแล้วเข้าไม้ และตอนถึง TP/SL', active: isOn });
-  window.OI_sfade = { RRS, view, stats, scan, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
+  window.OI_sfade = { RRS, view, stats, scan, fpOf: s => fp.get(key(s)), FP_MAX, _fpFetch: fpFetch, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
 })();

@@ -55,6 +55,16 @@
             evidence: s.real ? 'ไม้จริง v0.6' : s.fast ? 'ไม้บันทึก v0.6 (กรองพุ่ง)' : 'ไม้บันทึก v0.6',
             status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
         });
+        // V4.9.84: ชุดแยก "🌏 OSF+Δ5" (ไม้จริงเท่านั้น) — ฟุตปริ้นท์ Δ5 จาก Binance taker ก่อนแตะ · id ขึ้นต้น SFD| ไม่ปนชุด v0.6 · evidence = ผ่าน/ไม่ผ่าน Δ5
+        const f = s.real && F.fpOf ? F.fpOf(s) : null;
+        if (f && !f.err) (F.RRS || [1]).forEach(rr => {
+          const v = s.v && s.v[rr]; if (!v) return;
+          out.push({ id: `SFD|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OSF+Δ5 RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+            sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: f.push,
+            reason: `Δ5 ${f.push === null ? '-' : (f.push > 0 ? '+' : '') + f.push} · ซื้อ ${f.buy} / ขาย ${f.sell} oz (${f.n} ไม้ Binance) · ${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k} · พุ่ง ${s.mv === null ? '-' : s.mv}×ATR`,
+            evidence: f.pass ? `ผ่าน Δ5 (≤${F.FP_MAX})` : `ไม่ผ่าน Δ5 (>${F.FP_MAX})`,
+            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
+        });
       });
     } catch (e) {}
     return out;

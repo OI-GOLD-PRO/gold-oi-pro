@@ -239,4 +239,4 @@ body{padding-bottom:0!important}
 #v34oiChart .v34tag b.c{color:#29b995}
 #v34oiChart .v34tag b.p{color:#e95b76}
 #v34oiChart .v34tag i{font-style:normal;color:#7fd0ff;font-weight:700}
-#v34oiChart .v34tag i.gA{color:#ffd166}
+#v34oiChart .v34tag i.gA{color:#1a1200;background:#f2a900;padding:0 5px;border-radius:6px;box-shadow:0 0 6px rgba(242,169,0,.55)} /* V4.9.88 เกรด A ป้ายทึบสีทองเข้ม */

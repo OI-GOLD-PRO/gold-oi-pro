@@ -65,6 +65,17 @@
             evidence: f.pass ? `ผ่าน Δ5 (≤${F.FP_MAX})` : `ไม่ผ่าน Δ5 (>${F.FP_MAX})`,
             status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
         });
+        // V4.9.85: ชุดแยก "🌏 OSF+IV" (ไม้จริงเท่านั้น) — ATM IV ตอนเข้าไม้ + เปลี่ยนใน 1/3 ชม. · id ขึ้นต้น SFI| · evidence = IV ขึ้นเร็ว / IV ปกติ
+        const iv = s.real && F.ivOf ? F.ivOf(s) : null;
+        if (iv) (F.RRS || [1]).forEach(rr => {
+          const v = s.v && s.v[rr]; if (!v) return;
+          const fast = iv.d3 !== null && iv.d3 > F.IV_D3_MAX, sg = x => x === null ? '-' : (x > 0 ? '+' : '') + x;
+          out.push({ id: `SFI|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OSF+IV RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+            sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: iv.iv,
+            reason: `IV ${iv.iv}% · 1ชม. ${sg(iv.d1)} · 3ชม. ${sg(iv.d3)} · ${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k} · พุ่ง ${s.mv === null ? '-' : s.mv}×ATR`,
+            evidence: iv.d3 === null ? 'IV ไม่มีค่า 3ชม.' : fast ? `IV ขึ้นเร็ว (>+${F.IV_D3_MAX}/3ชม.)` : 'IV ปกติ',
+            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
+        });
       });
     } catch (e) {}
     return out;

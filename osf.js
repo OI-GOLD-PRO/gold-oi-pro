@@ -161,7 +161,7 @@
           past.push(...r); dl.push({ day: dt, tf: m1 ? 'M1' : 'M5', n: r.length });
         }
         setups = past.concat(today); days = dl;
-        today.filter(s => s.real).forEach(s => { if (!fp.has(key(s))) fpFetch(s); }); // Δ5 ฟุตปริ้นท์ของไม้จริงวันนี้
+        today.filter(s => s.real).forEach(s => { if (!fp.has(key(s))) fpFetch(s); ivSnap(s); }); // Δ5 ฟุตปริ้นท์ + IV ของไม้จริงวันนี้
         notify(oldKeys); O.markDirty();
       }
     } catch (e) {} finally { busy = false; }
@@ -268,6 +268,22 @@
     } catch (e) { fp.set(id, { err: String(e.message || e) }); }
   }
 
+  // ---------- IV ตอนเข้าไม้ (V4.9.85, เก็บข้อมูล forward test แยกชุด) ----------
+  // ATM IV ของสัญญาวันนั้น จากประวัติที่ป้าย IV เก็บในเครื่องทุก 5 นาที (localStorage oi_iv_hist2) + ค่าสดตอนเกิดไม้
+  // d1 / d3 = IV เปลี่ยนใน 1 / 3 ชม. ก่อนแตะ (จุด %) · แบ็กเทส 28 ไม้: IV ขึ้น > +1.8 ใน 3 ชม. แย่สุด · ยังไม่ใช้ตัดไม้ แค่บันทึก
+  const IV_D3_MAX = 1.8, ivs = new Map();
+  function ivHist() { try { const h = JSON.parse(localStorage.getItem('oi_iv_hist2') || '{}') || {}; return Object.values(h).flat().filter(x => Array.isArray(x) && x[1] > 0).sort((a, b) => a[0] - b[0]); } catch (e) { return []; } }
+  function ivSnap(s) {
+    const id = key(s); if (ivs.has(id)) return;
+    const ms = (s.t0 - 7 * 3600) * 1000, H = ivHist();
+    const at = (t, tol) => { let b = null; for (const h of H) { if (h[0] <= t) b = h; else break; } return b && t - b[0] <= tol ? b[1] : null; };
+    let iv = at(ms, 15 * 60e3); const R = window.OI_iv && window.OI_iv.result;
+    if (iv === null && R && R.iv > 0 && Date.now() - ms < 10 * 60e3) iv = R.iv; // ไม้เพิ่งเกิด ใช้ค่าสด
+    if (iv === null) return; // ไม่มีข้อมูล IV ช่วงนั้นในเครื่อง → ไม่บันทึก (ลองใหม่รอบหน้า)
+    const i1 = at(ms - 3600e3, 20 * 60e3), i3 = at(ms - 3 * 3600e3, 30 * 60e3), r1 = x => Math.round(x * 1000) / 10;
+    ivs.set(id, { iv: r1(iv), d1: i1 === null ? null : r1(iv - i1), d3: i3 === null ? null : r1(iv - i3) });
+  }
+
   // ---------- โมเมนตัมสด: ราคากำลังพุ่งเข้าหาเส้นไหน (ใช้แท่งที่ปิดแล้ว) ----------
   function liveMom() {
     const n = bars.length; if (n < ATR_N + MOM_N + 3) return null; // V4.9.80: คิดได้แม้ไม่มีเส้น (ตลาดปิด)
@@ -338,5 +354,5 @@
     });
   }
   if (window.OIAlerts) OIAlerts.reg('sfade', '🌏 OI Session Fade (เข้า/ออกไม้จริง)', { desc: 'Asia เช้า + London · เตือนตอนแตะกำแพงแล้วเข้าไม้ และตอนถึง TP/SL', active: isOn });
-  window.OI_sfade = { RRS, view, stats, scan, fpOf: s => fp.get(key(s)), FP_MAX, _fpFetch: fpFetch, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
+  window.OI_sfade = { RRS, view, stats, scan, fpOf: s => fp.get(key(s)), FP_MAX, _fpFetch: fpFetch, ivOf: s => ivs.get(key(s)), IV_D3_MAX, _ivSnap: ivSnap, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
 })();

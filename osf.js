@@ -2,7 +2,7 @@
 //  v0.5: Asia เช้า ข้ามไม้ที่ราคาพุ่งเข้าโซนเกิน 3×ATR ใน 5 แท่ง M1 ก่อนแตะ (ATR = ค่าเฉลี่ย True Range 60 แท่ง) → เป็นไม้บันทึก (กรองพุ่ง)
 //  เส้น: Call OI 3 อันดับ + Put OI 3 อันดับ ของสัญญาวันนี้ ในระยะ ±$60 จากราคาตอน 06:00 · เกรด A = strike ติด top 3 volume Call หรือ Put
 //  ตั้งรอ: แท่ง M1 ปิดห่างขอบโซน ≥ $3 (เหนือ = รอ BUY / ใต้ = รอ SELL) → แตะขอบใกล้ = เข้า limit ที่ขอบใกล้ · นับครั้งแตะใหม่ทุกช่วงตลาด
-//  SL = ขอบไกล ∓ $3 · TP = $5 (London เกรด A = $8) · ถือสูงสุด 240 แท่ง M1 · ข่าวแดง USD: ไม่เข้า −30/+90 นาที · ปิดไม้ก่อนข่าว 5 นาที
+//  SL = ขอบไกล ∓ $3 · v0.6: TP คิด 3 แบบพร้อมกัน RR 1 / 1.6 / 5 ถือจนโดน SL หรือถึง TP (ไม่มีเวลาปิด) · ข่าวแดง USD: ไม่เข้า −30/+90 นาที
 //  ไม้จริง: Asia เช้า 06:00–10:00 โซน ±2 แตะครั้งที่ 1–2 (เกรด A ถึง 3) · London 14:00–19:30 โซน ±1.5 แตะครั้งที่ 1
 //  ที่เหลือ (แตะครั้งอื่น / Asia สาย / NY) = ไม้บันทึก ไว้ forward test เทียบ ไม่ใช่สัญญาณเข้า
 (() => {
@@ -11,17 +11,17 @@
   if (!O || !O.hooks || !(O.sym === 'gold' || O.sym === 'gcy')) return;
   const $ = id => document.getElementById(id);
   const KEY = 'oi_sfade' + (O.psfx || '');
-  const cfg = { on: null, paper: false }; // on = null → ยังไม่เคยตั้ง: เปิดให้รหัสไม่จำกัดวันที่ไม่ใช่เครื่องใหม่
+  const cfg = { on: null, paper: false, rr: 1 }; // rr = TP ที่ใช้แสดงบนกราฟ/ป้าย/แจ้งเตือน (คิดครบทั้ง 3 ค่าเสมอ) // on = null → ยังไม่เคยตั้ง: เปิดให้รหัสไม่จำกัดวันที่ไม่ใช่เครื่องใหม่
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
   const isOn = () => cfg.on === null ? (!!O.unlimited && !window.OI_NEWDEV) : !!cfg.on;
 
-  const ARM = 3, SLB = 3, TP = 5, RANGE = 60, MOM_N = 5, ATR_N = 60, MOM_MAX = 3, NB = 30 * 60, NA = 90 * 60, NCLOSE = 5 * 60;
+  const ARM = 3, SLB = 3, RRS = [1, 1.6, 5], RANGE = 60, MOM_N = 5, ATR_N = 60, MOM_MAX = 3, NB = 30 * 60, NA = 90 * 60, NCLOSE = 5 * 60;
   // นาทีของวัน (เวลาไทย) · NY ข้ามเที่ยงคืนถึง 01:30
   const SESS = [
     { id: 'AM', lab: 'Asia เช้า', a: 360, b: 600, half: 2, real: 2, realA: 3, mom: 3 },
     { id: 'AL', lab: 'Asia สาย', a: 600, b: 840, half: 1, real: 0 },
-    { id: 'LDN', lab: 'London', a: 840, b: 1170, half: 1.5, real: 1, tpA: 8 },
+    { id: 'LDN', lab: 'London', a: 840, b: 1170, half: 1.5, real: 1 },
     { id: 'NY', lab: 'NY', a: 1170, b: 1530, half: 1.5, real: 0 },
   ];
   const mod = t => Math.floor((((t % 86400) + 86400) % 86400) / 60);
@@ -58,14 +58,17 @@
   }
   const momAt = (B, A, i, dir) => (i > MOM_N && A[i] > 0) ? (B[i - 1].close - B[i - 1 - MOM_N].close) * -dir / A[i] : null; // dir = ทิศเทรด (+1 BUY = ราคาวิ่งลงมาหา)
 
+  // ใช้ผลของ RR ที่เลือกเป็นค่าหลัก (st / tp / exit / pnl …) ให้ส่วนวาด/ป้าย/แจ้งเตือนใช้
+  function view(s) { const v = s.v[cfg.rr] || s.v[1]; ['tp', 'st', 'end', 'exit', 'why', 't1', 'pnl', 'res'].forEach(k => { s[k] = v[k]; }); return s; }
+
   // ---------- สแกน (ฟังก์ชันล้วน ใช้ทดสอบย้อนหลังได้) ----------
   // B = แท่ง M1 {time(วินาทีเวลาไทย), open, high, low, close} · L = [{k, p, side, grade}] · N = เวลาข่าว (วินาทีเวลาไทย)
   function scan(B, L, N, opt) {
-    opt = opt || {}; N = N || []; const HOLD = opt.hold || 240, from = opt.from || 0, ATR = atrArr(B);
+    opt = opt || {}; N = N || []; const from = opt.from || 0, until = opt.until || Infinity, ATR = atrArr(B);
     const out = [], n = B.length; let cur = null, st = new Map();
     const inNews = t => N.some(x => t >= x - NB && t <= x + NA);
     for (let i = 0; i < n; i++) {
-      const b = B[i]; if (b.time < from) continue;
+      const b = B[i]; if (b.time < from || b.time >= until) continue;
       const S = sessOf(b.time), sk = S ? S.id + '|' + dayStart(b.time) : null;
       if (sk !== cur) { cur = sk; st = new Map(); }
       if (!S) continue;
@@ -77,30 +80,35 @@
           let real = S.real > 0 && (s.k <= S.real || (z.grade === 'A' && s.k <= (S.realA || 0)));
           const mv = momAt(B, ATR, i, dir), atr = ATR[i] > 0 ? ATR[i] : null, fast = !!(real && S.mom && mv !== null && mv > S.mom);
           if (fast) real = false;
-          const entry = dir > 0 ? hi : lo, sl = dir > 0 ? lo - SLB : hi + SLB, tpd = (opt.tpA !== false && S.tpA && z.grade === 'A') ? S.tpA : TP;
-          out.push({ z, S, dir, k: s.k, real, fast, mv: mv !== null ? Math.round(mv * 10) / 10 : null, atr, ei: i, entry, sl, tp: entry + dir * tpd, st: 3 });
+          const entry = dir > 0 ? hi : lo, sl = dir > 0 ? lo - SLB : hi + SLB;
+          out.push({ z, S, dir, k: s.k, real, fast, mv: mv !== null ? Math.round(mv * 10) / 10 : null, atr, ei: i, entry, sl, st: 3 });
           return;
         }
         if (b.close > hi + ARM) s.arm = 1; else if (b.close < lo - ARM) s.arm = -1;
       });
     }
-    // ติดตามผล: แท่งที่เข้าเช็ก SL อย่างเดียว · จากนั้น SL ก่อน TP · หมดเวลา 240 แท่ง · ปิดก่อนข่าว 5 นาที
+    // ติดตามผล v0.6: TP 3 แบบ RR 1 / 1.6 / 5 (× ระยะ SL) · ถือจนโดน SL หรือถึง TP (ไม่มีเวลาปิด/ไม่ปิดก่อนข่าว) · แท่งที่เข้าเช็ก SL อย่างเดียว · SL ก่อน TP
     out.forEach(s => {
-      for (let j = s.ei; j < n && j < s.ei + HOLD; j++) {
-        const b = B[j];
-        if (j > s.ei && N.some(x => b.time >= x - NCLOSE && B[j - 1].time < x - NCLOSE)) { s.st = 7; s.end = j - 1; s.exit = B[j - 1].close; s.why = 'ปิดก่อนข่าว'; return; }
-        if (s.dir > 0 ? b.low <= s.sl : b.high >= s.sl) { s.st = 5; s.end = j; s.exit = s.sl; s.why = 'SL'; return; }
-        if (j > s.ei && (s.dir > 0 ? b.high >= s.tp : b.low <= s.tp)) { s.st = 4; s.end = j; s.exit = s.tp; s.why = 'TP'; return; }
-        if (j === s.ei + HOLD - 1) { s.st = 6; s.end = j; s.exit = b.close; s.why = 'หมดเวลา'; return; }
-      }
+      s.R = Math.abs(s.entry - s.sl); s.t0 = B[s.ei].time; s.v = {};
+      RRS.forEach(rr => {
+        const tp = s.entry + s.dir * rr * s.R, v = { rr, tp, st: 3 };
+        for (let j = s.ei; j < n; j++) {
+          const b = B[j];
+          if (s.dir > 0 ? b.low <= s.sl : b.high >= s.sl) { Object.assign(v, { st: 5, end: j, exit: s.sl, why: 'SL' }); break; }
+          if (j > s.ei && (s.dir > 0 ? b.high >= tp : b.low <= tp)) { Object.assign(v, { st: 4, end: j, exit: tp, why: 'TP' }); break; }
+        }
+        v.t1 = v.end !== undefined ? B[v.end].time : null;
+        if (v.exit !== undefined) { v.pnl = Math.round((v.exit - s.entry) * s.dir * 100) / 100; v.res = Math.round(v.pnl / s.R * 100) / 100; }
+        s.v[rr] = v;
+      });
+      view(s);
     });
-    out.forEach(s => { s.R = Math.abs(s.entry - s.sl); s.t0 = B[s.ei].time; s.t1 = s.end !== undefined ? B[s.end].time : null; if (s.exit !== undefined) { s.pnl = Math.round((s.exit - s.entry) * s.dir * 100) / 100; s.res = Math.round(s.pnl / s.R * 100) / 100; } });
     return out;
   }
 
   // ---------- OI ย้อนหลังรายวัน (API เดียวกับ Historical OI Zones: oi_backup + oi_recovered) ----------
   let hist = new Map(), histAt = 0, histMsg = '';
-  const m1Cache = new Map(), HIST_DAYS = 20; // แคชแท่ง M1 รายวันที่จบแล้ว (ไม่ต้องดึงซ้ำ) · แบ็กเทสย้อนหลังสูงสุด 10 วัน
+  const m1Cache = new Map(), HIST_DAYS = 20, TRACK = 36 * 3600, m1At = new Map(); // วันที่ยังติดตามผลไม่ครบ 36 ชม. ดึงใหม่ทุก 10 นาที // แคชแท่ง M1 รายวันที่จบแล้ว (ไม่ต้องดึงซ้ำ) · แบ็กเทสย้อนหลังสูงสุด 10 วัน
   async function loadHist() {
     if (Date.now() - histAt < 30 * 60e3 || !window.OIHistoryZonesAPI) return;
     histAt = Date.now();
@@ -138,18 +146,18 @@
         for (const dt of dts) {
           const ds = Date.parse(dt + 'T06:00:00Z') / 1000, de = ds + 86400;
           let src = null, m1 = false;
-          if (A1[0].time <= ds - (ATR_N + 10) * 60) { src = A1; m1 = true; }
+          if (A1[0].time <= ds - (ATR_N + 10) * 60) { src = A1; m1 = true; } // A1 มีถึงปัจจุบัน ติดตามผลต่อได้เอง
           else {
-            if (!m1Cache.has(dt) && O.fetchHist && de < A1[A1.length - 1].time) m1Cache.set(dt, await O.fetchHist('1m', (ds - 7 * 3600 - (ATR_N + 20) * 60 - (new Date(ds * 1000).getUTCDay() === 1 ? 3 * 86400 : 0)) * 1000, (de - 7 * 3600) * 1000)); // วันจันทร์: ย้อนถึงศุกร์ไว้คำนวณ ATR
+            if ((!m1Cache.has(dt) || (de + TRACK > Date.now() / 1000 + 7 * 3600 && Date.now() - (m1At.get(dt) || 0) > 10 * 60e3)) && O.fetchHist && de < A1[A1.length - 1].time) m1At.set(dt, Date.now()); m1Cache.set(dt, await O.fetchHist('1m', (ds - 7 * 3600 - (ATR_N + 20) * 60 - (new Date(ds * 1000).getUTCDay() === 1 ? 3 * 86400 : 0)) * 1000, Math.min(Date.now(), (de + TRACK - 7 * 3600) * 1000))); // +36 ชม. ไว้ติดตามผล RR 5 // วันจันทร์: ย้อนถึงศุกร์ไว้คำนวณ ATR
             const c = m1Cache.get(dt); if (c && c.length > 300) { src = c; m1 = true; }
             else if (A5 && A5.length && A5[0].time <= ds + 3600) src = A5;
           }
           if (!src) continue;
           const j0 = src.findIndex(b => b.time >= ds), j1 = src.findIndex(b => b.time >= de), je = j1 < 0 ? src.length : j1;
           if (j0 < 0 || je - j0 < (m1 ? 300 : 60)) continue;
-          const B = src.slice(Math.max(0, j0 - ATR_N - 10), je);
+          const j2 = src.findIndex(b => b.time >= de + TRACK), B = src.slice(Math.max(0, j0 - ATR_N - 10), j2 < 0 ? src.length : j2); // ติดตามผลต่อหลังจบวันได้อีก 36 ชม. (RR 5)
           const L = levels(src[j0].open, hist.get(dt)); if (!L.length) continue;
-          const r = scan(B, L, news, { hold: m1 ? 240 : 48, from: ds }).map(s => Object.assign(s, { day: dt, tf: m1 ? 'M1' : 'M5' }));
+          const r = scan(B, L, news, { from: ds, until: de }).map(s => Object.assign(s, { day: dt, tf: m1 ? 'M1' : 'M5' }));
           past.push(...r); dl.push({ day: dt, tf: m1 ? 'M1' : 'M5', n: r.length });
         }
         setups = past.concat(today); days = dl;
@@ -165,11 +173,11 @@
       const k = key(s);
       if (n - 1 - s.ei <= 2 && !told.has('e' + k) && !old.has(k)) {
         told.add('e' + k);
-        alertMsg(`🌏 <b>${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(2)}</b> · ${s.S.lab} · ${s.z.side}${s.z.k} เกรด ${s.z.grade} · แตะครั้งที่ ${s.k}<br>SL ${s.sl.toFixed(2)} · TP ${s.tp.toFixed(2)}`);
+        alertMsg(`🌏 <b>${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(2)}</b> · ${s.S.lab} · ${s.z.side}${s.z.k} เกรด ${s.z.grade} · แตะครั้งที่ ${s.k}<br>SL ${s.sl.toFixed(2)} · TP RR1 ${s.v[1].tp.toFixed(2)} · RR1.6 ${s.v[1.6].tp.toFixed(2)} · RR5 ${s.v[5].tp.toFixed(2)}`);
       }
       if (s.st >= 4 && s.end !== undefined && n - 1 - s.end <= 2 && !told.has('x' + k)) {
         told.add('x' + k);
-        alertMsg(`🌏 ${s.why === 'TP' ? '✓ ถึง TP' : s.why === 'SL' ? '✗ โดน SL' : s.why} · ${s.dir > 0 ? 'BUY' : 'SELL'} ${s.z.side}${s.z.k} (${s.res > 0 ? '+' : ''}${s.res}R)`);
+        alertMsg(`🌏 ${s.why === 'TP' ? `✓ ถึง TP RR${cfg.rr}` : s.why === 'SL' ? '✗ โดน SL' : s.why} · ${s.dir > 0 ? 'BUY' : 'SELL'} ${s.z.side}${s.z.k} (${s.res > 0 ? '+' : ''}${s.res}R)`);
       }
     });
   }
@@ -217,11 +225,13 @@
       ctx.strokeStyle = '#22e39a'; ctx.beginPath(); ctx.moveTo(x0, yt); ctx.lineTo(x1, yt); ctx.stroke();
       ctx.strokeStyle = '#ff4d6a'; ctx.beginPath(); ctx.moveTo(x0, ys); ctx.lineTo(x1, ys); ctx.stroke();
       ctx.strokeStyle = '#7fd0ff'; ctx.beginPath(); ctx.moveTo(x0, ye); ctx.lineTo(x1, ye); ctx.stroke();
+      // TP ของ RR อื่น = เส้นประจาง + ป้าย ✓/✗
+      RRS.filter(rr => rr !== cfg.rr && s.v[rr]).forEach(rr => { const v = s.v[rr], y = Y(v.tp); if (y === null) return; ctx.save(); ctx.globalAlpha = 0.55 * a; ctx.setLineDash([3, 3]); ctx.strokeStyle = '#22e39a'; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = v.st === 4 ? '#22e39a' : v.st === 5 ? '#ff4d6a' : '#7fd0ff'; ctx.textAlign = 'right'; if (x1 - 2 > 0) ctx.fillText(`${rr}R${v.st === 4 ? '✓' : v.st === 5 ? '✗' : ''}`, x1 - 2, y + (s.dir > 0 ? -6 : 6)); ctx.restore(); });
       // จุดออก
       if (s.t1 !== null && s.exit !== undefined) { const yx = Y(s.exit); if (yx !== null) { ctx.fillStyle = s.pnl > 0 ? '#22e39a' : s.pnl < 0 ? '#ff4d6a' : '#e0b44c'; ctx.beginPath(); ctx.arc(x1 - bw / 2, yx, 3.5, 0, 7); ctx.fill(); } }
       // ป้าย: ทิศ · ครั้งที่แตะ · ผล
       const res = s.st === 3 ? 'เปิดอยู่' : `${s.st === 4 ? '✓' : s.st === 5 ? '✗' : s.why === 'ปิดก่อนข่าว' ? '📰' : '⏱'} ${s.pnl > 0 ? '+' : ''}${s.pnl}$`;
-      const lab = `${s.tf === 'M5' ? '≈' : ''}${s.real ? '🌏' : '·'}${s.dir > 0 ? 'B' : 'S'}${s.k}${s.tf === 'M5' ? '' : ' ' + res}`;
+      const lab = `${s.tf === 'M5' ? '≈' : ''}${s.real ? '🌏' : '·'}${s.dir > 0 ? 'B' : 'S'}${s.k} ${cfg.rr}R${s.tf === 'M5' ? '' : ' ' + res}`;
       const ly = s.dir > 0 ? Math.max(yt, 0) - 7 : Math.min(yt, plotH) + 7; let lx = Math.max(2, x0 + 2);
       if (s.fast && lx < plotW) { const t = `⚡${s.mv}×ATR ข้าม `; ctx.globalAlpha = 1; ctx.fillStyle = '#ff3b5c'; ctx.textAlign = 'left'; ctx.fillText(t, lx, ly); lx += ctx.measureText(t).width; }
       ctx.globalAlpha = a; ctx.fillStyle = s.st === 3 ? '#7fd0ff' : s.pnl > 0 ? '#22e39a' : '#ff4d6a'; ctx.textAlign = 'left';
@@ -232,7 +242,7 @@
     if (fresh()) today.filter(s => s.real && s.st === 3).forEach(s => {
       const line = (p, col, lab) => { const y = Y(p); if (y === null || y < 0 || y > plotH) return; ctx.fillStyle = col; ctx.textAlign = 'right'; ctx.fillText(lab, plotW - 4, y - 6); };
       line(s.entry, '#7fd0ff', `🌏 ${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(1)} · ${s.z.side}${s.z.k} ครั้งที่ ${s.k}`);
-      line(s.sl, '#ff4d6a', `SL ${s.sl.toFixed(1)}`); line(s.tp, '#22e39a', `TP ${s.tp.toFixed(1)}`);
+      line(s.sl, '#ff4d6a', `SL ${s.sl.toFixed(1)}`); RRS.forEach(rr => line(s.v[rr].tp, '#22e39a', `TP ${rr}R ${s.v[rr].tp.toFixed(1)}${s.v[rr].st === 4 ? ' ✓' : ''}`));
     });
     ctx.restore();
   });
@@ -262,37 +272,38 @@
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     if (!isOn() || !fresh()) return null;
     const open = today.filter(s => s.real && s.st === 3);
-    if (open.length) { const s = open[open.length - 1]; return [`🌏 ${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(1)} SL ${s.sl.toFixed(1)} TP ${s.tp.toFixed(1)}`, s.dir > 0 ? '#22e39a' : '#ff8a3d', 'sfade']; }
+    if (open.length) { const s = open[open.length - 1]; return [`🌏 ${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(1)} SL ${s.sl.toFixed(1)} TP${cfg.rr}R ${s.tp.toFixed(1)}`, s.dir > 0 ? '#22e39a' : '#ff8a3d', 'sfade']; }
     const S = sessOf(bars[bars.length - 1].time);
     if (S && S.real && lv.length) return [`🌏 ${S.lab} · รอแตะ ${lv.length} เส้น`, '#7fd0ff', 'sfade'];
     return null;
   });
 
   // ---------- เมนู ƒx ----------
-  function sum(list) {
-    const d = list.filter(s => s.st >= 4), w = d.filter(s => s.pnl > 0).length, usd = d.reduce((a, s) => a + s.pnl, 0), r = d.reduce((a, s) => a + s.res, 0);
-    return { n: d.length, w, usd, r, wr: d.length ? Math.round(w / d.length * 100) : 0 };
+  // สรุปผลของ RR ที่ระบุ (ไม่ส่ง = RR ที่เลือก) · ไม้ที่ยังไม่จบไม่นับ
+  function sum(list, rr) {
+    const d = list.map(s => s.v[rr || cfg.rr]).filter(v => v && v.st >= 4), w = d.filter(v => v.pnl > 0).length, usd = d.reduce((a, v) => a + v.pnl, 0), r = d.reduce((a, v) => a + v.res, 0);
+    const gp = d.filter(v => v.pnl > 0).reduce((a, v) => a + v.pnl, 0), gl = -d.filter(v => v.pnl < 0).reduce((a, v) => a + v.pnl, 0);
+    return { n: d.length, w, usd, r, wr: d.length ? Math.round(w / d.length * 100) : 0, pf: gl ? gp / gl : (gp ? Infinity : 0), open: list.length - d.length };
   }
-  const fmt = x => `${x.n} ไม้ · ชนะ ${x.wr}% · ${x.usd > 0 ? '+' : ''}${x.usd.toFixed(1)}$ (${x.r > 0 ? '+' : ''}${x.r.toFixed(1)}R)`;
+  const fmt = x => `${x.n} ไม้ · ชนะ ${x.wr}% · ${x.usd > 0 ? '+' : ''}${x.usd.toFixed(1)}$ · PF ${isFinite(x.pf) ? x.pf.toFixed(2) : '∞'}${x.open ? ` · ค้าง ${x.open}` : ''}`;
   function stats() {
-    const real = setups.filter(s => s.real), t = sum(today.filter(s => s.real));
-    const nd = days.length, n5 = days.filter(d => d.tf === 'M5').length;
-    const r1 = real.filter(s => s.tf === 'M1'), r5 = real.filter(s => s.tf === 'M5');
+    const real = setups.filter(s => s.real), nd = days.length, n5 = days.filter(d => d.tf === 'M5').length;
+    const r1 = real.filter(s => s.tf === 'M1'), tr = today.filter(s => s.real);
     const dd = days.filter(d => d.tf === 'M1').map(d => d.day).sort(), rng = dd.length ? ` (${dd[0].slice(5)} → ${dd[dd.length - 1].slice(5)})` : '';
-    const lines = [`<b>แบ็กเทส M1 ${nd - n5} วัน${rng}</b>: ${fmt(sum(r1))}`,
-      `Asia เช้า: ${fmt(sum(r1.filter(s => s.S.id === 'AM')))}`, `London: ${fmt(sum(r1.filter(s => s.S.id === 'LDN')))}`,
-      `วันนี้: ${t.n ? fmt(t) : (bars.length && Date.now() / 1000 + 7 * 3600 - bars[bars.length - 1].time >= 3 * 3600 ? 'ตลาดปิด' : 'ยังไม่มีไม้จริงจบ')}`];
-    const f1 = setups.filter(s => s.fast && s.tf === 'M1'); if (f1.length) lines.push(`<span style="color:#ff6b82">⚡ กรองพุ่ง >${MOM_MAX}×ATR (Asia เช้า): ข้าม ${fmt(sum(f1))}</span>`);
-    if (n5) lines.push(`<span style="opacity:.7">อีก ${n5} วันไม่มีแท่ง M1 ครบ: วาดจาก M5 เป็นกรอบจาง ≈ ไว้ดูตำแหน่งเท่านั้น ไม่คิดผล (M5 ทำให้ผลดีเกินจริง)</span>`);
+    const lines = [`<b>แบ็กเทส M1 ${nd - n5} วัน${rng} · ถือจน SL/TP</b>`];
+    RRS.forEach(rr => lines.push(`${rr === cfg.rr ? '▶ ' : ''}<b>RR ${rr}</b>: ${fmt(sum(r1, rr))}<br><span style="opacity:.75">&nbsp;&nbsp;Asia เช้า ${fmt(sum(r1.filter(s => s.S.id === 'AM'), rr))}<br>&nbsp;&nbsp;London ${fmt(sum(r1.filter(s => s.S.id === 'LDN'), rr))}</span>`));
+    lines.push(`วันนี้: ${tr.length ? RRS.map(rr => { const x = sum(tr, rr); return `RR${rr} ${x.usd > 0 ? '+' : ''}${x.usd.toFixed(1)}$${x.open ? ` (ค้าง ${x.open})` : ''}`; }).join(' · ') : (bars.length && Date.now() / 1000 + 7 * 3600 - bars[bars.length - 1].time >= 3 * 3600 ? 'ตลาดปิด' : 'ยังไม่มีไม้จริง')}`);
+    const f1 = setups.filter(s => s.fast && s.tf === 'M1'); if (f1.length) lines.push(`<span style="color:#ff6b82">⚡ กรองพุ่ง >${MOM_MAX}×ATR (Asia เช้า) ไม้ที่ข้าม: ${RRS.map(rr => { const x = sum(f1, rr); return `RR${rr} ${x.usd > 0 ? '+' : ''}${x.usd.toFixed(0)}$`; }).join(' · ')}</span>`);
+    if (n5) lines.push(`<span style="opacity:.7">อีก ${n5} วันไม่มีแท่ง M1 ครบ: วาดจาก M5 เป็นกรอบจาง ≈ ไว้ดูตำแหน่งเท่านั้น ไม่คิดผล</span>`);
     if (cfg.paper) { const pp = setups.filter(s => !s.real && !s.fast && s.tf === 'M1');
-      lines.push(`ไม้บันทึก M1 (ไม้ที่กฎไม่เข้า: แตะครั้งอื่น / Asia สาย / NY): ${fmt(sum(pp))}`); }
+      lines.push(`ไม้บันทึก M1 (กฎไม่เข้า): ${RRS.map(rr => { const x = sum(pp, rr); return `RR${rr} ${x.usd > 0 ? '+' : ''}${x.usd.toFixed(0)}$`; }).join(' · ')}`); }
     if (histMsg) lines.push(histMsg); else if (!hist.size) lines.push('ยังไม่มี OI ย้อนหลัง (ต้องเข้าสู่ระบบ)');
-    return lines.join('<br>') + `<br><small>ย้อนหลังได้เท่าวันที่มี OI ในชีต (oi_backup/oi_recovered: ${hist.size ? [...hist.keys()].sort()[0].slice(5) : '–'} เป็นต้นไป) · ยังไม่หักสเปรด · ย้อนหลังเป็นเกรด B ทั้งหมด</small>`;
+    return lines.join('<br>') + `<br><small>หลายไม้ซ้อนกันได้ · ย้อนหลังได้เท่าวันที่มี OI ในชีต (${hist.size ? [...hist.keys()].sort()[0].slice(5) : '–'} เป็นต้นไป) · ยังไม่หักสเปรด · ย้อนหลังเป็นเกรด B ทั้งหมด</small>`;
   }
   function section() {
     const d = document.createElement('div'); d.id = 'sfBox'; d.className = 'gsbox';
-    d.innerHTML = `<div class="row"><button class="gsb${isOn() ? ' on' : ''}" data-sf="on"><i style="background:#7fd0ff"></i>🌏 OI Session Fade v0.5</button><span class="gsinfo">${isOn() ? '' : 'Asia เช้า + London สวนกำแพง OI'}</span></div>` + (isOn() ? `<div class="row ps"><span class="gsinfo" style="display:block;line-height:1.55;white-space:normal">${stats()}</span></div>` : '') +
-      (isOn() ? `<div class="row ps"><button class="gsb${cfg.paper ? ' on' : ''}" data-sf="paper">แสดงไม้บันทึก (forward test)</button><button class="gsb" data-sf="reload">↻ โหลดแบ็กเทสใหม่</button></div>` : '');
+    d.innerHTML = `<div class="row"><button class="gsb${isOn() ? ' on' : ''}" data-sf="on"><i style="background:#7fd0ff"></i>🌏 OI Session Fade v0.6</button><span class="gsinfo">${isOn() ? '' : 'Asia เช้า + London สวนกำแพง OI'}</span></div>` + (isOn() ? `<div class="row ps"><span class="gsinfo" style="display:block;line-height:1.55;white-space:normal">${stats()}</span></div>` : '') +
+      (isOn() ? `<div class="row ps"><button class="gsb${cfg.paper ? ' on' : ''}" data-sf="paper">แสดงไม้บันทึก (forward test)</button><button class="gsb" data-sf="reload">↻ โหลดแบ็กเทสใหม่</button></div><div class="row ps"><span class="gsinfo">TP บนกราฟ:</span>${RRS.map(rr => `<button class="gsb${cfg.rr === rr ? ' on' : ''}" data-sf="rr" data-rr="${rr}">RR ${rr}</button>`).join('')}</div>` : '');
     return d;
   }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('sfBox')) return; const box = section(), anchor = $('s3Box') || $('dhBox') || $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }
@@ -301,10 +312,10 @@
     new MutationObserver(() => mount()).observe(menu, { childList: true });
     menu.addEventListener('click', e => {
       const a = e.target.closest('[data-sf]'); if (!a) return;
-      if (a.dataset.sf === 'on') cfg.on = !isOn(); else if (a.dataset.sf === 'reload') { histAt = 0; m1Cache.forEach((v, k) => { if (!v) m1Cache.delete(k); }); } else cfg.paper = !cfg.paper;
+      if (a.dataset.sf === 'on') cfg.on = !isOn(); else if (a.dataset.sf === 'rr') { cfg.rr = +a.dataset.rr; setups.forEach(view); } else if (a.dataset.sf === 'reload') { histAt = 0; m1Cache.forEach((v, k) => { if (!v) m1Cache.delete(k); }); } else cfg.paper = !cfg.paper;
       save(); O.markDirty(); const b = $('sfBox'); if (b) b.remove(); mount(); run(true);
     });
   }
   if (window.OIAlerts) OIAlerts.reg('sfade', '🌏 OI Session Fade (เข้า/ออกไม้จริง)', { desc: 'Asia เช้า + London · เตือนตอนแตะกำแพงแล้วเข้าไม้ และตอนถึง TP/SL', active: isOn });
-  window.OI_sfade = { stats, scan, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
+  window.OI_sfade = { RRS, view, stats, scan, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
 })();

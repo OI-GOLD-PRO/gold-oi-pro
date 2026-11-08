@@ -45,11 +45,16 @@
     try {
       const F = window.OI_sfade, B = F && F.bars;
       if (F && F.isOn() && B && B.length) (F.today || []).forEach(s => { // เฉพาะวันนี้ (M1 สด) · แบ็กเทสย้อนหลังไม่ส่ง
-        const SS = { 3: 'open', 4: 'TP', 5: 'SL', 6: 'timeout', 7: 'news' };
-        out.push({ id: `SF|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}`, ind: '🌏 OI Session Fade' + (s.real ? '' : ' (บันทึก)'), side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
-          sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(s.tp), tp2: null, risk: r2(s.R), score: null,
-          reason: `${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k} เกรด ${s.z.grade} · โซน ±${s.S.half} · พุ่ง ${s.mv === null ? '-' : s.mv}×ATR`, evidence: s.real ? 'ไม้จริง v0.5' : s.fast ? 'ไม้บันทึก v0.5 (กรองพุ่ง)' : 'ไม้บันทึก v0.5',
-          status: SS[s.st] || 'open', exit_th: s.end !== undefined ? th(B[s.end].time) : '', result_r: s.res !== undefined ? s.res : null });
+        // v0.6: 1 ไม้ = 3 แถว (TP RR 1 / 1.6 / 5 ถือจน SL/TP) แยก id ด้วย |R1 |R1.6 |R5
+        const SS = { 3: 'open', 4: 'TP', 5: 'SL' };
+        (F.RRS || [1]).forEach(rr => {
+          const v = s.v && s.v[rr]; if (!v) return;
+          out.push({ id: `SF|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OI Session Fade RR${rr}` + (s.real ? '' : ' (บันทึก)'), side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+            sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: null,
+            reason: `${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k} เกรด ${s.z.grade} · โซน ±${s.S.half} · พุ่ง ${s.mv === null ? '-' : s.mv}×ATR · TP RR${rr}`,
+            evidence: s.real ? 'ไม้จริง v0.6' : s.fast ? 'ไม้บันทึก v0.6 (กรองพุ่ง)' : 'ไม้บันทึก v0.6',
+            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
+        });
       });
     } catch (e) {}
     return out;

@@ -92,7 +92,7 @@ body{padding-bottom:0!important}
 #v34oi{max-height:min(76dvh,720px);overflow-y:auto;overscroll-behavior:contain}
 #v34oiStatus{font-size:11px;color:#d5c094;line-height:1.6;margin:8px 0 10px}
 #v34oiChart{display:flex;flex-direction:column;gap:5px}
-#v34oiChart .v34strike{display:grid;grid-template-columns:minmax(0,1fr) 58px minmax(0,1fr);align-items:center;gap:6px;min-height:22px;font:12px ui-monospace,SFMono-Regular,monospace}
+#v34oiChart .v34strike{display:grid;grid-template-columns:minmax(0,1fr) 58px minmax(0,1fr) 62px;align-items:center;gap:6px;min-height:22px;font:12px ui-monospace,SFMono-Regular,monospace}
 #v34oiChart .v34strike strong{text-align:center;color:#e7edf7;font-weight:600}
 #v34oiChart .v34side{display:flex;align-items:center;gap:5px;min-width:0}
 #v34oiChart .v34side span{color:#b5c0d2;min-width:32px;font-size:11px}
@@ -232,3 +232,11 @@ body{padding-bottom:0!important}
 #v34oiChart .v34now{position:relative;height:18px;margin:2px 0;display:flex;align-items:center;justify-content:center}
 #v34oiChart .v34now::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:2px solid #e0b44c;box-shadow:0 0 6px rgba(224,180,76,.6)}
 #v34oiChart .v34now span{position:relative;background:#e0b44c;color:#111;font:700 11px ui-monospace,SFMono-Regular,monospace;padding:1px 8px;border-radius:9px}
+
+/* V4.9.87 คอลัมน์ท้าย: อันดับโซน + เกรด 🌏 */
+#v34oiChart .v34tag{font-style:normal;display:flex;gap:4px;align-items:center;justify-content:flex-end;font-size:10.5px;white-space:nowrap}
+#v34oiChart .v34tag b{font-weight:700}
+#v34oiChart .v34tag b.c{color:#29b995}
+#v34oiChart .v34tag b.p{color:#e95b76}
+#v34oiChart .v34tag i{font-style:normal;color:#7fd0ff;font-weight:700}
+#v34oiChart .v34tag i.gA{color:#ffd166}

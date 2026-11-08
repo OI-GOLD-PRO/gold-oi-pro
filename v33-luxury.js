@@ -47,9 +47,9 @@
       const p=document.createElement('div');p.className='v34side put';
       const pb=document.createElement('i');pb.style.width=(Math.max(0,+r.p||0)/max*100)+'%';
       const pn=document.createElement('span');pn.textContent=(+r.p||0).toLocaleString();
-      p.append(pb,pn);row.append(c,strike,p);host.appendChild(row);
+      p.append(pb,pn);const tg=document.createElement('em');tg.className='v34tag';row.append(c,strike,p,tg);host.appendChild(row);
     });
-    placeNow(true);
+    tagRows();placeNow(true);
   }
   // V4.5.5 (Claude): ขีดราคาปัจจุบันระหว่าง strike ในแถบ OI · อัปเดตทุก 3 วินาที · เปิดแถบแล้วเลื่อนไปที่ราคาอัตโนมัติ
   function nowPrice(){const O=window.OI;if(!O||O.lastClose==null||!isFinite(O.lastClose))return null;const r0=O.oi&&O.oi.rows?O.oi.rows.find(r=>r.price!=null):null;return O.lastClose-(r0?r0.price-r0.strike:0);}
@@ -62,7 +62,19 @@
     if(nxt){if(m.nextSibling!==nxt)host.insertBefore(m,nxt);}else if(host.lastChild!==m)host.appendChild(m);
     if(scroll&&!sheet.hidden)m.scrollIntoView({block:'center'});
   }
-  setInterval(()=>{if(!sheet.hidden)placeNow(false);},3000);
+  // V4.9.87: คอลัมน์ท้าย = อันดับโซน OI (C#/P# ตามฝั่งที่ OI มากกว่า เหมือนแถบโซนบนกราฟ) + เกรด 🌏 (A/B ถ้าเป็นเส้นของ OI Session Fade)
+  function tagRows(){
+    const host=sheet.querySelector('#v34oiChart'),O=window.OI;if(!host)return;const oi=O&&O.oi;
+    let lv=[];try{const F=window.OI_sfade;if(F){lv=F.levels_||[];if(!lv.length&&F.levels){const P=nowPrice();if(P!=null)lv=F.levels(P)||[];}}}catch(e){}
+    host.querySelectorAll('.v34strike').forEach(el=>{
+      const k=+el.dataset.k,t=el.querySelector('.v34tag');if(!t)return;
+      const r=oi&&oi.rows?oi.rows.find(x=>x.strike===k):null;
+      const rC=r&&r.c>0?(oi.rankC.get(k)||0):0,rP=r&&r.p>0?(oi.rankP.get(k)||0):0;
+      const useC=rC&&(!rP||r.c>=r.p),rk=useC?rC:rP,z=lv.find(x=>x.k===k);
+      t.innerHTML=(rk?`<b class="${useC?'c':'p'}">${useC?'C':'P'}#${rk}</b>`:'')+(z?`<i class="g${z.grade}">🌏${z.grade}</i>`:'');
+    });
+  }
+  setInterval(()=>{if(!sheet.hidden){placeNow(false);tagRows();}},3000);
   new MutationObserver(()=>{if(!sheet.hidden)setTimeout(()=>placeNow(true),50);}).observe(sheet,{attributes:true,attributeFilter:['hidden']});
   window.addEventListener('oi-gold-data',e=>renderOI(e.detail));
   if(window.__oiGoldLatest)renderOI(window.__oiGoldLatest);

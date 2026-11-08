@@ -662,7 +662,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.90';
+  const APP_VER = '4.9.91';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5)
   // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5
@@ -1055,8 +1055,10 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       const hline = (x0, x1) => { ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x1, yy); ctx.stroke(); };
       // เส้นประเฉพาะ OI มากสุด 5 อันดับของแต่ละฝั่ง
       const in5C = oi.top5C.includes(r.strike), in5P = oi.top5P.includes(r.strike);
+      const top3 = SC.note === 'GC' && (((oi.rankC.get(r.strike) || 99) <= 3 && r.c > 0) || ((oi.rankP.get(r.strike) || 99) <= 3 && r.p > 0)); // V4.9.91: อันดับ 1–3 ฝั่งใดฝั่งหนึ่ง = เส้นที่แบ็กเทสแล้ว
+      const dimRank = SC.note === 'GC' && !top3;
       if (in5C || in5P) {
-        ctx.globalAlpha = 0.75;
+        ctx.globalAlpha = dimRank ? 0.3 : 0.75;
         ctx.strokeStyle = (in5C && (!in5P || r.c >= r.p)) ? callC : putC;
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 3]); hline(0, plotW); ctx.setLineDash([]);
@@ -1073,10 +1075,10 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
         const wallC = 'rgb(' + wallRgb.join(',') + ')';
         const yTop = series.priceToCoordinate(r.price + half), yBot = series.priceToCoordinate(r.price - half);
         if (yTop !== null && yBot !== null) {
-          ctx.globalAlpha = .30 - .14 * rankT; ctx.fillStyle = wallC;
+          ctx.globalAlpha = SC.note === 'GC' ? (top3 ? .34 : .07) : .30 - .14 * rankT; ctx.fillStyle = wallC; // ทอง: อันดับ 1–3 เข้ม · 4–10 จาง
           ctx.fillRect(0, Math.min(yTop, yBot), plotW, Math.abs(yBot - yTop)); // สีเข้มตามอันดับ OI
         }
-        if (rk <= 5) { ctx.globalAlpha = .95 - .28 * rankT; ctx.lineWidth = 2; ctx.strokeStyle = wallC; hline(0, plotW); }
+        if (SC.note === 'GC' ? top3 : rk <= 5) { ctx.globalAlpha = .95 - .28 * rankT; ctx.lineWidth = 2; ctx.strokeStyle = wallC; hline(0, plotW); }
       }
       // Volume วันนี้ 5 อันดับ: เส้นทึบสีเหลืองจากขอบซ้ายถึงขอบขวาของกราฟ (เต็มจอ)
       if (oi.topV && oi.topV.includes(r.strike)) {

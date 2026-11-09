@@ -68,7 +68,7 @@
     opt = opt || {}; N = N || []; const from = opt.from || 0, until = opt.until || Infinity, ATR = atrArr(B);
     const out = [], n = B.length; let cur = null, st = new Map();
     const inNews = t => N.some(x => t >= x - NB && t <= x + NA);
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; opt.fade !== false && i < n; i++) {
       const b = B[i]; if (b.time < from || b.time >= until) continue;
       const S = sessOf(b.time), sk = S ? S.id + '|' + dayStart(b.time) : null;
       if (sk !== cur) { cur = sk; st = new Map(); }
@@ -109,7 +109,12 @@
         });
       }
     }
-    // ติดตามผล v0.6: TP 3 แบบ RR 1 / 1.6 / 5 (× ระยะ SL) · ถือจนโดน SL หรือถึง TP (ไม่มีเวลาปิด/ไม่ปิดก่อนข่าว) · แท่งที่เข้าเช็ก SL อย่างเดียว · SL ก่อน TP
+    return trackSetups(B, out);
+  }
+
+  function trackSetups(B, out) {
+    const n = B.length;
+    // TP 1R / 1.6R / 5R · แท่งเข้า Fade เช็ก SL อย่างเดียว · SL ก่อน TP
     out.forEach(s => {
       s.R = Math.abs(s.entry - s.sl); s.t0 = B[s.ei].time; s.v = {};
       const track = (sl, R, rr) => {
@@ -145,6 +150,45 @@
     } catch (e) { histMsg = 'โหลด OI ย้อนหลังไม่ได้: ' + (e.message || e); histAt = Date.now() - 25 * 60e3; }
   }
   const ymd = t => new Date(t * 1000).toISOString().slice(0, 10); // t = วินาทีเวลาไทย
+  const THAI = 7 * 3600;
+  let shared = null, sharedHistAt = 0;
+  const sharedHist = new Map();
+  async function loadShared() {
+    try {
+      const r = await fetch(O.worker + '/osf/v1', { cache: 'no-store', signal: AbortSignal.timeout(12000) });
+      if (!r.ok) return;
+      const s = await r.json();
+      if (s.version === 1 && Array.isArray(s.bars) && Array.isArray(s.events) && Array.isArray(s.levels) && Array.isArray(s.plans)) shared = s;
+    } catch (e) {}
+  }
+  async function loadSharedHist() {
+    if (Date.now() - sharedHistAt < 30 * 60e3) return;
+    sharedHistAt = Date.now();
+    const get = async q => {
+      const r = await fetch(O.worker + '/osf/v1?' + q, { signal: AbortSignal.timeout(12000) });
+      if (!r.ok) throw Error(r.status);
+      return r.json();
+    };
+    try {
+      const { days } = await get('view=history');
+      for (const day of days) {
+        if (sharedHist.has(day)) continue;
+        const s = await get('day=' + day);
+        if (s.day === day && Array.isArray(s.bars) && Array.isArray(s.events)) sharedHist.set(day, s);
+      }
+    } catch (e) { sharedHistAt = Date.now() - 29 * 60e3; }
+  }
+  function sharedTrades(book, follow = [], live = false) {
+    if (!book?.day) return [];
+    const B = book.bars.concat(follow).map(([t, open, high, low, close]) => ({ time: t + THAI, open, high, low, close }));
+    const indexes = new Map(B.map((b, i) => [b.time, i]));
+    const trades = book.events.flatMap(s => {
+      const S = SESS.find(x => x.id === s.sid), ei = indexes.get(s.t + THAI);
+      return !S || ei === undefined ? [] : [{ ...s, S, ei, tf: 'M1', live, central: true, day: ymd(book.day + THAI) }];
+    });
+    return trackSetups(B, trades);
+  }
+  const sharedReady = () => !!(shared?.ready && shared.until > Date.now() / 1000);
 
   let setups = [], today = [], bars = [], lv = [], days = [], lastRun = 0, busy = false;
   async function run(force) {
@@ -152,8 +196,16 @@
     if (!force && Date.now() - lastRun < 18000) return;
     busy = true; lastRun = Date.now();
     try {
-      await loadHist();
-      let [A1, A5] = await Promise.all([O.fetchTF('1m', 6000), O.fetchTF('5m', 1500)]);
+      void loadSharedHist();
+      let [A1, A5] = await Promise.all([O.fetchTF('1m', 6000), O.fetchTF('5m', 1500), loadShared(), loadHist()]);
+      const liveDay = dayStart(Date.now() / 1000 + THAI);
+      const confirmed = shared?.day + THAI === liveDay ? sharedTrades(shared, [], true) : [];
+      const archive = [...sharedHist.values(), ...(shared?.day && shared.day + THAI !== liveDay && !sharedHist.has(shared.day) ? [shared] : [])]
+        .sort((a, b) => a.day - b.day).slice(-HIST_DAYS);
+      const books = archive.concat(shared?.day + THAI === liveDay ? [shared] : []);
+      const archived = archive.flatMap(book => sharedTrades(book, books.filter(x => x.day > book.day && x.day < book.day + 86400 + TRACK)
+        .flatMap(x => x.bars.filter(b => b[0] >= book.day + 86400 && b[0] < book.day + 86400 + TRACK))));
+      const archivedDays = new Set(archive.map(b => ymd(b.day + THAI)));
       if ((!A1 || A1.length < 300) && O.fetchHist) { const h = await O.fetchHist('1m', Date.now() - 3.5 * 86400e3, Date.now() + 60e3); if (h && h.length > 300) A1 = h; } // เสาร์-อาทิตย์
       if (A1 && A1.length > 30) {
         const d0 = dayStart(A1[A1.length - 1].time), oldKeys = new Set(today.map(key));
@@ -162,10 +214,12 @@
         // V4.9.78: ตลาดปิด/ข้อมูลเก่า (แท่งล่าสุดเกิน 3 ชม.) → OI สดในแอปเป็นสัญญาณถัดไปแล้ว ใช้ไม่ได้กับแท่งวันนั้น → คิดวันนั้นจาก OI ย้อนหลังแทน
         const live = Date.now() / 1000 + 7 * 3600 - A1[A1.length - 1].time < 3 * 3600;
         bars = i0 >= 0 ? A1.slice(Math.max(0, i0 - ATR_N - 10)) : []; // +70 แท่งก่อน 06:00 ไว้คำนวณ ATR
-        lv = i0 >= 0 && live ? levels(A1[i0].open) : [];
-        today = bars.length && live ? scan(bars, lv, news, { from: d0 }).map(s => Object.assign(s, { day: ymd(d0), tf: 'M1', live: true })) : [];
+        const localLevels = i0 >= 0 && live ? levels(A1[i0].open) : [];
+        lv = shared?.day + THAI === d0 ? shared.levels : [];
+        today = confirmed.concat(bars.length && live ? scan(bars, localLevels, news, { from: d0, fade: false }).map(s => Object.assign(s, { day: ymd(d0), tf: 'M1', live: true })) : []);
         // ย้อนหลัง: วันที่มี OI ในชีต · ใช้ M1 ถ้ามีครบวัน ไม่งั้น M5 (ประมาณ) · เกรด A ย้อนหลังไม่มี (ไม่มี volume รายวัน) = เกรด B ทั้งหมด
-        const past = [], dl = live ? [{ day: ymd(d0), tf: 'M1', n: today.length }] : [];
+        const past = archived, dl = archive.map(b => ({ day: ymd(b.day + THAI), tf: 'M1', n: b.events.length }));
+        if (live && !archivedDays.has(ymd(d0))) dl.push({ day: ymd(d0), tf: 'M1', n: today.length });
         // V4.9.79: วันที่ M1 ในกราฟไม่ครบ → ดึง M1 ย้อนหลังรายวัน (Bybit/Binance ไล่หน้า) เก็บแคชไว้ · ไม่ได้จริง ๆ ค่อยใช้ M5 (≈ ไม่คิดผล)
         const dts = [...hist.keys()].sort().filter(dt => { const ds = Date.parse(dt + 'T06:00:00Z') / 1000, wd = new Date(ds * 1000).getUTCDay(); return wd >= 1 && wd <= 5 && (live ? ds < d0 : ds <= d0); }).slice(-HIST_DAYS); // V4.9.81: ข้ามเสาร์-อาทิตย์ (เดิมกินโควตาวัน)
         for (const dt of dts) {
@@ -182,12 +236,19 @@
           if (j0 < 0 || je - j0 < (m1 ? 300 : 60)) continue;
           const j2 = src.findIndex(b => b.time >= de + TRACK), B = src.slice(Math.max(0, j0 - ATR_N - 10), j2 < 0 ? src.length : j2); // ติดตามผลต่อหลังจบวันได้อีก 36 ชม. (RR 5)
           const L = levels(src[j0].open, hist.get(dt)); if (!L.length) continue;
-          const r = scan(B, L, news, { from: ds, until: de }).map(s => Object.assign(s, { day: dt, tf: m1 ? 'M1' : 'M5' }));
-          past.push(...r); dl.push({ day: dt, tf: m1 ? 'M1' : 'M5', n: r.length });
+          const r = scan(B, L, news, { from: ds, until: de, fade: !archivedDays.has(dt) }).map(s => Object.assign(s, { day: dt, tf: m1 ? 'M1' : 'M5' }));
+          past.push(...r);
+          if (!archivedDays.has(dt)) dl.push({ day: dt, tf: m1 ? 'M1' : 'M5', n: r.length });
         }
         setups = past.concat(today); days = dl;
         const o06 = i0 >= 0 ? A1[i0].open : null;
         today.filter(s => s.real && !s.bo).forEach(s => { if (!fp.has(key(s))) fpFetch(s); ivSnap(s); gxSnap(s, o06); }); // ชุด Δ5/IV/GEX เก็บเฉพาะไม้สวนกำแพง // Δ5 ฟุตปริ้นท์ + IV + gmf/EM ของไม้จริงวันนี้
+        notify(oldKeys); O.markDirty();
+      } else {
+        const oldKeys = new Set(today.map(key));
+        today = confirmed;
+        lv = shared?.levels || [];
+        setups = setups.filter(s => !s.live && !s.central).concat(archived, today);
         notify(oldKeys); O.markDirty();
       }
     } catch (e) {} finally { busy = false; }
@@ -198,11 +259,12 @@
     const n = bars.length;
     today.filter(s => s.real).forEach(s => {
       const k = key(s);
-      if (n - 1 - s.ei <= 2 && !told.has('e' + k) && !old.has(k)) {
+      const recent = (t, i) => s.central ? Date.now() / 1000 + THAI - t < 180 : n - 1 - i <= 2;
+      if (recent(s.t0, s.ei) && !told.has('e' + k) && !old.has(k)) {
         told.add('e' + k);
         alertMsg(`🌏 <b>${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(2)}</b> · ${s.S.lab} · ${s.z.side}${s.z.k} ${s.bo ? `เบรก M5 +${s.brk}$` : `เกรด ${s.z.grade} · แตะครั้งที่ ${s.k}`}<br>SL ${s.sl.toFixed(2)} · ${s.bo ? `TP RR1 ${s.v[1].tp.toFixed(2)}` : `TP RR1 ${s.v[1].tp.toFixed(2)} · RR1.6 ${s.v[1.6].tp.toFixed(2)} · RR5 ${s.v[5].tp.toFixed(2)}`}`);
       }
-      if (s.st >= 4 && s.end !== undefined && n - 1 - s.end <= 2 && !told.has('x' + k)) {
+      if (s.st >= 4 && s.end !== undefined && recent(s.t1, s.end) && !told.has('x' + k)) {
         told.add('x' + k);
         alertMsg(`🌏 ${s.why === 'TP' ? `✓ ถึง TP RR${cfg.rr}` : s.why === 'SL' ? '✗ โดน SL' : s.why} · ${s.dir > 0 ? 'BUY' : 'SELL'} ${s.z.side}${s.z.k} (${s.res > 0 ? '+' : ''}${s.res}R)`);
       }
@@ -244,7 +306,7 @@
     $('sfDetailsReason').textContent = s.bo
       ? `M5 ปิดเบรก${buy ? 'เหนือขอบบน' : 'ใต้ขอบล่าง'} $${s.brk.toFixed(2)} เป็นเบรกแรกของโซนในวันนั้น และผ่านตัวกรองข่าวแดง USD`
       : `${s.tf} ปิดห่างขอบโซนเกิน $3 แล้วราคากลับมาแตะครั้งที่ ${s.k} จาก${buy ? 'ด้านบน' : 'ด้านล่าง'} จึงจำลองเข้า Limit ที่ขอบใกล้`;
-    $('sfDetailsStatus').textContent = [status, s.mv !== null ? `โมเมนตัมก่อนแตะ ≈ ${s.mv}×ATR` : '', s.tf === 'M5' ? 'ตำแหน่งย้อนหลังโดยประมาณ' : ''].filter(Boolean).join(' · ');
+    $('sfDetailsStatus').textContent = [status, s.mv !== null ? `โมเมนตัมก่อนแตะ ≈ ${s.mv}×ATR` : '', s.central ? `รหัสกลาง ${s.key}` : '', s.tf === 'M5' ? 'ตำแหน่งย้อนหลังโดยประมาณ' : ''].filter(Boolean).join(' · ');
     $('sfDetailsRisk').textContent = `SL ${price(s.sl)} · TP ${rr}R ${price(s.v[rr].tp)}`;
     details.showModal();
   });
@@ -396,8 +458,14 @@
     if (!isOn() || !fresh()) return null;
     const open = today.filter(s => s.real && s.st === 3);
     if (open.length) { const s = open[open.length - 1]; return [`🌏 ${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(1)} SL ${s.sl.toFixed(1)} TP${cfg.rr}R ${s.tp.toFixed(1)}`, s.dir > 0 ? '#22e39a' : '#ff8a3d', 'sfade']; }
-    const S = sessOf(bars[bars.length - 1].time);
-    if (S && S.real && lv.length) return [`🌏 ${S.lab} · รอแตะ ${lv.length} เส้น`, '#7fd0ff', 'sfade'];
+    const S = sessOf(Date.now() / 1000 + THAI);
+    if (S?.real && !sharedReady()) return ['🌏 รอข้อมูลสัญญาณกลาง', '#8fa3c8', 'sfade'];
+    if (S?.real) {
+      const plans = shared.plans.filter(p => p[5] === 1);
+      const p = plans[0];
+      if (p) return [`🌏 ${p[3] > 0 ? 'BUY' : 'SELL'} ${p[1]}${p[0]} ครั้งที่ ${p[4]}${plans.length > 1 ? ' +' + (plans.length - 1) : ''}`, '#7fd0ff', 'sfade'];
+      return [`🌏 ${S.lab} · รอตั้งสัญญาณ`, '#7fd0ff', 'sfade'];
+    }
     return null;
   });
 

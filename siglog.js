@@ -43,57 +43,57 @@
     } catch (e) {}
     // 🌏 OI Session Fade (V4.9.72) — ไม้จริง + ไม้บันทึก (forward test) · evidence บอกว่าเป็นไม้ไหน
     try {
-      const F = window.OI_sfade, B = F && F.bars;
-      if (F && F.isOn() && B && B.length) (F.today || []).forEach(s => { // เฉพาะวันนี้ (M1 สด) · แบ็กเทสย้อนหลังไม่ส่ง
+      const F = window.OI_sfade;
+      if (F && F.isOn()) (F.today || []).forEach(s => { // เฉพาะวันนี้ (M1 สด) · แบ็กเทสย้อนหลังไม่ส่ง
         // v0.6: 1 ไม้ = 3 แถว (TP RR 1 / 1.6 / 5 ถือจน SL/TP) แยก id ด้วย |R1 |R1.6 |R5
         const SS = { 3: 'open', 4: 'TP', 5: 'SL' };
         (F.RRS || [1]).forEach(rr => {
           const v = s.v && s.v[rr]; if (!v) return;
-          out.push({ id: `SF|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OI Session Fade RR${rr}` + (s.real ? '' : ' (บันทึก)'), side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
-            sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: null,
+          out.push({ id: `${s.central ? "SFC" : "SF"}|1m|${s.t0}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OI Session Fade RR${rr}` + (s.real ? '' : ' (บันทึก)'), side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+            sig_th: th(s.t0), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: null,
             reason: `${s.S.lab} · ${s.bo ? `เบรก M5 +${s.brk}$` : `แตะครั้งที่ ${s.k}`} · ${s.z.side}${s.z.k} เกรด ${s.z.grade} · โซน ±${s.S.half} · พุ่ง ${s.mv === null ? '-' : s.mv}×ATR · TP RR${rr}`,
-            evidence: s.real ? 'ไม้จริง v0.6' : s.fast ? 'ไม้บันทึก v0.6 (กรองพุ่ง)' : 'ไม้บันทึก v0.6',
-            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
+            evidence: s.central ? `ระบบกลาง ${s.key}` : s.real ? 'ไม้จริง v0.6' : s.fast ? 'ไม้บันทึก v0.6 (กรองพุ่ง)' : 'ไม้บันทึก v0.6',
+            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(v.t1) : '', result_r: v.res !== undefined ? v.res : null });
         });
         // V4.9.94: ชุดแยก "🌏 NY Breakout" — ไม้เบรก NY ทุกไม้ บันทึกทั้ง SL ขอบอีกฝั่ง (E) และ SL กลางโซน (M) × RR 1/1.6/5 · id ขึ้นต้น SFB|
         if (s.bo) [['E', 'ขอบ', s.sl, s.vAll || s.v], ['M', 'กลาง', s.slMid, s.vm]].forEach(([cd, nm, sl, V]) => (F.RRS || [1]).forEach(rr => {
           const v = V && V[rr]; if (!v) return;
-          out.push({ id: `SFB|1m|${B[s.ei].time}|${s.z.k}|${cd}|R${rr}`, ind: `🌏 NY Breakout SL${nm} RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
-            sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(sl), tp1: r2(v.tp), tp2: null, risk: r2(Math.abs(s.entry - sl)), score: s.brk,
+          out.push({ id: `SFB|1m|${s.t0}|${s.z.k}|${cd}|R${rr}`, ind: `🌏 NY Breakout SL${nm} RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+            sig_th: th(s.t0), entry: r2(s.entry), sl: r2(sl), tp1: r2(v.tp), tp2: null, risk: r2(Math.abs(s.entry - sl)), score: s.brk,
             reason: `NY เบรก M5 พ้นขอบ +${s.brk}$ · ${s.z.side}${s.z.k} · SL ${nm}โซน · TP RR${rr}`, evidence: `NY Breakout SL${nm}`,
-            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
+            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(v.t1) : '', result_r: v.res !== undefined ? v.res : null });
         }));
         // V4.9.84: ชุดแยก "🌏 OSF+Δ5" (ไม้จริงเท่านั้น) — ฟุตปริ้นท์ Δ5 จาก Binance taker ก่อนแตะ · id ขึ้นต้น SFD| ไม่ปนชุด v0.6 · evidence = ผ่าน/ไม่ผ่าน Δ5
         const f = s.real && F.fpOf ? F.fpOf(s) : null;
         if (f && !f.err) (F.RRS || [1]).forEach(rr => {
           const v = s.v && s.v[rr]; if (!v) return;
-          out.push({ id: `SFD|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OSF+Δ5 RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
-            sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: f.push,
+          out.push({ id: `SFD|1m|${s.t0}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OSF+Δ5 RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+            sig_th: th(s.t0), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: f.push,
             reason: `Δ5 ${f.push === null ? '-' : (f.push > 0 ? '+' : '') + f.push} · ซื้อ ${f.buy} / ขาย ${f.sell} oz (${f.n} ไม้ Binance) · ${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k} · พุ่ง ${s.mv === null ? '-' : s.mv}×ATR`,
             evidence: f.pass ? `ผ่าน Δ5 (≤${F.FP_MAX})` : `ไม่ผ่าน Δ5 (>${F.FP_MAX})`,
-            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
+            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(v.t1) : '', result_r: v.res !== undefined ? v.res : null });
         });
         // V4.9.85: ชุดแยก "🌏 OSF+IV" (ไม้จริงเท่านั้น) — ATM IV ตอนเข้าไม้ + เปลี่ยนใน 1/3 ชม. · id ขึ้นต้น SFI| · evidence = IV ขึ้นเร็ว / IV ปกติ
         const iv = s.real && F.ivOf ? F.ivOf(s) : null;
         if (iv) (F.RRS || [1]).forEach(rr => {
           const v = s.v && s.v[rr]; if (!v) return;
           const fast = iv.d3 !== null && iv.d3 > F.IV_D3_MAX, sg = x => x === null ? '-' : (x > 0 ? '+' : '') + x;
-          out.push({ id: `SFI|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OSF+IV RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
-            sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: iv.iv,
+          out.push({ id: `SFI|1m|${s.t0}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OSF+IV RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+            sig_th: th(s.t0), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: iv.iv,
             reason: `IV ${iv.iv}% · 1ชม. ${sg(iv.d1)} · 3ชม. ${sg(iv.d3)} · ${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k} · พุ่ง ${s.mv === null ? '-' : s.mv}×ATR`,
             evidence: iv.d3 === null ? 'IV ไม่มีค่า 3ชม.' : fast ? `IV ขึ้นเร็ว (>+${F.IV_D3_MAX}/3ชม.)` : 'IV ปกติ',
-            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
+            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(v.t1) : '', result_r: v.res !== undefined ? v.res : null });
         });
         // V4.9.92: ชุดแยก "🌏 OSF+GEX" (ไม้จริงเท่านั้น) — ราคาเข้าเทียบ gmf itd + ใช้ EM ไปแล้วกี่เท่า · id ขึ้นต้น SFG| · evidence = เหนือ/ใต้ flip · EM น้อย/มาก
         const gx = s.real && F.gxOf ? F.gxOf(s) : null;
         if (gx) (F.RRS || [1]).forEach(rr => {
           const v = s.v && s.v[rr]; if (!v) return;
           const pos = gx.above === null ? 'ไม่มี gmf' : gx.above ? 'เหนือ flip' : 'ใต้ flip', emT = gx.emUse === null ? 'ไม่มี EM' : gx.emUse < 0.5 ? 'EM<0.5' : 'EM≥0.5';
-          out.push({ id: `SFG|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OSF+GEX RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
-            sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: gx.emUse,
+          out.push({ id: `SFG|1m|${s.t0}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OSF+GEX RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+            sig_th: th(s.t0), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: gx.emUse,
             reason: `gmf ${gx.gmf === null ? '-' : gx.gmf} (ราคา${gx.dist === null ? '-' : (gx.dist >= 0 ? '+' : '') + gx.dist}$) · EM ${gx.em === null ? '-' : gx.em}$ · ใช้ไป ${gx.emUse === null ? '-' : gx.emUse} EM${gx.late ? ' · บันทึกช้า' : ''} · ${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k}`,
             evidence: `${pos} · ${emT}`,
-            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
+            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(v.t1) : '', result_r: v.res !== undefined ? v.res : null });
         });
       });
     } catch (e) {}

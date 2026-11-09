@@ -56,7 +56,7 @@
             status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
         });
         // V4.9.94: ชุดแยก "🌏 NY Breakout" — ไม้เบรก NY ทุกไม้ บันทึกทั้ง SL ขอบอีกฝั่ง (E) และ SL กลางโซน (M) × RR 1/1.6/5 · id ขึ้นต้น SFB|
-        if (s.bo) [['E', 'ขอบ', s.sl, s.v], ['M', 'กลาง', s.slMid, s.vm]].forEach(([cd, nm, sl, V]) => (F.RRS || [1]).forEach(rr => {
+        if (s.bo) [['E', 'ขอบ', s.sl, s.vAll || s.v], ['M', 'กลาง', s.slMid, s.vm]].forEach(([cd, nm, sl, V]) => (F.RRS || [1]).forEach(rr => {
           const v = V && V[rr]; if (!v) return;
           out.push({ id: `SFB|1m|${B[s.ei].time}|${s.z.k}|${cd}|R${rr}`, ind: `🌏 NY Breakout SL${nm} RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
             sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(sl), tp1: r2(v.tp), tp2: null, risk: r2(Math.abs(s.entry - sl)), score: s.brk,

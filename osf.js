@@ -124,6 +124,7 @@
         return v;
       };
       RRS.forEach(rr => { s.v[rr] = track(s.sl, s.R, rr); });
+      if (s.bo) { s.vAll = s.v; s.v = {}; RRS.forEach(rr => { s.v[rr] = s.vAll[1]; }); } // V4.9.95: NY เบรกใช้ TP RR 1 เสมอ (ทุกปุ่ม RR / ทุกสรุป) · ผล RR อื่นเก็บใน vAll ไว้บันทึกชุด NY Breakout
       if (s.bo) { const Rm = Math.abs(s.entry - s.slMid); s.vm = {}; RRS.forEach(rr => { s.vm[rr] = track(s.slMid, Rm, rr); }); } // แบบ SL กลางโซน (บันทึกเทียบ)
       view(s);
     });
@@ -199,7 +200,7 @@
       const k = key(s);
       if (n - 1 - s.ei <= 2 && !told.has('e' + k) && !old.has(k)) {
         told.add('e' + k);
-        alertMsg(`🌏 <b>${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(2)}</b> · ${s.S.lab} · ${s.z.side}${s.z.k} ${s.bo ? `เบรก M5 +${s.brk}$` : `เกรด ${s.z.grade} · แตะครั้งที่ ${s.k}`}<br>SL ${s.sl.toFixed(2)} · TP RR1 ${s.v[1].tp.toFixed(2)} · RR1.6 ${s.v[1.6].tp.toFixed(2)} · RR5 ${s.v[5].tp.toFixed(2)}`);
+        alertMsg(`🌏 <b>${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(2)}</b> · ${s.S.lab} · ${s.z.side}${s.z.k} ${s.bo ? `เบรก M5 +${s.brk}$` : `เกรด ${s.z.grade} · แตะครั้งที่ ${s.k}`}<br>SL ${s.sl.toFixed(2)} · ${s.bo ? `TP RR1 ${s.v[1].tp.toFixed(2)}` : `TP RR1 ${s.v[1].tp.toFixed(2)} · RR1.6 ${s.v[1.6].tp.toFixed(2)} · RR5 ${s.v[5].tp.toFixed(2)}`}`);
       }
       if (s.st >= 4 && s.end !== undefined && n - 1 - s.end <= 2 && !told.has('x' + k)) {
         told.add('x' + k);
@@ -263,12 +264,12 @@
       ctx.strokeStyle = '#ff4d6a'; ctx.beginPath(); ctx.moveTo(x0, ys); ctx.lineTo(x1, ys); ctx.stroke();
       ctx.strokeStyle = '#7fd0ff'; ctx.beginPath(); ctx.moveTo(x0, ye); ctx.lineTo(x1, ye); ctx.stroke();
       // TP ของ RR อื่น = เส้นประจาง + ป้าย ✓/✗
-      RRS.filter(rr => rr !== cfg.rr && s.v[rr]).forEach(rr => { const v = s.v[rr], y = Y(v.tp); if (y === null) return; ctx.save(); ctx.globalAlpha = 0.55 * a; ctx.setLineDash([3, 3]); ctx.strokeStyle = '#22e39a'; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = v.st === 4 ? '#22e39a' : v.st === 5 ? '#ff4d6a' : '#7fd0ff'; ctx.textAlign = 'right'; if (x1 - 2 > 0) ctx.fillText(`${rr}R${v.st === 4 ? '✓' : v.st === 5 ? '✗' : ''}`, x1 - 2, y + (s.dir > 0 ? -6 : 6)); ctx.restore(); });
+      RRS.filter(rr => !s.bo && rr !== cfg.rr && s.v[rr]).forEach(rr => { const v = s.v[rr], y = Y(v.tp); if (y === null) return; ctx.save(); ctx.globalAlpha = 0.55 * a; ctx.setLineDash([3, 3]); ctx.strokeStyle = '#22e39a'; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = v.st === 4 ? '#22e39a' : v.st === 5 ? '#ff4d6a' : '#7fd0ff'; ctx.textAlign = 'right'; if (x1 - 2 > 0) ctx.fillText(`${rr}R${v.st === 4 ? '✓' : v.st === 5 ? '✗' : ''}`, x1 - 2, y + (s.dir > 0 ? -6 : 6)); ctx.restore(); });
       // จุดออก
       if (s.t1 !== null && s.exit !== undefined) { const yx = Y(s.exit); if (yx !== null) { ctx.fillStyle = s.pnl > 0 ? '#22e39a' : s.pnl < 0 ? '#ff4d6a' : '#e0b44c'; ctx.beginPath(); ctx.arc(x1 - bw / 2, yx, 3.5, 0, 7); ctx.fill(); } }
       // ป้าย: ทิศ · ครั้งที่แตะ · ผล
       const res = s.st === 3 ? 'เปิดอยู่' : `${s.st === 4 ? '✓' : s.st === 5 ? '✗' : s.why === 'ปิดก่อนข่าว' ? '📰' : '⏱'} ${s.pnl > 0 ? '+' : ''}${s.pnl}$`;
-      const lab = `${s.tf === 'M5' ? '≈' : ''}${s.real ? '🌏' : '·'}${s.bo ? 'NY⚡' : ''}${s.dir > 0 ? 'B' : 'S'}${s.bo ? '' : s.k} ${cfg.rr}R${s.tf === 'M5' ? '' : ' ' + res}`;
+      const lab = `${s.tf === 'M5' ? '≈' : ''}${s.real ? '🌏' : '·'}${s.bo ? 'NY⚡' : ''}${s.dir > 0 ? 'B' : 'S'}${s.bo ? '' : s.k} ${s.bo ? 1 : cfg.rr}R${s.tf === 'M5' ? '' : ' ' + res}`;
       const ly = s.dir > 0 ? Math.max(yt, 0) - 7 : Math.min(yt, plotH) + 7; let lx = Math.max(2, x0 + 2);
       if (s.fast && lx < plotW) { const t = `⚡${s.mv}×ATR ข้าม `; ctx.globalAlpha = 1; ctx.fillStyle = '#ff3b5c'; ctx.textAlign = 'left'; ctx.fillText(t, lx, ly); lx += ctx.measureText(t).width; }
       ctx.globalAlpha = a; ctx.fillStyle = s.st === 3 ? '#7fd0ff' : s.pnl > 0 ? '#22e39a' : '#ff4d6a'; ctx.textAlign = 'left';
@@ -279,7 +280,7 @@
     if (fresh()) today.filter(s => s.real && s.st === 3).forEach(s => {
       const line = (p, col, lab) => { const y = Y(p); if (y === null || y < 0 || y > plotH) return; ctx.fillStyle = col; ctx.textAlign = 'right'; ctx.fillText(lab, plotW - 4, y - 6); };
       line(s.entry, '#7fd0ff', `🌏 ${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(1)} · ${s.z.side}${s.z.k} ครั้งที่ ${s.k}`);
-      line(s.sl, '#ff4d6a', `SL ${s.sl.toFixed(1)}`); RRS.forEach(rr => line(s.v[rr].tp, '#22e39a', `TP ${rr}R ${s.v[rr].tp.toFixed(1)}${s.v[rr].st === 4 ? ' ✓' : ''}`));
+      line(s.sl, '#ff4d6a', `SL ${s.sl.toFixed(1)}`); (s.bo ? [1] : RRS).forEach(rr => line(s.v[rr].tp, '#22e39a', `TP ${rr}R ${s.v[rr].tp.toFixed(1)}${s.v[rr].st === 4 ? ' ✓' : ''}`));
     });
     ctx.restore();
   });
@@ -378,7 +379,7 @@
     const r1 = real.filter(s => s.tf === 'M1'), tr = today.filter(s => s.real);
     const dd = days.filter(d => d.tf === 'M1').map(d => d.day).sort(), rng = dd.length ? ` (${dd[0].slice(5)} → ${dd[dd.length - 1].slice(5)})` : '';
     const lines = [`<b>แบ็กเทส M1 ${nd - n5} วัน${rng} · ถือจน SL/TP</b>`];
-    RRS.forEach(rr => lines.push(`${rr === cfg.rr ? '▶ ' : ''}<b>RR ${rr}</b>: ${fmt(sum(r1, rr))}<br><span style="opacity:.75">&nbsp;&nbsp;Asia เช้า ${fmt(sum(r1.filter(s => s.S.id === 'AM'), rr))}<br>&nbsp;&nbsp;London ${fmt(sum(r1.filter(s => s.S.id === 'LDN'), rr))}<br>&nbsp;&nbsp;NY เบรก ${fmt(sum(r1.filter(s => s.S.id === 'NYB'), rr))}</span>`));
+    RRS.forEach(rr => lines.push(`${rr === cfg.rr ? '▶ ' : ''}<b>RR ${rr}</b>: ${fmt(sum(r1, rr))}<br><span style="opacity:.75">&nbsp;&nbsp;Asia เช้า ${fmt(sum(r1.filter(s => s.S.id === 'AM'), rr))}<br>&nbsp;&nbsp;London ${fmt(sum(r1.filter(s => s.S.id === 'LDN'), rr))}<br>&nbsp;&nbsp;NY เบรก (RR1 เสมอ) ${fmt(sum(r1.filter(s => s.S.id === 'NYB'), rr))}</span>`));
     lines.push(`วันนี้: ${tr.length ? RRS.map(rr => { const x = sum(tr, rr); return `RR${rr} ${x.usd > 0 ? '+' : ''}${x.usd.toFixed(1)}$${x.open ? ` (ค้าง ${x.open})` : ''}`; }).join(' · ') : (bars.length && Date.now() / 1000 + 7 * 3600 - bars[bars.length - 1].time >= 3 * 3600 ? 'ตลาดปิด' : 'ยังไม่มีไม้จริง')}`);
     const f1 = setups.filter(s => s.fast && s.tf === 'M1'); if (f1.length) lines.push(`<span style="color:#ff6b82">⚡ กรองพุ่ง >${MOM_MAX}×ATR (Asia เช้า) ไม้ที่ข้าม: ${RRS.map(rr => { const x = sum(f1, rr); return `RR${rr} ${x.usd > 0 ? '+' : ''}${x.usd.toFixed(0)}$`; }).join(' · ')}</span>`);
     if (n5) lines.push(`<span style="opacity:.7">อีก ${n5} วันไม่มีแท่ง M1 ครบ: วาดจาก M5 เป็นกรอบจาง ≈ ไว้ดูตำแหน่งเท่านั้น ไม่คิดผล</span>`);

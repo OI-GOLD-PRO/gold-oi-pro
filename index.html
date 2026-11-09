@@ -242,6 +242,9 @@
   #badges::-webkit-scrollbar { display: none; }
   #badges span[data-k] { cursor: pointer; -webkit-user-select: none; user-select: none; touch-action: manipulation; padding: 0 7px; }
   #badges span { flex: none; font: bold 10px var(--mono); line-height: 14px; padding: 0 5px; border: 1px solid; border-radius: 3px; }
+  /* V4.9.93: ป้าย ⚡ โมเมนตัม ATR = กรอบทองหนาเรืองแสง (สีตัวอักษรยังบอกระดับ เทา/เหลือง/แดง) */
+  #badges span[data-k="sfmom"] { border: 2px solid #f2a900 !important; border-radius: 5px; box-shadow: 0 0 6px rgba(242,169,0,.75), inset 0 0 4px rgba(242,169,0,.35); animation: sfmomGlow 2.4s ease-in-out infinite; }
+  @keyframes sfmomGlow { 0%, 100% { box-shadow: 0 0 5px rgba(242,169,0,.6), inset 0 0 3px rgba(242,169,0,.3); } 50% { box-shadow: 0 0 11px rgba(242,169,0,.95), inset 0 0 5px rgba(242,169,0,.45); } }
   #wrap.bdg #badges { display: flex; }
   #wrap.bdg #chart, #wrap.bdg #ov { top: 22px; }
   #wrap.bdg #tip { top: 30px; }
@@ -662,7 +665,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.92';
+  const APP_VER = '4.9.93';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5)
   // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5

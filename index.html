@@ -676,7 +676,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.98';
+  const APP_VER = '4.9.99';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5)
   // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5
@@ -2927,7 +2927,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   <p id="sfDetailsStatus"></p>
   <p id="sfDetailsRisk"></p>
 </dialog>
-<script src="osf.js?v=40998"></script>
+<script src="osf.js?v=40999"></script>
 <script src="squeeze.js?v=40316"></script>
 <script src="trap.js?v=40929"></script>
 <script src="volreg.js?v=40929"></script>

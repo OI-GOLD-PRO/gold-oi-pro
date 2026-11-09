@@ -441,7 +441,7 @@
   }
 
   // ---------- ป้ายสถานะ ----------
-  // ป้ายโมเมนตัม หน้าสุดของแถบป้าย (โชว์ค้างตลอดเมื่อเปิดอินดี้) · V4.9.96: ไม่เกิน 3×ATR = พื้นเขียว · เกิน 3×ATR = พื้นแดงกระพริบ (key sfmom-hot) (Asia เช้า = ข้ามไม้ตามกฎ v0.5)
+  // ป้ายโมเมนตัม · ขึ้นพื้นเขียว ลงพื้นส้ม เกิน 3×ATR พื้นแดงกะพริบทั้งสองทิศ
   let lastMom = null;
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     if (!isOn() || !bars.length) return null;
@@ -449,7 +449,8 @@
     lastMom = m;
     const open = fresh(), S = open ? sessOf(bars[bars.length - 1].time) : null, hot = m.mv > MOM_MAX;
     const t = `⚡ ${m.dn ? 'ลง' : 'ขึ้น'} ${m.mv}×ATR (${m.usd}$/5น.)${m.z ? ` → ${m.z.side}${m.z.k}` : ''}${!open ? ' · ตลาดปิด' : hot && S && S.mom ? ' · ข้ามไม้' : ''}`;
-    return hot ? [t, '#ffffff', 'sfmom-hot', '#d0142f', 'first'] : [t, '#eafff4', 'sfmom', '#0f7a46', 'first'];
+    if (hot) return [t, '#ffffff', 'sfmom-hot', '#d0142f', 'first'];
+    return m.dn ? [t, '#fff4e8', 'sfmom', '#9a420c', 'first'] : [t, '#eafff4', 'sfmom', '#0f7a46', 'first'];
   });
   (window.OIBadgeExtra = window.OIBadgeExtra || []).push(() => {
     if (!isOn() || !fresh()) return null;

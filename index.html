@@ -365,6 +365,14 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   #zoneWait small { font: 500 10px var(--mono, monospace); color: #c9b8ff; }
   #zoneWait[hidden] { display: none; }
   @keyframes zwPulse { 50% { background: rgba(64,48,12,.96); border-color: #ffe08a; } }
+  #sfDetails { box-sizing: border-box; width: min(420px, calc(100% - 28px)); max-height: 85dvh; overflow: auto; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--fg); }
+  #sfDetails::backdrop { background: rgba(0, 0, 0, .56); }
+  #sfDetails header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  #sfDetails h2 { margin: 4px 0 12px; font-size: 18px; }
+  #sfDetails p { margin: 0 0 10px; line-height: 1.5; }
+  #sfDetails p#sfDetailsReason { margin-top: 4px; }
+  #sfDetailsZone, #sfDetailsStatus { color: var(--muted); }
+  #sfDetailsRisk { color: #7fd0ff; font-family: var(--mono); }
 </style>
 <link rel="stylesheet" href="v3-premium.css?v=30201">
 <link rel="stylesheet" href="v33-luxury.css?v=40989">
@@ -668,7 +676,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.96';
+  const APP_VER = '4.9.97';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5)
   // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5
@@ -2852,6 +2860,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     get unlimited() { return !!authCode && (!authExpire || String(authExpire) >= '9999'); }, // V4.9.32 รหัสไม่จำกัดวัน
     get tf() { return tf; }, tzShift: TZ_SHIFT, sym: SYM, cfg: SC, sfx: SYMSFX, psfx: PSFX,
     chart, series, chartEl, hooks: overlayHooks, bgHooks,
+    get drawingActive() { return !!drawTool || clickMeas || !!(g1 && meas); },
     get oi() { return oi; }, get lastClose() { return lastClose; }, get cfgData() { return lastCfg; }, setLevels, get rawBars() { return rawBars; }, get adj() { return adj; }, get src() { return prov ? prov.id : null; }, worker: GC_WORKER, beep: () => { try { beep(); } catch (e) {} },
     // ดึงข้อมูลชีตของสัญลักษณ์ใดก็ได้ (ใช้ในแดชบอร์ด dash.js)
     async fetchData(sym) {
@@ -2906,7 +2915,19 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <script src="dealer.js?v=40929"></script>
 <script src="ivbadge.js?v=40504"></script>
 <script src="oistep.js?v=40960"></script>
-<script src="osf.js?v=40996"></script>
+<dialog id="sfDetails" aria-labelledby="sfDetailsTitle">
+  <header>
+    <strong>🌏 OI Session Fade</strong>
+    <form method="dialog"><button class="icon" type="submit" aria-label="ปิดรายละเอียด">×</button></form>
+  </header>
+  <h2 id="sfDetailsTitle"></h2>
+  <p id="sfDetailsZone"></p>
+  <strong>เหตุผลของสัญญาณ</strong>
+  <p id="sfDetailsReason"></p>
+  <p id="sfDetailsStatus"></p>
+  <p id="sfDetailsRisk"></p>
+</dialog>
+<script src="osf.js?v=40997"></script>
 <script src="squeeze.js?v=40316"></script>
 <script src="trap.js?v=40929"></script>
 <script src="volreg.js?v=40929"></script>

@@ -222,7 +222,34 @@
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   const csec = () => TFS[O.tf] || 60, toChart = t => Math.floor(t / csec()) * csec();
   const fresh = () => bars.length && Date.now() / 1000 + 7 * 3600 - bars[bars.length - 1].time < 3 * 3600;
+  const entryTargets = [];
+  const details = $('sfDetails');
+  if (details) O.chart.subscribeClick(({ point }) => {
+    if (!isOn() || O.drawingActive || !point || details.open) return;
+    let selected = null, distance = 15;
+    entryTargets.forEach(({ s, x, y, label }) => {
+      const hit = Math.hypot(point.x - x, point.y - y);
+      const labelHit = label && point.x >= label.left && point.x <= label.right && Math.abs(point.y - label.y) <= 8;
+      const d = labelHit ? 0 : hit;
+      if (d <= distance) { selected = s; distance = d; }
+    });
+    if (!selected) return;
+    const s = selected, buy = s.dir > 0, rr = s.bo ? 1 : cfg.rr;
+    const price = p => p.toFixed(2);
+    const status = s.fast ? 'ข้ามไม้เพราะโมเมนตัมเกิน 3×ATR'
+      : !s.real ? 'ไม้บันทึกสำหรับเปรียบเทียบ'
+        : s.bo ? 'ผ่านกฎเข้าไม้' : 'ครั้งที่แตะอยู่ในเกณฑ์ของช่วงตลาด และผ่านตัวกรองข่าวแดง USD';
+    $('sfDetailsTitle').textContent = `${buy ? 'BUY' : 'SELL'} ${price(s.entry)} · ${s.S.lab}`;
+    $('sfDetailsZone').textContent = `${s.z.side === 'C' ? 'Call' : 'Put'} OI ${s.z.k} · เกรด ${s.z.grade} · ${price(s.z.p - s.S.half)}–${price(s.z.p + s.S.half)}`;
+    $('sfDetailsReason').textContent = s.bo
+      ? `M5 ปิดเบรก${buy ? 'เหนือขอบบน' : 'ใต้ขอบล่าง'} $${s.brk.toFixed(2)} เป็นเบรกแรกของโซนในวันนั้น และผ่านตัวกรองข่าวแดง USD`
+      : `${s.tf} ปิดห่างขอบโซนเกิน $3 แล้วราคากลับมาแตะครั้งที่ ${s.k} จาก${buy ? 'ด้านบน' : 'ด้านล่าง'} จึงจำลองเข้า Limit ที่ขอบใกล้`;
+    $('sfDetailsStatus').textContent = [status, s.mv !== null ? `โมเมนตัมก่อนแตะ ≈ ${s.mv}×ATR` : '', s.tf === 'M5' ? 'ตำแหน่งย้อนหลังโดยประมาณ' : ''].filter(Boolean).join(' · ');
+    $('sfDetailsRisk').textContent = `SL ${price(s.sl)} · TP ${rr}R ${price(s.v[rr].tp)}`;
+    details.showModal();
+  });
   O.hooks.push((ctx, w, h) => {
+    entryTargets.length = 0;
     if (!isOn()) return;
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height();
     const X = t => ts.timeToCoordinate(toChart(t)), Y = p => sr.priceToCoordinate(p), bw = Math.max(2, (X(bars.length ? bars[bars.length - 1].time : 0) || 0) - (X((bars.length ? bars[bars.length - 1].time : 0) - csec()) || 0));
@@ -274,6 +301,14 @@
       if (s.fast && lx < plotW) { const t = `⚡${s.mv}×ATR ข้าม `; ctx.globalAlpha = 1; ctx.fillStyle = '#ff3b5c'; ctx.textAlign = 'left'; ctx.fillText(t, lx, ly); lx += ctx.measureText(t).width; }
       ctx.globalAlpha = a; ctx.fillStyle = s.st === 3 ? '#7fd0ff' : s.pnl > 0 ? '#22e39a' : '#ff4d6a'; ctx.textAlign = 'left';
       if (lx < plotW) ctx.fillText(lab, lx, ly);
+      const label = lx < plotW && ly >= 0 && ly <= plotH
+        ? { left: lx, right: Math.min(plotW, lx + ctx.measureText(lab).width), y: ly } : null;
+      if (x0 >= 0 && ye >= 0 && ye <= plotH) {
+        ctx.fillStyle = '#7fd0ff'; ctx.beginPath(); ctx.arc(x0, ye, 4, 0, Math.PI * 2); ctx.fill();
+        entryTargets.push({ s, x: x0, y: ye, label });
+      } else if (label) {
+        entryTargets.push({ s, x: -Infinity, y: -Infinity, label });
+      }
     });
     ctx.globalAlpha = 1;
     // ไม้จริงที่ยังเปิดอยู่: ราคาเข้า / SL / TP ที่ขอบขวา

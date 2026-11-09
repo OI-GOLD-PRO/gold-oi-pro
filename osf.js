@@ -161,7 +161,8 @@
           past.push(...r); dl.push({ day: dt, tf: m1 ? 'M1' : 'M5', n: r.length });
         }
         setups = past.concat(today); days = dl;
-        today.filter(s => s.real).forEach(s => { if (!fp.has(key(s))) fpFetch(s); ivSnap(s); }); // Δ5 ฟุตปริ้นท์ + IV ของไม้จริงวันนี้
+        const o06 = i0 >= 0 ? A1[i0].open : null;
+        today.filter(s => s.real).forEach(s => { if (!fp.has(key(s))) fpFetch(s); ivSnap(s); gxSnap(s, o06); }); // Δ5 ฟุตปริ้นท์ + IV + gmf/EM ของไม้จริงวันนี้
         notify(oldKeys); O.markDirty();
       }
     } catch (e) {} finally { busy = false; }
@@ -295,6 +296,20 @@
     ivs.set(id, { iv: r1(iv), d1: i1 === null ? null : r1(iv - i1), d3: i3 === null ? null : r1(iv - i3) });
   }
 
+  // ---------- gmf itd + Expected Move ตอนเข้าไม้ (V4.9.92, เก็บข้อมูล forward test แยกชุด) ----------
+  // จาก live.js (OILive.calc): gmf itd สด (สเกลเดียวกับกราฟ) + EM ($) · emUse = |ราคาเข้า − ราคาเปิด 06:00| ÷ EM
+  // แบ็กเทส 28 ไม้: ใต้ flip RR1 ชนะ 94% / เหนือ flip RR5 ดีกว่า · ใช้ EM ไม่ถึงครึ่ง RR1 ชนะ 89% · ยังไม่ใช้ตัดไม้ แค่บันทึก
+  const gxs = new Map();
+  function gxSnap(s, open06) {
+    const id = key(s); if (gxs.has(id)) return;
+    const L = window.OILive, c = L && L.calc; if (!c || !c.match) return;
+    const ms = (s.t0 - 7 * 3600) * 1000, late = Date.now() - ms > 10 * 60e3;
+    let gmf = c.gmf; const h = (L.hist || []).filter(x => x[0] <= ms + 60e3).pop(); if (h && ms - h[0] < 5 * 60e3) gmf = h[1]; // ค่าใกล้เวลาแตะที่สุดถ้ามี
+    const em = c.em > 0 ? c.em : null, r2x = x => Math.round(x * 100) / 100;
+    gxs.set(id, { gmf: gmf === null || gmf === undefined ? null : r2x(gmf), above: gmf == null ? null : s.entry > gmf, dist: gmf == null ? null : r2x(s.entry - gmf),
+      em: em === null ? null : r2x(em), emUse: em && open06 ? r2x(Math.abs(s.entry - open06) / em) : null, late });
+  }
+
   // ---------- โมเมนตัมสด: ราคากำลังพุ่งเข้าหาเส้นไหน (ใช้แท่งที่ปิดแล้ว) ----------
   function liveMom() {
     const n = bars.length; if (n < ATR_N + MOM_N + 3) return null; // V4.9.80: คิดได้แม้ไม่มีเส้น (ตลาดปิด)
@@ -365,5 +380,5 @@
     });
   }
   if (window.OIAlerts) OIAlerts.reg('sfade', '🌏 OI Session Fade (เข้า/ออกไม้จริง)', { desc: 'Asia เช้า + London · เตือนตอนแตะกำแพงแล้วเข้าไม้ และตอนถึง TP/SL', active: isOn });
-  window.OI_sfade = { RRS, view, stats, scan, fpOf: s => fp.get(key(s)), FP_MAX, _fpFetch: fpFetch, ivOf: s => ivs.get(key(s)), IV_D3_MAX, _ivSnap: ivSnap, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
+  window.OI_sfade = { RRS, view, stats, scan, fpOf: s => fp.get(key(s)), FP_MAX, _fpFetch: fpFetch, ivOf: s => ivs.get(key(s)), IV_D3_MAX, gxOf: s => gxs.get(key(s)), _gxSnap: gxSnap, _ivSnap: ivSnap, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
 })();

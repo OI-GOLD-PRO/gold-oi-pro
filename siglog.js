@@ -76,6 +76,17 @@
             evidence: iv.d3 === null ? 'IV ไม่มีค่า 3ชม.' : fast ? `IV ขึ้นเร็ว (>+${F.IV_D3_MAX}/3ชม.)` : 'IV ปกติ',
             status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
         });
+        // V4.9.92: ชุดแยก "🌏 OSF+GEX" (ไม้จริงเท่านั้น) — ราคาเข้าเทียบ gmf itd + ใช้ EM ไปแล้วกี่เท่า · id ขึ้นต้น SFG| · evidence = เหนือ/ใต้ flip · EM น้อย/มาก
+        const gx = s.real && F.gxOf ? F.gxOf(s) : null;
+        if (gx) (F.RRS || [1]).forEach(rr => {
+          const v = s.v && s.v[rr]; if (!v) return;
+          const pos = gx.above === null ? 'ไม่มี gmf' : gx.above ? 'เหนือ flip' : 'ใต้ flip', emT = gx.emUse === null ? 'ไม่มี EM' : gx.emUse < 0.5 ? 'EM<0.5' : 'EM≥0.5';
+          out.push({ id: `SFG|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OSF+GEX RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+            sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: gx.emUse,
+            reason: `gmf ${gx.gmf === null ? '-' : gx.gmf} (ราคา${gx.dist === null ? '-' : (gx.dist >= 0 ? '+' : '') + gx.dist}$) · EM ${gx.em === null ? '-' : gx.em}$ · ใช้ไป ${gx.emUse === null ? '-' : gx.emUse} EM${gx.late ? ' · บันทึกช้า' : ''} · ${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k}`,
+            evidence: `${pos} · ${emT}`,
+            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
+        });
       });
     } catch (e) {}
     return out;

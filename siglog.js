@@ -51,10 +51,18 @@
           const v = s.v && s.v[rr]; if (!v) return;
           out.push({ id: `SF|1m|${B[s.ei].time}|${s.z.k}|${s.S.id}${s.k}|R${rr}`, ind: `🌏 OI Session Fade RR${rr}` + (s.real ? '' : ' (บันทึก)'), side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
             sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(s.sl), tp1: r2(v.tp), tp2: null, risk: r2(s.R), score: null,
-            reason: `${s.S.lab} · แตะครั้งที่ ${s.k} · ${s.z.side}${s.z.k} เกรด ${s.z.grade} · โซน ±${s.S.half} · พุ่ง ${s.mv === null ? '-' : s.mv}×ATR · TP RR${rr}`,
+            reason: `${s.S.lab} · ${s.bo ? `เบรก M5 +${s.brk}$` : `แตะครั้งที่ ${s.k}`} · ${s.z.side}${s.z.k} เกรด ${s.z.grade} · โซน ±${s.S.half} · พุ่ง ${s.mv === null ? '-' : s.mv}×ATR · TP RR${rr}`,
             evidence: s.real ? 'ไม้จริง v0.6' : s.fast ? 'ไม้บันทึก v0.6 (กรองพุ่ง)' : 'ไม้บันทึก v0.6',
             status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
         });
+        // V4.9.94: ชุดแยก "🌏 NY Breakout" — ไม้เบรก NY ทุกไม้ บันทึกทั้ง SL ขอบอีกฝั่ง (E) และ SL กลางโซน (M) × RR 1/1.6/5 · id ขึ้นต้น SFB|
+        if (s.bo) [['E', 'ขอบ', s.sl, s.v], ['M', 'กลาง', s.slMid, s.vm]].forEach(([cd, nm, sl, V]) => (F.RRS || [1]).forEach(rr => {
+          const v = V && V[rr]; if (!v) return;
+          out.push({ id: `SFB|1m|${B[s.ei].time}|${s.z.k}|${cd}|R${rr}`, ind: `🌏 NY Breakout SL${nm} RR${rr}`, side: s.dir > 0 ? 'BUY' : 'SELL', tf: 'M1',
+            sig_th: th(B[s.ei].time), entry: r2(s.entry), sl: r2(sl), tp1: r2(v.tp), tp2: null, risk: r2(Math.abs(s.entry - sl)), score: s.brk,
+            reason: `NY เบรก M5 พ้นขอบ +${s.brk}$ · ${s.z.side}${s.z.k} · SL ${nm}โซน · TP RR${rr}`, evidence: `NY Breakout SL${nm}`,
+            status: SS[v.st] || 'open', exit_th: v.end !== undefined ? th(B[v.end].time) : '', result_r: v.res !== undefined ? v.res : null });
+        }));
         // V4.9.84: ชุดแยก "🌏 OSF+Δ5" (ไม้จริงเท่านั้น) — ฟุตปริ้นท์ Δ5 จาก Binance taker ก่อนแตะ · id ขึ้นต้น SFD| ไม่ปนชุด v0.6 · evidence = ผ่าน/ไม่ผ่าน Δ5
         const f = s.real && F.fpOf ? F.fpOf(s) : null;
         if (f && !f.err) (F.RRS || [1]).forEach(rr => {

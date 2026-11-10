@@ -676,8 +676,28 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.106';
+  const APP_VER = '4.9.107';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
+  // V4.9.107: เช็กเวอร์ชันบนเว็บ (ตอนเปิด / กลับเข้าแอป / ทุก 15 นาที) → ถ้าใหม่กว่า โหลดใหม่แบบเลี่ยงแคช (กัน iPhone ค้างเวอร์ชันเก่า)
+  (() => {
+    const num = v => String(v).split('.').map(Number).reduce((a, x) => a * 1000 + (x || 0), 0);
+    let busy = false, last = 0;
+    async function chk() {
+      if (busy || Date.now() - last < 60e3 || !navigator.onLine) return;
+      busy = true; last = Date.now();
+      try {
+        const t = await (await fetch(location.pathname + '?vc=' + Date.now(), { cache: 'no-store' })).text();
+        const m = t.match(/const APP_VER = '([\d.]+)'/), v = m && m[1];
+        if (v && num(v) > num(APP_VER)) {
+          const k = 'oi_vc_' + v; if (sessionStorage.getItem(k)) return; // กันวนโหลด
+          sessionStorage.setItem(k, '1');
+          location.replace(location.pathname + '?v=' + v + location.hash);
+        }
+      } catch (e) {} finally { busy = false; }
+    }
+    setTimeout(chk, 4000); setInterval(chk, 15 * 60e3);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') chk(); });
+  })();
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5)
   // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5
   const zoneHalf = () => {

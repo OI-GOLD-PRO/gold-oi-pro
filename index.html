@@ -676,7 +676,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.103';
+  const APP_VER = '4.9.104';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5)
   // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5
@@ -886,7 +886,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   // ---------- overlay แท่ง OI ----------
   const ov = $('ov'), ctx = ov.getContext('2d');
   let dirty = true, lastKey = '';
-  { let zh0 = null; setInterval(() => { const z = zoneHalf(); if (z !== zh0) { zh0 = z; dirty = true; } }, 30000); } // เปลี่ยนช่วงเวลา → วาดโซนใหม่
+  { let zh0 = null; setInterval(() => { const z = zoneHalf(); if (z !== zh0) { zh0 = z; dirty = true; } }, 10000); } // เปลี่ยนช่วงเวลา → วาดโซนใหม่ (V4.9.104: เช็กทุก 10 วิ)
   const overlayHooks = []; const bgHooks = []; // V4.9.20 ชั้นใต้แถบ OI // ส่วนเสริม (เช่น goldscalp.js) วาดทับกราฟได้
   window.OIHistoryZonesRedraw = () => { dirty = true; };
   window.OIHistoryZonesWide=()=>{ document.querySelector('.tfs button[data-tf="1H"]')?.click(); const b=[...document.querySelectorAll('.tfs button')].find(b=>b.textContent.trim()==='H1');b?.click();setTimeout(()=>{chart.timeScale().fitContent();dirty=true;},2500); };
@@ -1962,13 +1962,13 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     if (SYM !== 'gold' || liveBusy || !prov || !oi) return;
     liveBusy = true;
     try {
-      const rows = await fetchBars(prov, '1m', 400);
+      const rows = await fetchBars(prov, '1m', 60); // V4.9.104: ใช้แค่แท่งล่าสุด (เรียกทุก 10 วิ)
       const pm = new Map(rows.map(k => [Math.floor(k[0] / 1000), k[4]])); // ราคาปิดแท่ง M1 ของ perp
       const nowS = Date.now() / 1000;
       let gfOk = false;
       // หลัก: Gold.F (BlackBull, เรียลไทม์) จับคู่แท่ง M1 ที่ปิดแล้ว 5 แท่งล่าสุด ใช้ค่ากลาง (median) → ไม่ดีเลย์แบบ Yahoo
       try {
-        const g = await fetch(`${GC_WORKER}/gf?t=${Math.floor(Date.now() / 20000)}`, { cache: 'no-store' });
+        const g = await fetch(`${GC_WORKER}/gf?t=${Math.floor(Date.now() / 10000)}`, { cache: 'no-store' });
         const gb = g.ok ? ((await g.json()).bars || []) : [];
         gfOk = gb.length > 0;
         const d = [];
@@ -2006,7 +2006,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     } catch (e) {}
     finally { liveBusy = false; }
   }
-  setInterval(pairYahoo, 60000); setTimeout(pairYahoo, 5000);
+  setInterval(pairYahoo, 10000); setTimeout(pairYahoo, 3000); // V4.9.104: offset ทุก 10 วิ (เดิม 60 วิ)
   // (เดิม) คำนวณ offset ใหม่: GC ประมาณ = spot ล่าสุด + carry → offset = GC − perp (ปิดใช้งาน)
   function refreshAdj(force) {
     return; // ปิดการลอยตาม spot/carry: offset ล็อกตามชีต

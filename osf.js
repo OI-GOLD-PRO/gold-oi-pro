@@ -337,13 +337,13 @@
         ctx.shadowBlur = 0; ctx.fillStyle = '#f2a900'; ctx.textAlign = 'right'; ctx.fillText(`🌏A ${z.side}${z.k}`, plotW - 6, Math.round(y1) - 6); ctx.restore();
       });
     }
-    // V4.9.102: โซนที่ระบบกลางตั้ง Limit ไม้จริงรออยู่ + ราคาห่างขอบเข้า ≤ $0.5 → กะพริบ (หยุดเมื่อแตะโซน/ถอยห่าง)
+    // V4.9.102: โซนที่ระบบกลางตั้ง Limit ไม้จริงรออยู่ + ราคาห่างขอบเข้า ≤ $0.5 → กะพริบ · V4.9.103: อยู่ในกรอบแล้วกะพริบต่อ (หยุดเมื่อออกจากกรอบ/ถอยห่าง)
     nearZones = [];
     if (shared?.ready && shared.until + 60 > Date.now() / 1000 && O.lastClose != null) { // แผนเปลี่ยนเฉพาะตอนแท่งปิด → ใช้ต่อได้ระหว่างรอดึงรอบถัดไป
       const SN = SESS.find(x => x.id === shared.session);
       if (SN && SN.real) shared.plans.filter(q => q[5] === 1).forEach(q => {
         const [k, side, grade, dir, touch, , entry] = q, d = dir > 0 ? O.lastClose - entry : entry - O.lastClose;
-        if (d < 0 || d > NEAR) return;
+        if (d < -2 * SN.half - 0.01 || d > NEAR) return; // V4.9.103: กะพริบต่อขณะราคาอยู่ในกรอบ (เดิมหยุดทันทีที่แตะ)
         nearZones.push(k);
         const y1 = Y(k + SN.half), y2 = Y(k - SN.half); if (y1 === null || y2 === null || y2 < 0 || y1 > plotH) return;
         const ph = (Math.sin(Date.now() / 800 * Math.PI) + 1) / 2, col = grade === 'A' ? '#f2a900' : '#7fd0ff';
@@ -351,7 +351,7 @@
         ctx.globalAlpha = 0.12 + 0.38 * ph; ctx.fillStyle = col; ctx.fillRect(0, y1, plotW, Math.max(2, y2 - y1));
         ctx.globalAlpha = 0.5 + 0.5 * ph; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(1, Math.round(y1) + .5, plotW - 2, Math.max(2, Math.round(y2 - y1)));
         ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.textAlign = 'center';
-        ctx.fillText(`🌏 ${dir > 0 ? 'BUY' : 'SELL'} รอ ${entry.toFixed(1)} · ${side}${k} ครั้งที่ ${touch} · ห่าง ${d.toFixed(2)}$`, plotW / 2, dir > 0 ? Math.round(y1) - 7 : Math.round(y2) + 8);
+        ctx.fillText(`🌏 ${dir > 0 ? 'BUY' : 'SELL'} รอ ${entry.toFixed(1)} · ${side}${k} ครั้งที่ ${touch} · ${d < 0 ? 'ราคาอยู่ในกรอบ' : 'ห่าง ' + d.toFixed(2) + '$'}`, plotW / 2, dir > 0 ? Math.round(y1) - 7 : Math.round(y2) + 8);
         ctx.restore();
       });
     }

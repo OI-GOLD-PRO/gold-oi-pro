@@ -676,7 +676,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.102';
+  const APP_VER = '4.9.103';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   const ZONE_HALF = SC.zone; // ครึ่งความกว้างโซนกำแพง OI ต่อสัญลักษณ์ (ทอง ±2.5 = $5)
   // V4.9.74: ทอง = ความกว้างโซนตามช่วงเวลา (ตรงกับ 🌏 OI Session Fade / แบ็กเทส) · Asia เช้า 06–10 ±2 · Asia สาย 10–14 ±1 · London 14–19:30 ±1.5 · NY/กลางคืน ±1.5
@@ -926,7 +926,9 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     ctx.textAlign = 'left';
   }
 
+  let zoneFlashing = false, zfAt = 0;
   function drawOverlay() {
+    zoneFlashing = false;
     const w = chartEl.clientWidth, h = chartEl.clientHeight, dpr = window.devicePixelRatio || 1;
     if (ov.width !== Math.round(w * dpr) || ov.height !== Math.round(h * dpr)) {
       ov.width = Math.round(w * dpr); ov.height = Math.round(h * dpr);
@@ -1093,6 +1095,14 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
           ctx.fillRect(0, Math.min(yTop, yBot), plotW, Math.abs(yBot - yTop)); // สีเข้มตามอันดับ OI
         }
         if (SC.note === 'GC' ? top3 : rk <= 5) { ctx.globalAlpha = .95 - .28 * rankT; ctx.lineWidth = 2; ctx.strokeStyle = wallC; hline(0, plotW); }
+        // V4.9.103: ราคาอยู่ในกรอบโซน OI → กรอบกระพริบ (เรืองแสงเป็นจังหวะ) จนกว่าราคาจะออกจากกรอบ
+        if (lastClose !== null && lastClose >= r.price - half && lastClose <= r.price + half && yTop !== null && yBot !== null) {
+          const ph = 0.5 + 0.5 * Math.sin(Date.now() / 160), y0 = Math.min(yTop, yBot), hh = Math.max(2, Math.abs(yBot - yTop));
+          zoneFlashing = true;
+          ctx.save(); ctx.globalAlpha = 0.12 + 0.30 * ph; ctx.fillStyle = wallC; ctx.fillRect(0, y0, plotW, hh);
+          ctx.globalAlpha = 0.45 + 0.55 * ph; ctx.lineWidth = 2; ctx.strokeStyle = '#ffd36b'; ctx.shadowColor = 'rgba(255,211,107,.9)'; ctx.shadowBlur = 4 + 10 * ph;
+          ctx.strokeRect(1, Math.round(y0) + .5, plotW - 2, Math.round(hh)); ctx.restore();
+        }
       }
       // Volume วันนี้ 5 อันดับ: เส้นทึบสีเหลืองจากขอบซ้ายถึงขอบขวาของกราฟ (เต็มจอ)
       if (oi.topV && oi.topV.includes(r.strike)) {
@@ -1382,6 +1392,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     const ref = oi && oi.rows.length && oi.offset !== null ? oi.rows[0].price : 0;
     const lr = chart.timeScale().getVisibleLogicalRange();
     const key = [chartEl.clientWidth, chartEl.clientHeight, chart.timeScale().width(), series.priceToCoordinate(ref), series.priceToCoordinate(ref + 50), lr ? lr.from.toFixed(2) + ',' + lr.to.toFixed(2) : ''].join('|');
+    if (zoneFlashing && Date.now() - zfAt > 50) { dirty = true; zfAt = Date.now(); } // V4.9.103 กรอบกระพริบ ~20 เฟรม/วิ
     if (dirty || key !== lastKey) { drawOverlay(); lastKey = key; dirty = false; }
     requestAnimationFrame(loop);
   }
@@ -2929,7 +2940,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   <p id="sfDetailsStatus"></p>
   <p id="sfDetailsRisk"></p>
 </dialog>
-<script src="osf.js?v=41002"></script>
+<script src="osf.js?v=41003"></script>
 <script src="squeeze.js?v=40316"></script>
 <script src="trap.js?v=40929"></script>
 <script src="volreg.js?v=40929"></script>

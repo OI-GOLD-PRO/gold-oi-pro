@@ -393,7 +393,16 @@
     ctx.globalAlpha = 1;
     // ไม้จริงที่ยังเปิดอยู่: ราคาเข้า / SL / TP ที่ขอบขวา
     if (fresh()) today.filter(s => s.real && s.st === 3).forEach(s => {
-      const line = (p, col, lab) => { const y = Y(p); if (y === null || y < 0 || y > plotH) return; ctx.fillStyle = col; ctx.textAlign = 'right'; ctx.fillText(lab, plotW - 4, y - 6); };
+      // V4.9.108: ป้ายมีพื้นทึบ + หลบป้าย 🌏A ของโซนที่อยู่ระดับเดียวกัน (เดิมซ้อนกันอ่านไม่ออก)
+      const Sx = sessOf(s.t0) || s.S, hz = Sx && Sx.half ? Sx.half : 1.5;
+      const aY = (lv || []).filter(z => z.grade === 'A').map(z => Y(z.k + hz)).filter(y => y !== null);
+      const line = (p, col, lab) => {
+        let y = Y(p); if (y === null || y < 0 || y > plotH) return; y = Math.round(y) - 6;
+        if (aY.some(a => Math.abs(a - 6 - y) < 15)) y -= 18; // ป้ายโซนเกรด A อยู่ตรงนี้ → ยกขึ้นอีกบรรทัด
+        const w = ctx.measureText(lab).width + 10;
+        ctx.fillStyle = 'rgba(11,16,30,.86)'; ctx.fillRect(plotW - 4 - w, y - 13, w, 17);
+        ctx.fillStyle = col; ctx.textAlign = 'right'; ctx.fillText(lab, plotW - 9, y);
+      };
       line(s.entry, '#7fd0ff', `🌏 ${s.dir > 0 ? 'BUY' : 'SELL'} ${s.entry.toFixed(1)} · ${s.z.side}${s.z.k} ครั้งที่ ${s.k}`);
       line(s.sl, '#ff4d6a', `SL ${s.sl.toFixed(1)}`); (s.bo ? [1] : RRS).forEach(rr => line(s.v[rr].tp, '#22e39a', `TP ${rr}R ${s.v[rr].tp.toFixed(1)}${s.v[rr].st === 4 ? ' ✓' : ''}`));
     });

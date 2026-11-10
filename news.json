@@ -15,7 +15,9 @@
       "i": "H",
       "title": "Core CPI m/m",
       "forecast": "0.2%",
-      "previous": "0.3%"
+      "previous": "0.3%",
+      "actual": "0.3%",
+      "better": true
     },
     {
       "date": "2026-11-10T08:30:00-05:00",
@@ -23,7 +25,9 @@
       "i": "H",
       "title": "CPI m/m",
       "forecast": "0.3%",
-      "previous": "0.6%"
+      "previous": "0.6%",
+      "actual": "0.4%",
+      "better": true
     },
     {
       "date": "2026-11-12T08:30:00-05:00",

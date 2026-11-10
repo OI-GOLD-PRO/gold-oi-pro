@@ -71,7 +71,8 @@
       const r=oi&&oi.rows?oi.rows.find(x=>x.strike===k):null;
       const rC=r&&r.c>0?(oi.rankC.get(k)||0):0,rP=r&&r.p>0?(oi.rankP.get(k)||0):0;
       const useC=rC&&(!rP||r.c>=r.p),rk=useC?rC:rP,z=lv.find(x=>x.k===k);
-      t.innerHTML=(rk?`<b class="${useC?'c':'p'}">${useC?'C':'P'}#${rk}</b>`:'')+(z?`<i class="g${z.grade}">🌏${z.grade}</i>`:'');
+      let tc='';try{const q=z&&window.OI_sfade&&OI_sfade.touchOf?OI_sfade.touchOf(k):null;if(q&&q.live){const st=!q.quota?'นอกช่วง':q.k>=q.quota?'ครบ':'',cl=st?'off':'ok';tc=`<em class="v34tc ${cl}"><span>${q.quota?`แตะ ${q.k}/${q.quota}`:`แตะ ${q.k}`}${st?' · '+st:''}</span>${q.arm&&q.quota&&q.k<q.quota?`<span class="${q.arm>0?'b':'s'}">รอ ${q.arm>0?'BUY ▲':'SELL ▼'}</span>`:''}</em>`;}}catch(e){}
+      t.innerHTML=(rk?`<b class="${useC?'c':'p'}">${useC?'C':'P'}#${rk}</b>`:'')+(z?`<i class="g${z.grade}">🌏${z.grade}</i>`:'')+tc;
     });
   }
   setInterval(()=>{if(!sheet.hidden){placeNow(false);tagRows();}},3000);

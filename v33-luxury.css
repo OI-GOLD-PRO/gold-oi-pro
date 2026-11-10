@@ -241,3 +241,10 @@ body{padding-bottom:0!important}
 #v34oiChart .v34tag b.p{background:#c23552}
 #v34oiChart .v34tag i{font-style:normal;color:#7fd0ff;font-weight:700}
 #v34oiChart .v34tag i.gA{color:#1a1200;background:#f2a900;padding:0 5px;border-radius:6px;box-shadow:0 0 6px rgba(242,169,0,.55)} /* V4.9.88 เกรด A ป้ายทึบสีทองเข้ม */
+
+/* V4.9.105 ตัวนับแตะ 🌏 oi ss ช่วงปัจจุบัน + สถานะรอ */
+#v34oiChart .v34tag em.v34tc{font-style:normal;display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:6px}
+#v34oiChart .v34tag em.v34tc.ok{color:#f2c14e;border:1px solid rgba(242,169,0,.6)}
+#v34oiChart .v34tag em.v34tc.off{color:#8a93a8;border:1px solid rgba(138,147,168,.4)}
+#v34oiChart .v34tag em.v34tc span.b{color:#22e39a}
+#v34oiChart .v34tag em.v34tc span.s{color:#ff4d6a}

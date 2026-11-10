@@ -524,5 +524,15 @@
     });
   }
   if (window.OIAlerts) OIAlerts.reg('sfade', '🌏 OI Session Fade (เข้า/ออกไม้จริง)', { desc: 'Asia เช้า + London · เตือนตอนแตะกำแพงแล้วเข้าไม้ และตอนถึง TP/SL', active: isOn });
-  window.OI_sfade = { RRS, view, stats, scan, fpOf: s => fp.get(key(s)), FP_MAX, _fpFetch: fpFetch, ivOf: s => ivs.get(key(s)), IV_D3_MAX, gxOf: s => gxs.get(key(s)), _gxSnap: gxSnap, _ivSnap: ivSnap, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
+  // V4.9.105: ตัวนับแตะ/สถานะรอของเส้นในช่วงปัจจุบัน (จาก counters ของระบบกลาง) — ใช้ในหน้า OI / Gamma
+  function touchOf(k) {
+    const now = Date.now() / 1000, nowT = now + 7 * 3600, S = sessOf(nowT); // แอปใช้เวลาไทยแบบเลื่อน +7 ชม. · ระบบกลางใช้ UTC
+    if (!S) return null;
+    const z = (lv || []).find(x => x.k === k); if (!z) return null;
+    const quota = S.real ? (S.realA && z.grade === 'A' ? S.realA : S.real) : 0;
+    const C = shared?.counters, fresh = C && shared.day + 7 * 3600 === dayStart(nowT) && shared.bar > now - 180;
+    const c = fresh && C.session === S.id ? C.c[k] || C.c[String(k)] : null;
+    return { sess: S.id, lab: S.lab, quota, k: c ? c[1] : 0, arm: c ? c[0] : 0, live: !!fresh };
+  }
+  window.OI_sfade = { touchOf, RRS, view, stats, scan, fpOf: s => fp.get(key(s)), FP_MAX, _fpFetch: fpFetch, ivOf: s => ivs.get(key(s)), IV_D3_MAX, gxOf: s => gxs.get(key(s)), _gxSnap: gxSnap, _ivSnap: ivSnap, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
 })();

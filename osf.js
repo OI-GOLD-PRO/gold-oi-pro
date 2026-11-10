@@ -510,7 +510,7 @@
   function section() {
     const d = document.createElement('div'); d.id = 'sfBox'; d.className = 'gsbox';
     d.innerHTML = `<div class="row"><button class="gsb${isOn() ? ' on' : ''}" data-sf="on"><i style="background:#7fd0ff"></i>🌏 OI Session Fade v0.6</button><span class="gsinfo">${isOn() ? '' : 'Asia เช้า + London สวนกำแพง · NY เบรก'}</span></div>` + (isOn() ? `<div class="row ps"><span class="gsinfo" style="display:block;line-height:1.55;white-space:normal">${stats()}</span></div>` : '') +
-      (isOn() ? `<div class="row ps"><button class="gsb" data-sf="reload">↻ โหลดแบ็กเทสใหม่</button></div><div class="row ps"><span class="gsinfo">TP บนกราฟ:</span>${RRS.map(rr => `<button class="gsb${cfg.rr === rr ? ' on' : ''}" data-sf="rr" data-rr="${rr}">RR ${rr}</button>`).join('')}</div>` : '');
+      (isOn() ? `<div class="row ps"><button class="gsb" data-sf="plan" style="border-color:#f2a900;color:#ffd66e">📋 แผนตอนนี้</button></div><div class="row ps"><button class="gsb" data-sf="reload">↻ โหลดแบ็กเทสใหม่</button></div><div class="row ps"><span class="gsinfo">TP บนกราฟ:</span>${RRS.map(rr => `<button class="gsb${cfg.rr === rr ? ' on' : ''}" data-sf="rr" data-rr="${rr}">RR ${rr}</button>`).join('')}</div>` : '');
     return d;
   }
   function mount() { const m = $('indMenu'); if (!m || m.hidden || $('sfBox')) return; const box = section(), anchor = $('s3Box') || $('dhBox') || $('btBox') || m.querySelector('.t'); anchor ? anchor.after(box) : m.prepend(box); }
@@ -519,11 +519,94 @@
     new MutationObserver(() => mount()).observe(menu, { childList: true });
     menu.addEventListener('click', e => {
       const a = e.target.closest('[data-sf]'); if (!a) return;
+      if (a.dataset.sf === 'plan') { openPlan(); return; }
       if (a.dataset.sf === 'on') cfg.on = !isOn(); else if (a.dataset.sf === 'rr') { cfg.rr = +a.dataset.rr; setups.forEach(view); } else if (a.dataset.sf === 'reload') { histAt = 0; m1Cache.forEach((v, k) => { if (!v) m1Cache.delete(k); }); } else return;
       save(); O.markDirty(); const b = $('sfBox'); if (b) b.remove(); mount(); run(true);
     });
   }
   if (window.OIAlerts) OIAlerts.reg('sfade', '🌏 OI Session Fade (เข้า/ออกไม้จริง)', { desc: 'Asia เช้า + London · เตือนตอนแตะกำแพงแล้วเข้าไม้ และตอนถึง TP/SL', active: isOn });
+  // ---------- V4.9.106: 📋 แผนตอนนี้ (แดชบอร์ด oi ss) ----------
+  const hm = t => { const m = mod(t); return String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+  const dur = sec => { sec = Math.max(0, Math.round(sec / 60)); const h = Math.floor(sec / 60), m = sec % 60; return (h ? h + ' ชม. ' : '') + m + ' นาที'; };
+  const f1 = x => x.toFixed(1), sg = x => (x > 0 ? '+' : '') + x.toFixed(1);
+  let planTimer = null;
+  function planHTML() {
+    const now = Date.now() / 1000, nowT = now + THAI, S = sessOf(nowT), m = mod(nowT), d0 = dayStart(nowT), P = O.lastClose;
+    const open = fresh(), rr = cfg.rr;
+    const C = (t, x) => `<span style="color:${t}">${x}</span>`;
+    const G = '#22e39a', Rd = '#ff4d6a', Au = '#ffd66e', Mu = '#8fa3c8', Bl = '#7fd0ff';
+    const h = [];
+    // 1) สถานะตอนนี้
+    const realS = [{ id: 'AM', lab: 'Asia เช้า สวนกำแพง', a: 360, b: 600 }, { id: 'LDN', lab: 'London สวนกำแพง', a: 840, b: 1170 }, { id: 'NYB', lab: 'NY เบรก', a: 1170, b: 1380 }];
+    const cur = realS.find(x => m >= x.a && m < x.b), nxt = realS.find(x => m < x.a) || realS[0];
+    const nxtIn = ((nxt.a - m + 1440) % 1440) * 60;
+    const nb = news.filter(n => nowT >= n - NB && nowT <= n + NA)[0];
+    const mm = liveMom();
+    h.push(`<div class="sp-card"><div class="sp-h">สถานะตอนนี้ · ${hm(nowT)} น.</div>`
+      + (!open ? C(Mu, 'ตลาดปิด / ไม่มีแท่งล่าสุด') : cur ? `${C(Au, '● ' + cur.lab)} · เหลือ ${dur((cur.b - m) * 60)}` : `${C(Mu, '○ ' + (S ? S.lab : '') + ' ไม่มีไม้จริง')}`)
+      + `<br>ถัดไป: ${cur && cur.id !== nxt.id ? '' : ''}${nxt.lab} ${hm(nxt.a * 60)} น. (อีก ${dur(nxtIn)})`
+      + (mm ? `<br>⚡ ${mm.dn ? 'ลง' : 'ขึ้น'} ${mm.mv}×ATR (${mm.usd}$/5น.) ${mm.mv > MOM_MAX ? C(Rd, cur && cur.id === 'AM' ? '· เกิน 3×ATR ข้ามไม้' : '· เกิน 3×ATR') : C(G, '· ปกติ')}` : '')
+      + `<br>${nb ? C(Rd, `⛔ ช่วงข่าวแดง ${hm(nb)} น. ห้ามเข้าถึง ${hm(nb + NA)} น.`) : C(G, '✓ ไม่ติดข่าว')}`
+      + (P != null ? `<br>ราคาตอนนี้ ${C('#fff', f1(P))}` : '') + `</div>`);
+    // 2) ตารางเส้น
+    const plans = sharedReady() ? shared.plans.filter(q => q[5] === 1) : [];
+    const half = S ? S.half : 1.5;
+    const rows = (lv || []).slice().sort((a, b) => P == null ? a.k - b.k : Math.abs(a.p - P) - Math.abs(b.p - P)).map(z => {
+      const q = touchOf(z.k) || { quota: 0, k: 0, arm: 0, live: false };
+      const lo = z.p - half, hi = z.p + half, dist = P == null ? null : P > hi ? P - hi : P < lo ? lo - P : 0;
+      let st, plan = '';
+      if (!S || !S.real) {
+        const NS = SESS.find(x => x.id === (nxt.id === 'NYB' ? 'AM' : nxt.id)), nh = NS.half, nq = NS.realA && z.grade === 'A' ? NS.realA : NS.real;
+        st = C(Mu, `นอกช่วงไม้จริง · ${NS.lab} โซน ${f1(z.p - nh)}–${f1(z.p + nh)} โควตา ${nq} ครั้ง`);
+        if (P != null && Math.abs(P - z.p) > nh) {
+          const dir = P > z.p ? 1 : -1, en = z.k + dir * nh, sl = z.k - dir * (nh + SLB), R_ = Math.abs(en - sl);
+          plan = `<div class="sp-plan">${C(Mu, `ถ้าตั้งรอตอน ${NS.lab}: `)}${dir > 0 ? 'BUY' : 'SELL'} LIMIT <b>${f1(en)}</b> · SL ${C(Rd, f1(sl))} (${f1(R_)}$) · TP ${rr}R ${C(G, f1(en + dir * rr * R_))}</div>`;
+        }
+      }
+      else if (q.k >= q.quota) st = C(Mu, `ครบโควตา (${q.k}/${q.quota})`);
+      else if (!q.arm) st = C(Mu, `ยังไม่ตั้งรอ · ต้องปิด${P != null && P < z.p ? 'ใต้' : 'เหนือ'}โซนเกิน 3$`);
+      else {
+        const dir = q.arm, pl = plans.find(x => x[0] === z.k && x[3] === dir);
+        const en = pl ? pl[6] : z.k + dir * half, sl = pl ? pl[7] : z.k - dir * (half + SLB), R_ = Math.abs(en - sl), tp = en + dir * rr * R_;
+        const gap = P == null ? null : (P - en) * dir;
+        st = C(dir > 0 ? G : Rd, `รอ ${dir > 0 ? 'BUY ▲' : 'SELL ▼'}`) + (gap != null ? ` · ห่าง ${f1(Math.max(0, gap))}$` : '') + (!pl && sharedReady() ? C(Mu, ' (ระบบกลางไม่วาง: ข่าว/พุ่ง)') : '');
+        plan = `<div class="sp-plan">${dir > 0 ? 'BUY' : 'SELL'} LIMIT <b>${f1(en)}</b> · SL ${C(Rd, f1(sl))} (${f1(R_)}$) · TP ${rr}R ${C(G, f1(tp))}</div>`;
+      }
+      return `<div class="sp-row"><div><b class="${z.side === 'C' ? 'sp-c' : 'sp-p'}">${z.side}${z.k}</b> <i class="sp-g${z.grade}">🌏${z.grade}</i> <span class="sp-mu">${S && S.real ? `โซน ${f1(lo)}–${f1(hi)} · แตะ ${q.k}/${q.quota}` : ''}${dist != null ? ` · ห่าง ${f1(dist)}$` : ''}</span></div><div>${st}</div>${plan}</div>`;
+    });
+    h.push(`<div class="sp-card"><div class="sp-h">เส้นของวัน (เรียงจากใกล้ราคา) · TP ใช้ RR ${rr}</div>${rows.length ? rows.join('') : C(Mu, 'ยังไม่มีเส้น (รอ 06:00 / รอข้อมูลกลาง)')}</div>`);
+    // 3) ไม้ที่เปิดอยู่
+    const op = today.filter(x => x.real && x.st === 3);
+    h.push(`<div class="sp-card"><div class="sp-h">ไม้ที่เปิดอยู่ (${op.length})</div>` + (op.length ? op.map(x => {
+      const R_ = Math.abs(x.entry - x.sl), pn = P == null ? 0 : (P - x.entry) * x.dir;
+      return `<div class="sp-row"><div>${C(x.dir > 0 ? G : Rd, x.dir > 0 ? 'BUY' : 'SELL')} ${x.bo ? 'NY เบรก' : x.S.lab} ${x.z.side}${x.z.k} · เข้า ${hm(x.t0)} น.</div><div>เข้า <b>${f1(x.entry)}</b> · SL ${C(Rd, f1(x.sl))} · TP ${x.bo ? 1 : rr}R ${C(G, f1(x.tp))}</div><div>ตอนนี้ ${C(pn >= 0 ? G : Rd, `${sg(pn)}$ (${sg(pn / R_)}R)`)}</div></div>`;
+    }).join('') : C(Mu, 'ไม่มี')) + `</div>`);
+    // 4) NY เบรก
+    const used = new Set(today.filter(x => x.bo).map(x => x.z.k));
+    const nyRows = (lv || []).slice().sort((a, b) => b.k - a.k).map(z => used.has(z.k) ? `<div class="sp-row">${z.side}${z.k} ${C(Mu, '· เบรกไปแล้ววันนี้')}</div>`
+      : `<div class="sp-row">${z.side}${z.k} · BUY ถ้า M5 ปิด > ${C(G, f1(z.p + BO.half + BO_BUF))} · SELL ถ้าปิด &lt; ${C(Rd, f1(z.p - BO.half - BO_BUF))}</div>`);
+    h.push(`<div class="sp-card"><div class="sp-h">NY เบรก 19:30–23:00 (TP RR 1 · SL ขอบอีกฝั่ง)</div>${m >= 1170 && m < 1380 ? C(Au, '● กำลังทำงาน') : C(Mu, m < 1170 ? `เริ่ม 19:30 น. (อีก ${dur((1170 - m) * 60)})` : 'จบแล้ววันนี้')}${nyRows.join('')}</div>`);
+    // 5) ข่าวแดง
+    const nd = news.filter(n => n >= d0 && n < d0 + 86400);
+    h.push(`<div class="sp-card"><div class="sp-h">ข่าวแดง USD วันนี้</div>${nd.length ? nd.map(n => `<div class="sp-row">${hm(n)} น. · ห้ามเข้า ${hm(n - NB)}–${hm(n + NA)} ${nowT > n + NA ? C(Mu, '(ผ่านแล้ว)') : nowT >= n - NB ? C(Rd, '(ตอนนี้)') : ''}</div>`).join('') : C(Mu, 'ไม่มี')}</div>`);
+    // 6) สรุปวันนี้
+    const done = today.filter(x => x.real && x.st >= 4), tp = done.filter(x => x.pnl > 0).length;
+    const rsum = done.reduce((a, x) => a + (x.res || 0), 0), usd = done.reduce((a, x) => a + (x.pnl || 0), 0);
+    h.push(`<div class="sp-card"><div class="sp-h">สรุปวันนี้</div>ปิดแล้ว ${done.length} ไม้ · ${C(G, 'TP ' + tp)} · ${C(Rd, 'SL ' + (done.length - tp))} · ${C(rsum >= 0 ? G : Rd, `${sg(rsum)}R (${sg(usd)}$)`)}${op.length ? ` · เปิดอยู่ ${op.length}` : ''}</div>`);
+    return h.join('') + `<div class="sp-mu" style="text-align:center;margin:8px 0 2px">ข้อมูลจากระบบกลางชุดเดียวกับ EA · อัปเดตทุก 3 วิ</div>`;
+  }
+  function openPlan() {
+    let el = $('sfPlan');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'sfPlan';
+      el.innerHTML = `<style>#sfPlan{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}#sfPlan .sp-in{width:100%;max-height:86vh;overflow:auto;background:#0e1527;border-top:2px solid #f2a900;border-radius:18px 18px 0 0;padding:12px 12px calc(16px + env(safe-area-inset-bottom));font-size:13px;line-height:1.5;color:#dfe6f5}#sfPlan .sp-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}#sfPlan .sp-top b{color:#ffd66e;font-size:16px}#sfPlan .sp-x{background:#1c2640;border:0;color:#fff;border-radius:10px;padding:6px 12px;font-size:14px}#sfPlan .sp-card{background:#131c33;border:1px solid #26304a;border-radius:12px;padding:8px 10px;margin-bottom:8px}#sfPlan .sp-h{color:#ffd66e;font-weight:700;margin-bottom:4px}#sfPlan .sp-row{border-top:1px solid #1f2842;padding:5px 0}#sfPlan .sp-row:first-of-type{border-top:0}#sfPlan .sp-mu{color:#8fa3c8;font-size:12px}#sfPlan .sp-c{color:#22e39a}#sfPlan .sp-p{color:#ff4d6a}#sfPlan i{font-style:normal;font-weight:700}#sfPlan .sp-gA{color:#1a1200;background:#f2a900;border-radius:5px;padding:0 4px}#sfPlan .sp-gB{color:#7fd0ff}#sfPlan .sp-plan{margin-top:3px;padding:4px 8px;border-radius:8px;background:#0b1222;border:1px dashed #3a4a70}</style><div class="sp-in"><div class="sp-top"><b>📋 แผน 🌏 oi ss ตอนนี้</b><button class="sp-x">ปิด ✕</button></div><div class="sp-body"></div></div>`;
+      document.body.appendChild(el);
+      el.addEventListener('click', e => { if (e.target === el || e.target.closest('.sp-x')) closePlan(); });
+    }
+    const draw = () => { try { el.querySelector('.sp-body').innerHTML = planHTML(); } catch (e) { el.querySelector('.sp-body').textContent = 'คำนวณแผนไม่ได้: ' + e.message; } };
+    draw(); run(); clearInterval(planTimer); planTimer = setInterval(() => { run(); draw(); }, 3000);
+  }
+  function closePlan() { clearInterval(planTimer); planTimer = null; const el = $('sfPlan'); if (el) el.remove(); }
   // V4.9.105: ตัวนับแตะ/สถานะรอของเส้นในช่วงปัจจุบัน (จาก counters ของระบบกลาง) — ใช้ในหน้า OI / Gamma
   function touchOf(k) {
     const now = Date.now() / 1000, nowT = now + 7 * 3600, S = sessOf(nowT); // แอปใช้เวลาไทยแบบเลื่อน +7 ชม. · ระบบกลางใช้ UTC
@@ -534,5 +617,5 @@
     const c = fresh && C.session === S.id ? C.c[k] || C.c[String(k)] : null;
     return { sess: S.id, lab: S.lab, quota, k: c ? c[1] : 0, arm: c ? c[0] : 0, live: !!fresh };
   }
-  window.OI_sfade = { touchOf, RRS, view, stats, scan, fpOf: s => fp.get(key(s)), FP_MAX, _fpFetch: fpFetch, ivOf: s => ivs.get(key(s)), IV_D3_MAX, gxOf: s => gxs.get(key(s)), _gxSnap: gxSnap, _ivSnap: ivSnap, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
+  window.OI_sfade = { openPlan, _planHTML: () => planHTML(), touchOf, RRS, view, stats, scan, fpOf: s => fp.get(key(s)), FP_MAX, _fpFetch: fpFetch, ivOf: s => ivs.get(key(s)), IV_D3_MAX, gxOf: s => gxs.get(key(s)), _gxSnap: gxSnap, _ivSnap: ivSnap, levels, sessOf, dayStart, run, get setups() { return setups; }, get today() { return today; }, get days() { return days; }, get bars() { return bars; }, get levels_() { return lv; }, get cfg() { return cfg; }, isOn };
 })();

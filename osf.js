@@ -598,10 +598,17 @@
     // 5) ข่าวแดง
     const nd = news.filter(n => n >= d0 && n < d0 + 86400);
     h.push(`<div class="sp-card"><div class="sp-h">ข่าวแดง USD วันนี้</div>${nd.length ? nd.map(n => `<div class="sp-row">${hm(n)} น. · ห้ามเข้า ${hm(n - NB)}–${hm(n + NA)} ${nowT > n + NA ? C(Mu, '(ผ่านแล้ว)') : nowT >= n - NB ? C(Rd, '(ตอนนี้)') : ''}</div>`).join('') : C(Mu, 'ไม่มี')}</div>`);
-    // 6) สรุปวันนี้
-    const done = today.filter(x => x.real && x.st >= 4), tp = done.filter(x => x.pnl > 0).length;
-    const rsum = done.reduce((a, x) => a + (x.res || 0), 0), usd = done.reduce((a, x) => a + (x.pnl || 0), 0);
-    h.push(`<div class="sp-card"><div class="sp-h">สรุปวันนี้</div>ปิดแล้ว ${done.length} ไม้ · ${C(G, 'TP ' + tp)} · ${C(Rd, 'SL ' + (done.length - tp))} · ${C(rsum >= 0 ? G : Rd, `${sg(rsum)}R (${sg(usd)}$)`)}${op.length ? ` · เปิดอยู่ ${op.length}` : ''}</div>`);
+    // 6) สรุปแต่ละขาตาม RR ของ EA · NY เบรกมี TP เดียว
+    const fade = today.filter(x => x.real && !x.bo), ny = today.filter(x => x.real && x.bo);
+    const resultRow = (label, trades, target) => {
+      const legs = trades.map(x => x.v[target]).filter(Boolean);
+      const tp = legs.filter(x => x.st === 4).length, sl = legs.filter(x => x.st === 5).length;
+      const pending = legs.filter(x => x.st === 3).length;
+      const result = legs.reduce((total, x) => total + (x.res || 0), 0);
+      return `<div class="sp-row"><b>${label} · RR ${target}</b><br>ปิด ${tp + sl} · ${C(G, 'ถึง TP ' + tp)} · ${C(Rd, 'โดน SL ' + sl)} · ค้าง ${pending} · ${C(result >= 0 ? G : Rd, sg(result) + 'R')}</div>`;
+    };
+    const splitRows = RRS.map((target, i) => resultRow('TP' + (i + 1), fade, target));
+    h.push(`<div class="sp-card"><div class="sp-h">สรุปวันนี้ · แบ่ง TP 3 ไม้</div><div class="sp-mu">ผลจำลองตาม RR มาตรฐานของ EA</div>${splitRows.join('')}${resultRow('NY เบรก', ny, 1)}</div>`);
     return h.join('') + `<div class="sp-mu" style="text-align:center;margin:8px 0 2px">ข้อมูลจากระบบกลางชุดเดียวกับ EA · อัปเดตทุก 3 วิ</div>`;
   }
   function openPlan() {

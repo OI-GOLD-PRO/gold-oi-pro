@@ -1,0 +1,136 @@
+<!-- OI Gold mobile layout v1 -->
+<style>
+#oiMobileNav{display:none}
+@media(max-width:760px){
+ html,body{width:100%;max-width:100%;height:100%;overflow:hidden}
+ body{display:flex;flex-direction:column;height:100dvh;font-size:16px}
+ #oiMobileNav{display:flex;flex:none;gap:8px;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--border)}
+ #oiMobileNav button{flex:1;min-height:44px;font-size:16px}
+ #oiMobileNav button[aria-selected="true"]{background:var(--accent);color:var(--accent-text)}
+ #side{display:none;width:100%;min-width:0;flex:1;min-height:0;border:0;padding:16px;overflow:auto;gap:16px}
+ #main{width:100%;min-width:0;min-height:0;flex:1;overflow:hidden}
+ body.oi-settings #side{display:flex}
+ body.oi-settings #main{display:none}
+ #side h1{font-size:20px} #side h1 small{font-size:13px}
+ #headerToggles,#side>#srcLink{display:none}
+ #chat{padding:12px;gap:12px;min-width:0;overscroll-behavior:contain}
+ .msg,.msg.summary,.msg.verdict{width:100%;max-width:100%;min-width:0;padding:14px;font-size:16px;line-height:1.7;overflow-wrap:anywhere}
+ .msg .who{flex-wrap:wrap;font-size:13px}
+ .msg .who .badge,.conv{font-size:11px}
+ #status{min-height:42px;padding:10px 12px;flex:none}
+ #statetext{min-width:0;overflow-wrap:anywhere}
+ #thinking{height:auto;min-height:24px;padding:4px 12px;flex:none}
+ #composer{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px max(12px,env(safe-area-inset-bottom));flex:none}
+ #composer textarea{grid-column:1/-1;width:100%;min-width:0;height:48px;min-height:48px}
+ #sendBtn{grid-column:1/-1}
+ button.btn,input,textarea,select{font-size:16px;min-height:44px}
+ .prow .top{min-width:0}.prow input,.prow select{min-width:0}
+ .prow select{width:50%}
+ .mrow{flex-wrap:wrap}.mrow .mtag{width:100%;font-size:13px}.mrow select{min-width:90px}
+ label{font-size:14px}
+ details.oi-group{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:12px}
+ details.oi-group summary{cursor:pointer;min-height:32px;font-weight:600}
+ details.oi-group>div{margin-top:12px}
+ #startBtn{min-height:50px}
+ .acct .adesc{font-size:12px}
+ #loginModal{width:calc(100vw - 24px);max-width:calc(100vw - 24px)}
+ #loginCmdRow{min-width:0}
+}
+</style>
+<script>
+(() => {
+  if (!matchMedia('(max-width:760px)').matches) return;
+  const translations = {
+    appTitle:'OI Gold AI', appSubtitle:'GPT และ DeepSeek · วิเคราะห์ร่วมกัน',
+    topic:'หัวข้อหรือข้อมูลที่ต้องการวิเคราะห์',topicPlaceholder:'พิมพ์คำถาม หรือวางข้อมูลตลาดที่นี่…',
+    accounts:'การเชื่อมต่อ',presets:'ชุดตั้งค่าที่บันทึก',savePreset:'บันทึกชุดตั้งค่านี้',
+    history:'บทสนทนาที่ผ่านมา',refresh:'รีเฟรช',
+    exchanges:'จำนวนคำตอบต่อคนในแต่ละรอบ',
+    participants:'ผู้ร่วมวิเคราะห์',addParticipant:'เพิ่มผู้ร่วมวิเคราะห์',
+    startDebate:'เริ่มวิเคราะห์',send:'ส่งข้อความ',continueRound:'คุยต่ออีกรอบ',wrapUp:'สรุปสุดท้าย',
+    composerPlaceholder:'ถามเพิ่ม หรือส่งข้อมูลใหม่…',
+    metaModels:'ผู้สรุปผล',summaryModel:'สรุปรายรอบ',verdictModel:'สรุปสุดท้าย',
+    metaHint:'Auto เลือกจากโมเดลที่เชื่อมต่อแล้ว',
+    reference:'แนบ PDF (ถ้ามี)',exportPdf:'ดาวน์โหลด PDF',exportObsidian:'ส่งออก Obsidian',
+    connect:'เชื่อมต่อ',reconnect:'ตรวจการเชื่อมต่อ',recheck:'ตรวจอีกครั้ง',close:'ปิด',copy:'คัดลอก',
+    noPresets:'ยังไม่มีชุดตั้งค่า',noSessions:'ยังไม่มีบทสนทนา',
+    stateConfiguring:'พร้อม · ไปที่ตั้งค่าเพื่อเริ่มวิเคราะห์',
+    stateInRound:r=>'กำลังวิเคราะห์รอบ '+r,
+    stateRoundSummary:'กำลังสรุปรอบนี้…',
+    stateModCheckpoint:r=>'จบรอบ '+r+' · ถามเพิ่ม คุยต่อ หรือสรุปสุดท้าย',
+    stateWrappingUp:'กำลังสรุปสุดท้าย…',stateDone:'วิเคราะห์เสร็จแล้ว',
+    notConnected:'กำลังเชื่อมต่อเซิร์ฟเวอร์…',
+    alertSetTopic:'กรอกหัวข้อก่อนครับ',alertNeedTwo:'เลือกผู้ร่วมวิเคราะห์อย่างน้อย 2 คน',
+    confirmNewSession:'เริ่มใหม่จะจบการวิเคราะห์ที่กำลังทำอยู่ ต้องการเริ่มใหม่ไหม?',
+    namePlaceholder:'ชื่อ',personaPlaceholder:'บทบาทและมุมมอง'
+  };
+  Object.assign(LABELS.en, translations);
+  lang='en';
+  const side=$('side');
+  const top=document.createElement('nav');
+  top.id='oiMobileNav';
+  top.setAttribute('aria-label','หน้าหลัก');
+  top.innerHTML='<button class="btn sec" id="oiChatTab">สนทนา</button><button class="btn sec" id="oiSetupTab">ตั้งค่า / เริ่มใหม่</button>';
+  document.body.prepend(top);
+  const show = setup => {
+    document.body.classList.toggle('oi-settings',setup);
+    $('oiChatTab').setAttribute('aria-selected',String(!setup));
+    $('oiSetupTab').setAttribute('aria-selected',String(setup));
+  };
+  $('oiChatTab').onclick=()=>show(false);
+  $('oiSetupTab').onclick=()=>show(true);
+  const topic=$('topic').parentElement;
+  const participants=$('plist').parentElement;
+  const start=$('startBtn');
+  const heading=side.querySelector('h1');
+  heading.after(topic);
+  topic.after(participants);
+  participants.after(start);
+  const quick=document.createElement('button');
+  quick.className='btn sec';
+  quick.textContent='ใช้ GPT + DeepSeek';
+  quick.onclick=()=>{
+    $('plist').replaceChildren();
+    addParticipant({name:'GPT',provider:'openai',model:models.openai[0],persona:'วิเคราะห์จากหลักฐาน ตอบภาษาไทย ระบุข้อมูลที่ขาดและเงื่อนไขที่จะเปลี่ยนมุมมอง'});
+    addParticipant({name:'DeepSeek',provider:'deepseek',model:models.deepseek[0],persona:'ตรวจสอบเหตุผลของอีกฝ่าย ชี้สมมติฐานและข้อมูลที่ขาด ตอบภาษาไทย เปลี่ยนมุมมองได้เมื่อหลักฐานสนับสนุน'});
+  };
+  participants.prepend(quick);
+  function group(title,nodes){
+    const details=document.createElement('details');
+    details.className='oi-group';
+    const summary=document.createElement('summary');
+    summary.textContent=title;
+    details.append(summary);
+    nodes.forEach(node=>details.append(node));
+    side.append(details);
+  }
+  group('บัญชีและการเชื่อมต่อ',[$('accounts').parentElement]);
+  group('ประวัติและชุดตั้งค่า',[$('history').parentElement,$('presetList').parentElement]);
+  group('ตัวเลือกเพิ่มเติม',[$('exchanges').parentElement,$('lbl-metaModels').parentElement,$('refFiles').parentElement,$('exportPdfBtn').parentElement,$('srcLink')]);
+  const originalSend=send;
+  send=function(data){
+    const ready=ws && ws.readyState===WebSocket.OPEN;
+    originalSend(data);
+    if(ready && data.action==='start')show(false);
+  };
+  $('history').addEventListener('click',event=>{
+    if(event.target.closest('.hitem') && !event.target.closest('button.del'))show(false);
+  });
+  const source=document.createElement('button');
+  source.className='btn sec';
+  source.textContent='ดาวน์โหลดซอร์สหน้าเว็บนี้';
+  source.onclick=async()=>{
+    try{
+      const response=await fetch(location.pathname,{cache:'no-store'});
+      if(!response.ok)throw Error('download failed');
+      const url=URL.createObjectURL(new Blob([await response.text()],{type:'text/html'}));
+      const anchor=document.createElement('a');
+      anchor.href=url;anchor.download='ai-roundtable-mobile.html';anchor.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch{alert('ดาวน์โหลดไม่สำเร็จ กรุณาลองใหม่')}
+  };
+  side.append(source);
+  applyLabels();
+  show(true);
+})();
+</script>

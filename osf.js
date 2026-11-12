@@ -112,16 +112,27 @@
     return trackSetups(B, out);
   }
 
-  function trackSetups(B, out) {
+  const hitsStop = (bar, dir, sl) => dir > 0 ? bar.low <= sl : bar.high >= sl;
+  const chartStops = new Map(), hitTimes = new Map();
+
+  function trackSetups(B, out, stopBars) {
     const n = B.length;
     // TP 1R / 1.6R / 5R · แท่งเข้า Fade เช็ก SL อย่างเดียว · SL ก่อน TP
     out.forEach(s => {
       s.R = Math.abs(s.entry - s.sl); s.t0 = B[s.ei].time; s.v = {};
+      const chartStop = stopBars && s.real ? stopBars : null;
+      const hitKey = chartStop ? s.key + '|' + s.t0 : null;
       const track = (sl, R, rr) => {
+        const savedHit = hitKey ? hitTimes.get(hitKey) : undefined;
         const tp = s.entry + s.dir * rr * R, v = { rr, tp, st: 3 };
         for (let j = s.ei; j < n; j++) {
           const b = B[j];
-          if (s.dir > 0 ? b.low <= sl : b.high >= sl) { Object.assign(v, { st: 5, end: j, exit: sl, why: 'SL' }); break; }
+          const chartBar = chartStop?.get(b.time);
+          if (savedHit === b.time || (savedHit === undefined && hitsStop(chartBar || b, s.dir, sl))) {
+            if (chartBar && savedHit === undefined) hitTimes.set(hitKey, b.time);
+            Object.assign(v, { st: 5, end: j, exit: sl, why: 'SL' });
+            break;
+          }
           if ((j > s.ei || s.bo) && (s.dir > 0 ? b.high >= tp : b.low <= tp)) { Object.assign(v, { st: 4, end: j, exit: tp, why: 'TP' }); break; } // เบรกเอาท์เข้าที่ราคาปิดแท่งก่อน → TP นับตั้งแต่แท่งแรก
         }
         v.t1 = v.end !== undefined ? B[v.end].time : null;
@@ -181,12 +192,17 @@
   function sharedTrades(book, follow = [], live = false) {
     if (!book?.day) return [];
     const B = book.bars.concat(follow).map(([t, open, high, low, close]) => ({ time: t + THAI, open, high, low, close }));
+    if (live && B.length) {
+      const last = B.at(-1).time;
+      // แท่งกราฟที่ระบบกลางยังไม่ปิด ใช้เช็ก SL ได้ทันที
+      for (const time of [...chartStops.keys()].filter(t => t > last).sort((a, b) => a - b)) B.push({ time });
+    }
     const indexes = new Map(B.map((b, i) => [b.time, i]));
     const trades = book.events.flatMap(s => {
       const S = SESS.find(x => x.id === s.sid), ei = indexes.get(s.t + THAI);
       return !S || ei === undefined ? [] : [{ ...s, S, ei, tf: 'M1', live, central: true, day: ymd(book.day + THAI) }];
     });
-    return trackSetups(B, trades);
+    return trackSetups(B, trades, chartStops);
   }
   const sharedReady = () => !!(shared?.ready && shared.until > Date.now() / 1000);
   // V4.9.102: กะพริบโซนที่ราคาใกล้ขอบเข้า (≤ NEAR $) — วาดใหม่ทุก 100 ms เฉพาะตอนมีโซนกะพริบ
@@ -202,6 +218,11 @@
       void loadSharedHist();
       let [A1, A5] = await Promise.all([O.fetchTF('1m', 6000), O.fetchTF('5m', 1500), loadShared(), loadHist()]);
       const liveDay = dayStart(Date.now() / 1000 + THAI);
+      if ((!A1 || A1.length < 300) && O.fetchHist) { const h = await O.fetchHist('1m', Date.now() - 3.5 * 86400e3, Date.now() + 60e3); if (h && h.length > 300) A1 = h; } // เสาร์-อาทิตย์
+      chartStops.clear();
+      for (const b of A1 || []) chartStops.set(b.time, b);
+      for (const b of O.chartM1?.() || []) chartStops.set(b.time, b);
+      for (const [id, time] of hitTimes) if (time < liveDay - HIST_DAYS * 86400) hitTimes.delete(id);
       const confirmed = shared?.day + THAI === liveDay ? sharedTrades(shared, [], true) : [];
       const archive = [...sharedHist.values(), ...(shared?.day && shared.day + THAI !== liveDay && !sharedHist.has(shared.day) ? [shared] : [])]
         .sort((a, b) => a.day - b.day).slice(-HIST_DAYS);
@@ -209,7 +230,6 @@
       const archived = archive.flatMap(book => sharedTrades(book, books.filter(x => x.day > book.day && x.day < book.day + 86400 + TRACK)
         .flatMap(x => x.bars.filter(b => b[0] >= book.day + 86400 && b[0] < book.day + 86400 + TRACK))));
       const archivedDays = new Set(archive.map(b => ymd(b.day + THAI)));
-      if ((!A1 || A1.length < 300) && O.fetchHist) { const h = await O.fetchHist('1m', Date.now() - 3.5 * 86400e3, Date.now() + 60e3); if (h && h.length > 300) A1 = h; } // เสาร์-อาทิตย์
       if (A1 && A1.length > 30) {
         const d0 = dayStart(A1[A1.length - 1].time), oldKeys = new Set(today.map(key));
         // วันนี้: M1 + OI สด (มีเกรด A จาก volume)
@@ -287,6 +307,20 @@
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   const csec = () => TFS[O.tf] || 60, toChart = t => Math.floor(t / csec()) * csec();
   const fresh = () => bars.length && Date.now() / 1000 + 7 * 3600 - bars[bars.length - 1].time < 3 * 3600;
+  function checkChartStops() {
+    if (shared?.day + THAI !== dayStart(Date.now() / 1000 + THAI)) return;
+    const active = today.filter(s => s.central && s.real && RRS.some(rr => s.v[rr].st === 3));
+    if (!active.length) return;
+    const tail = O.chartM1?.(2) || [];
+    for (const b of tail) chartStops.set(b.time, b);
+    if (!active.some(s => tail.some(b => b.time >= s.t0 && hitsStop(b, s.dir, s.sl)))) return;
+    const next = new Map(sharedTrades(shared, [], true).map(s => [s.key, s]));
+    const refresh = s => s.live && s.central ? next.get(s.key) || s : s;
+    today = today.map(refresh);
+    setups = setups.map(refresh);
+    notify(new Set(today.map(key)));
+  }
+
   const entryTargets = [];
   const details = $('sfDetails');
   if (details) O.chart.subscribeClick(({ point }) => {
@@ -314,6 +348,7 @@
   O.hooks.push((ctx, w, h) => {
     entryTargets.length = 0;
     if (!isOn()) return;
+    checkChartStops();
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height();
     const X = t => ts.timeToCoordinate(toChart(t)), Y = p => sr.priceToCoordinate(p), bw = Math.max(2, (X(bars.length ? bars[bars.length - 1].time : 0) || 0) - (X((bars.length ? bars[bars.length - 1].time : 0) - csec()) || 0));
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
@@ -359,10 +394,12 @@
     const lastT = bars.length ? bars[bars.length - 1].time : null;
     setups.filter(s => s.real).forEach(s => {
       // V4.9.80: แท่งเข้าไม่อยู่ในกราฟ (เลื่อนเกิน/ข้อมูลกราฟไม่ถึง) = ไม่วาด · แท่งออกไม่อยู่ในกราฟ: ไม้เปิดอยู่ = ถึงขอบขวา, ไม้จบแล้ว = ไม่วาด (เดิมยืดเต็มจอ ทับกันทั้งกราฟ)
-      let x0 = X(s.t0), x1 = X(s.t1 !== null ? s.t1 : (lastT || s.t0));
+      const exitX = s.t1 !== null ? X(s.t1) : null;
+      const x0 = X(s.t0);
+      let x1 = s.t1 !== null ? exitX : X(lastT || s.t0);
       if (x0 === null) return;
       if (x1 === null) { if (s.t1 !== null) return; x1 = plotW; }
-      x1 = Math.max(x1 + bw, x0 + 6); if (x1 < 0 || x0 > plotW) return;
+      x1 = Math.max(x1 + (exitX === null ? bw : bw / 2), x0 + 6); if (x1 < 0 || x0 > plotW) return;
       const ye = Y(s.entry), yt = Y(s.tp), ys = Y(s.sl); if (ye === null || yt === null || ys === null) return;
       const a = s.tf === 'M5' ? 0.75 : 1;
       ctx.globalAlpha = 0.32 * a; ctx.fillStyle = '#22e39a'; ctx.fillRect(x0, Math.min(ye, yt), x1 - x0, Math.abs(yt - ye));
@@ -374,7 +411,7 @@
       // TP ของ RR อื่น = เส้นประจาง + ป้าย ✓/✗
       RRS.filter(rr => !s.bo && rr !== cfg.rr && s.v[rr]).forEach(rr => { const v = s.v[rr], y = Y(v.tp); if (y === null) return; ctx.save(); ctx.globalAlpha = 0.55 * a; ctx.setLineDash([3, 3]); ctx.strokeStyle = '#22e39a'; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = v.st === 4 ? '#22e39a' : v.st === 5 ? '#ff4d6a' : '#7fd0ff'; ctx.textAlign = 'right'; if (x1 - 2 > 0) ctx.fillText(`${rr}R${v.st === 4 ? '✓' : v.st === 5 ? '✗' : ''}`, x1 - 2, y + (s.dir > 0 ? -6 : 6)); ctx.restore(); });
       // จุดออก
-      if (s.t1 !== null && s.exit !== undefined) { const yx = Y(s.exit); if (yx !== null) { ctx.fillStyle = s.pnl > 0 ? '#22e39a' : s.pnl < 0 ? '#ff4d6a' : '#e0b44c'; ctx.beginPath(); ctx.arc(x1 - bw / 2, yx, 3.5, 0, 7); ctx.fill(); } }
+      if (s.t1 !== null && s.exit !== undefined) { const yx = Y(s.exit); if (yx !== null) { ctx.fillStyle = s.pnl > 0 ? '#22e39a' : s.pnl < 0 ? '#ff4d6a' : '#e0b44c'; ctx.beginPath(); ctx.arc(exitX, yx, 3.5, 0, 7); ctx.fill(); } }
       // ป้าย: ทิศ · ครั้งที่แตะ · ผล
       const res = s.st === 3 ? 'เปิดอยู่' : `${s.st === 4 ? '✓' : s.st === 5 ? '✗' : s.why === 'ปิดก่อนข่าว' ? '📰' : '⏱'} ${s.pnl > 0 ? '+' : ''}${s.pnl}$`;
       const lab = `${s.tf === 'M5' ? '≈' : ''}🌏${s.bo ? 'NY⚡' : ''}${s.dir > 0 ? 'B' : 'S'}${s.bo ? '' : s.k} ${s.bo ? 1 : cfg.rr}R${s.tf === 'M5' ? '' : ' ' + res}`;
@@ -609,7 +646,7 @@
     };
     const splitRows = RRS.map((target, i) => resultRow('TP' + (i + 1), fade, target));
     h.push(`<div class="sp-card"><div class="sp-h">สรุปวันนี้ · แบ่ง TP 3 ไม้</div><div class="sp-mu">ผลจำลองตาม RR มาตรฐานของ EA</div>${splitRows.join('')}${resultRow('NY เบรก', ny, 1)}</div>`);
-    return h.join('') + `<div class="sp-mu" style="text-align:center;margin:8px 0 2px">ข้อมูลจากระบบกลางชุดเดียวกับ EA · อัปเดตทุก 3 วิ</div>`;
+    return h.join('') + `<div class="sp-mu" style="text-align:center;margin:8px 0 2px">แผนเข้าจากระบบกลาง · SL จำลองอิงไส้เทียน M1 ของแอปเมื่อมีข้อมูล</div>`;
   }
   function openPlan() {
     let el = $('sfPlan');

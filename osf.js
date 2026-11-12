@@ -597,7 +597,7 @@
     // 2) ตารางเส้น
     const plans = sharedReady() ? shared.plans.filter(q => q[5] === 1) : [];
     const half = S ? S.half : 1.5;
-    const rows = (lv || []).slice().sort((a, b) => P == null ? a.k - b.k : Math.abs(a.p - P) - Math.abs(b.p - P)).map(z => {
+    const rows = (lv || []).slice().sort((a, b) => P == null ? a.k - b.k : Math.abs(a.p - P) - Math.abs(b.p - P)).map((z, index) => {
       const q = touchOf(z.k) || { quota: 0, k: 0, arm: 0, live: false };
       const lo = z.p - half, hi = z.p + half, dist = P == null ? null : P > hi ? P - hi : P < lo ? lo - P : 0;
       let st, plan = '';
@@ -618,7 +618,7 @@
         st = C(dir > 0 ? G : Rd, `รอ ${dir > 0 ? 'BUY ▲' : 'SELL ▼'}`) + (gap != null ? ` · ห่าง ${f1(Math.max(0, gap))}$` : '') + (!pl && sharedReady() ? C(Mu, ' (ระบบกลางไม่วาง: ข่าว/พุ่ง)') : '');
         plan = `<div class="sp-plan">${dir > 0 ? 'BUY' : 'SELL'} LIMIT <b>${f1(en)}</b> · SL ${C(Rd, f1(sl))} (${f1(R_)}$) · TP ${rr}R ${C(G, f1(tp))}</div>`;
       }
-      return `<div class="sp-row"><div><b class="${z.side === 'C' ? 'sp-c' : 'sp-p'}">${z.side}${z.k}</b> <i class="sp-g${z.grade}">🌏${z.grade}</i> <span class="sp-mu">${S && S.real ? `โซน ${f1(lo)}–${f1(hi)} · แตะ ${q.k}/${q.quota}` : ''}${dist != null ? ` · ห่าง ${f1(dist)}$` : ''}</span></div><div>${st}</div>${plan}</div>`;
+      return `<div class="sp-row"><div>${C(Au, `<b>แผนที่ ${index + 1}</b>`)} · <b class="${z.side === 'C' ? 'sp-c' : 'sp-p'}">${z.side}${z.k}</b> <i class="sp-g${z.grade}">🌏${z.grade}</i> <span class="sp-mu">${S && S.real ? `โซน ${f1(lo)}–${f1(hi)} · แตะ ${q.k}/${q.quota}` : ''}${dist != null ? ` · ห่าง ${f1(dist)}$` : ''}</span></div><div>${st}</div>${plan}</div>`;
     });
     h.push(`<div class="sp-card"><div class="sp-h">เส้นของวัน (เรียงจากใกล้ราคา) · TP ใช้ RR ${rr}</div>${rows.length ? rows.join('') : C(Mu, 'ยังไม่มีเส้น (รอ 06:00 / รอข้อมูลกลาง)')}</div>`);
     // 3) ไม้ที่เปิดอยู่

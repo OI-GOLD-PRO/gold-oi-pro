@@ -646,6 +646,22 @@
     };
     const splitRows = RRS.map((target, i) => resultRow('TP' + (i + 1), fade, target));
     h.push(`<div class="sp-card"><div class="sp-h">สรุปวันนี้ · แบ่ง TP 3 ไม้</div><div class="sp-mu">ผลจำลองตาม RR มาตรฐานของ EA</div>${splitRows.join('')}${resultRow('NY เบรก', ny, 1)}</div>`);
+    const tradeRows = [...fade, ...ny].sort((a, b) => a.t0 - b.t0).map((x, index) => {
+      const legs = (x.bo ? [1] : RRS).map((target, legIndex) => {
+        const leg = x.v[target];
+        const label = x.bo ? 'TP' : 'TP' + (legIndex + 1);
+        let outcome = C(Mu, 'ไม่มีข้อมูล');
+        if (leg?.st === 3) outcome = C(Au, 'ยังเปิดอยู่');
+        if (leg?.st === 4 || leg?.st === 5) {
+          outcome = C(leg.st === 4 ? G : Rd, `${leg.st === 4 ? 'ถึง TP' : 'โดน SL'} ${sg(leg.res)}R`);
+          if (leg.t1 != null) outcome += ` · ออก ${hm(leg.t1)} น.`;
+        }
+        return `<div><b>${label} · RR ${target}</b> · ${outcome}</div>`;
+      });
+      const side = x.dir > 0 ? C(G, 'BUY') : C(Rd, 'SELL');
+      return `<div class="sp-row"><div><b>ไม้ที่ ${index + 1}</b> · ${side} ${x.z.side}${x.z.k} · ${x.bo ? 'NY เบรก' : x.S.lab}</div><div>เข้า ${hm(x.t0)} น. ที่ <b>${f1(x.entry)}</b> · SL ${C(Rd, f1(x.sl))}</div>${legs.join('')}</div>`;
+    });
+    h.push(`<div class="sp-card"><div class="sp-h">ผลจำลองรายไม้วันนี้ (${tradeRows.length})</div>${tradeRows.length ? tradeRows.join('') : C(Mu, 'ยังไม่มีไม้วันนี้')}</div>`);
     return h.join('') + `<div class="sp-mu" style="text-align:center;margin:8px 0 2px">แผนเข้าจากระบบกลาง · SL จำลองอิงไส้เทียน M1 ของแอปเมื่อมีข้อมูล</div>`;
   }
   function openPlan() {

@@ -677,7 +677,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.111';
+  const APP_VER = '4.9.112';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   // V4.9.107: เช็กเวอร์ชันบนเว็บ (ตอนเปิด / กลับเข้าแอป / ทุก 15 นาที) → ถ้าใหม่กว่า โหลดใหม่แบบเลี่ยงแคช (กัน iPhone ค้างเวอร์ชันเก่า)
   (() => {
@@ -2200,6 +2200,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       if (lastBarTime !== null && b.time < lastBarTime) return;
       try {
         series.update(b); lastBarTime = b.time; rawClose = k[4]; lastClose = rawClose - adj;
+        if (tf === '1m') dirty = true;
         const lastRaw = rawBars[rawBars.length - 1];
         if (lastRaw && lastRaw[0] === k[0]) rawBars[rawBars.length - 1] = k; else if (!lastRaw || k[0] > lastRaw[0]) rawBars.push(k);
       } catch (e) {}
@@ -2271,6 +2272,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
             const b = toBar(k);
             if (lastBarTime !== null && b.time < lastBarTime) return;
             series.update(b); lastBarTime = b.time; rawClose = k[4]; lastClose = rawClose - adj;
+            if (tf === '1m') dirty = true;
             const lastRaw = rawBars[rawBars.length - 1];
             if (lastRaw && lastRaw[0] === k[0]) rawBars[rawBars.length - 1] = k; else rawBars.push(k);
           });

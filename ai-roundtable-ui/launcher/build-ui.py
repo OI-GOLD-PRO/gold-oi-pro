@@ -34,7 +34,9 @@ block='''    $page = [IO.File]::ReadAllText($pagePath)
         $page = $page.Replace('</body>', $updateMarkup + '</body>')
         $tempPage = $pagePath + '.oi-update.tmp'
         [IO.File]::WriteAllText($tempPage, $page, [Text.UTF8Encoding]::new($false))
-        [IO.File]::Replace($tempPage, $pagePath, $null)
+        # Windows PowerShell 5.1 converts a null string argument to an invalid empty path.
+        $replaceBackup = $pagePath + '.before-central-replace.bak'
+        [IO.File]::Replace($tempPage, $pagePath, $replaceBackup)
     }
 '''.replace('PAYLOAD',base64.b64encode(markup.encode()).decode())
 s=s[:start]+block+s[stop:]

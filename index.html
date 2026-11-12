@@ -677,7 +677,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.116';
+  const APP_VER = '4.9.117';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   // V4.9.107: เช็กเวอร์ชันบนเว็บ (ตอนเปิด / กลับเข้าแอป / ทุก 15 นาที) → ถ้าใหม่กว่า โหลดใหม่แบบเลี่ยงแคช (กัน iPhone ค้างเวอร์ชันเก่า)
   (() => {
@@ -2966,7 +2966,30 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   <p id="sfDetailsStatus"></p>
   <p id="sfDetailsRisk"></p>
 </dialog>
-<script src="osf.js?v=41014"></script>
+<script>
+window.bindLeftSwipeDismiss = function (panel, dismiss) {
+  let start = null;
+  panel.addEventListener('touchstart', e => {
+    const touch = e.touches[0];
+    start = e.touches.length === 1 ? { id: touch.identifier, x: touch.clientX, y: touch.clientY } : null;
+  }, { passive: true });
+  panel.addEventListener('touchmove', e => {
+    if (start && (e.touches.length !== 1 || Math.abs(e.touches[0].clientY - start.y) > 32)) start = null;
+  }, { passive: true });
+  panel.addEventListener('touchcancel', () => { start = null; }, { passive: true });
+  panel.addEventListener('touchend', e => {
+    const origin = start;
+    start = null;
+    if (!origin || e.touches.length) return;
+    const touch = Array.from(e.changedTouches).find(t => t.identifier === origin.id);
+    if (!touch) return;
+    const left = origin.x - touch.clientX;
+    const vertical = Math.abs(touch.clientY - origin.y);
+    if (left >= 65 && vertical <= 32) dismiss();
+  }, { passive: true });
+};
+</script>
+<script src="osf.js?v=41015"></script>
 <script src="squeeze.js?v=40316"></script>
 <script src="trap.js?v=40929"></script>
 <script src="volreg.js?v=40929"></script>
@@ -2975,7 +2998,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <script src="siglog.js?v=40998"></script>
 <script src="quant.js?v=20031"></script>
 <script src="aitray.js?v=40929"></script>
-<script src="v33-luxury.js?v=41010"></script>
+<script src="v33-luxury.js?v=41011"></script>
 <script src="historical-oi.js?v=4201"></script>
 </body>
 </html>

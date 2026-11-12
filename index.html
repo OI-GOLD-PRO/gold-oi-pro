@@ -726,11 +726,13 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       if (busy || now - last < 10e3 || !navigator.onLine) return;
       busy = true;
       last = now;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
       try {
         const url = new URL(location.href);
         url.searchParams.delete('v');
         url.searchParams.set('vc', String(now));
-        const response = await fetch(url.href, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+        const response = await fetch(url.href, { cache: 'no-store', signal: controller.signal });
         if (!response.ok) return;
 
         const html = await response.text();
@@ -747,6 +749,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       } catch (error) {
         // เครือข่ายกลับมาแล้วจะตรวจได้อีกครั้ง
       } finally {
+        clearTimeout(timeout);
         busy = false;
       }
     }

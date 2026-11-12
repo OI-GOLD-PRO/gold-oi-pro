@@ -645,23 +645,33 @@
       return `<div class="sp-row"><b>${label} · RR ${target}</b><br>ปิด ${tp + sl} · ${C(G, 'ถึง TP ' + tp)} · ${C(Rd, 'โดน SL ' + sl)} · ค้าง ${pending} · ${C(result >= 0 ? G : Rd, sg(result) + 'R')}</div>`;
     };
     const splitRows = RRS.map((target, i) => resultRow('TP' + (i + 1), fade, target));
-    h.push(`<div class="sp-card"><div class="sp-h">สรุปวันนี้ · แบ่ง TP 3 ไม้</div><div class="sp-mu">ผลจำลองตาม RR มาตรฐานของ EA</div>${splitRows.join('')}${resultRow('NY เบรก', ny, 1)}</div>`);
+    h.push(`<div class="sp-card"><div class="sp-h">สรุปวันนี้ · แบ่ง TP 3 ไม้</div><div class="sp-mu">คำนวณตาม RR มาตรฐานของ EA</div>${splitRows.join('')}${resultRow('NY เบรก', ny, 1)}</div>`);
+    const totalsLine = ({ tp, sl, net }) =>
+      `<div><b>รวม</b> · ${C(G, 'TP ' + tp)} · ${C(Rd, 'SL ' + sl)} · สุทธิ ${C(net >= 0 ? G : Rd, sg(net) + 'R')}</div>`;
+    const dayTotals = { tp: 0, sl: 0, net: 0 };
     const tradeRows = [...fade, ...ny].sort((a, b) => a.t0 - b.t0).map((x, index) => {
+      const totals = { tp: 0, sl: 0, net: 0 };
       const legs = (x.bo ? [1] : RRS).map((target, legIndex) => {
         const leg = x.v[target];
         const label = x.bo ? 'TP' : 'TP' + (legIndex + 1);
         let outcome = C(Mu, 'ไม่มีข้อมูล');
         if (leg?.st === 3) outcome = C(Au, 'ยังเปิดอยู่');
         if (leg?.st === 4 || leg?.st === 5) {
+          if (leg.st === 4) totals.tp++;
+          else totals.sl++;
+          totals.net += leg.res || 0;
           outcome = C(leg.st === 4 ? G : Rd, `${leg.st === 4 ? 'ถึง TP' : 'โดน SL'} ${sg(leg.res)}R`);
           if (leg.t1 != null) outcome += ` · ออก ${hm(leg.t1)} น.`;
         }
         return `<div><b>${label} · RR ${target}</b> · ${outcome}</div>`;
       });
+      dayTotals.tp += totals.tp;
+      dayTotals.sl += totals.sl;
+      dayTotals.net += totals.net;
       const side = x.dir > 0 ? C(G, 'BUY') : C(Rd, 'SELL');
-      return `<div class="sp-row"><div><b>ไม้ที่ ${index + 1}</b> · ${side} ${x.z.side}${x.z.k} · ${x.bo ? 'NY เบรก' : x.S.lab}</div><div>เข้า ${hm(x.t0)} น. ที่ <b>${f1(x.entry)}</b> · SL ${C(Rd, f1(x.sl))}</div>${legs.join('')}</div>`;
+      return `<div class="sp-row"><div><b>ไม้ที่ ${index + 1}</b> · ${side} ${x.z.side}${x.z.k} · ${x.bo ? 'NY เบรก' : x.S.lab}</div><div>เข้า ${hm(x.t0)} น. ที่ <b>${f1(x.entry)}</b> · SL ${C(Rd, f1(x.sl))}</div>${legs.join('')}${totalsLine(totals)}</div>`;
     });
-    h.push(`<div class="sp-card"><div class="sp-h">ผลจำลองรายไม้วันนี้ (${tradeRows.length})</div>${tradeRows.length ? tradeRows.join('') : C(Mu, 'ยังไม่มีไม้วันนี้')}</div>`);
+    h.push(`<div class="sp-card"><div class="sp-h">รายไม้วันนี้ (${tradeRows.length})</div>${tradeRows.length ? totalsLine(dayTotals) + tradeRows.join('') : C(Mu, 'ยังไม่มีไม้วันนี้')}</div>`);
     return h.join('') + `<div class="sp-mu" style="text-align:center;margin:8px 0 2px">แผนเข้าจากระบบกลาง · SL จำลองอิงไส้เทียน M1 ของแอปเมื่อมีข้อมูล</div>`;
   }
   function openPlan() {

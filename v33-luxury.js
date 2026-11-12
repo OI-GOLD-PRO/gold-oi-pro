@@ -28,7 +28,33 @@
     if(px)px.style.display='none';
     header.classList.add('v35header');
   }
-  const sheet=document.createElement('section');sheet.id='v34oi';sheet.hidden=true;sheet.setAttribute('aria-label','OI และ Gamma');sheet.innerHTML='<div class="v34oihead"><strong>OI / Gamma</strong><button type="button" id="v34close" aria-label="ปิด">✕</button></div><p>OI ราย Strike จากข้อมูลที่แอปโหลดล่าสุด</p><div id="v34oiStatus">กำลังรอข้อมูล OI…</div><div id="v34oiChart" role="img" aria-label="กราฟแท่ง Open Interest แยก Call และ Put ตาม Strike"></div><div class="v34oiactions"><button type="button" id="v34show">แสดง OI บนกราฟ</button><button type="button" id="v34hide">ซ่อน OI</button></div><small>ข้อมูล OI ยังเป็น Overlay บนกราฟราคา ไม่ใช่กราฟแยก</small>';main.appendChild(sheet);sheet.querySelector('#v34close').addEventListener('click',()=>{sheet.hidden=true;setActive('chart');});sheet.querySelector('#v34show').addEventListener('click',()=>{const b=document.getElementById('oiBtn');if(b&&!b.classList.contains('has'))b.click();sheet.hidden=true;setActive('oi');});sheet.querySelector('#v34hide').addEventListener('click',()=>{const b=document.getElementById('oiBtn');if(b&&b.classList.contains('has'))b.click();sheet.hidden=true;setActive('chart');});
+  const backdrop = document.createElement('div');
+  backdrop.id = 'v34oiBackdrop';
+  backdrop.hidden = true;
+  backdrop.setAttribute('aria-hidden', 'true');
+  const sheet=document.createElement('section');sheet.id='v34oi';sheet.hidden=true;sheet.setAttribute('aria-label','OI และ Gamma');sheet.innerHTML='<div class="v34oihead"><strong>OI / Gamma</strong><button type="button" id="v34close" aria-label="ปิด">✕</button></div><p>OI ราย Strike จากข้อมูลที่แอปโหลดล่าสุด</p><div id="v34oiStatus">กำลังรอข้อมูล OI…</div><div id="v34oiChart" role="img" aria-label="กราฟแท่ง Open Interest แยก Call และ Put ตาม Strike"></div><div class="v34oiactions"><button type="button" id="v34show">แสดง OI บนกราฟ</button><button type="button" id="v34hide">ซ่อน OI</button></div><small>ข้อมูล OI ยังเป็น Overlay บนกราฟราคา ไม่ใช่กราฟแยก</small>';
+  main.append(backdrop, sheet);
+  function setOiOpen(open) {
+    sheet.hidden = !open;
+    backdrop.hidden = !open;
+  }
+  function closeOI() {
+    setOiOpen(false);
+    setActive('chart');
+  }
+  backdrop.addEventListener('click', closeOI);
+  sheet.querySelector('#v34close').addEventListener('click', closeOI);
+  sheet.querySelector('#v34show').addEventListener('click', () => {
+    const b = document.getElementById('oiBtn');
+    if (b && !b.classList.contains('has')) b.click();
+    setOiOpen(false);
+    setActive('oi');
+  });
+  sheet.querySelector('#v34hide').addEventListener('click', () => {
+    const b = document.getElementById('oiBtn');
+    if (b && b.classList.contains('has')) b.click();
+    closeOI();
+  });
   function renderOI(data){
     const host=sheet.querySelector('#v34oiChart'), status=sheet.querySelector('#v34oiStatus');
     host.replaceChildren();
@@ -83,8 +109,8 @@
   const tabs=[['chart','▥','กราฟ'],['oi','◎','OI / Gamma'],['ind','ƒx','อินดิเคเตอร์'],['tools','✎','เครื่องมือ'],['settings','⚙','ตั้งค่า']];
   function setActive(k){nav.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b.dataset.page===k);b.setAttribute('aria-current',b.dataset.page===k?'page':'false');});}
   function go(k){
-   if(k!=='oi')sheet.hidden=true;
-   if(k==='oi'){sheet.hidden=false;setActive('oi');return;}
+   setOiOpen(k === 'oi');
+   if(k==='oi'){setActive('oi');return;}
    if(k==='ind'){document.getElementById('indBtn')?.click();setActive('ind');return;}
    if(k==='tools'){document.getElementById('drawBtn')?.click();setActive('tools');return;}
    if(k==='settings'){document.getElementById('setBtn')?.click();setActive('settings');return;}

@@ -80,7 +80,9 @@ body{padding-bottom:0!important}
 
 /* V3.4.2 OI tab panel */
 #v34oi{position:absolute;left:10px;right:10px;bottom:75px;z-index:35;padding:15px;border:1px solid #c6a05a;border-radius:15px;background:linear-gradient(145deg,#17263c,#0b1425);color:#e8edf5;box-shadow:0 12px 35px #0009}
-#v34oi[hidden]{display:none!important}
+#v34oiBackdrop{position:absolute;inset:0;z-index:34}
+#v34oiBackdrop:not([hidden]) ~ #v33nav{z-index:36}
+#v34oiBackdrop[hidden],#v34oi[hidden]{display:none!important}
 #v34oi .v34oihead{display:flex;align-items:center;justify-content:space-between;color:#f3cc7a;font-size:16px}
 #v34oi p{font-size:12px;line-height:1.6;color:#c1cbd9}
 #v34oi small{font-size:10px;color:#9daac0}

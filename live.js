@@ -318,9 +318,22 @@
     const wrap = document.getElementById('wrap');
     if (wrap) {
       let bar = document.getElementById('badges');
-      if (!bar) { bar = document.createElement('div'); bar.id = 'badges'; wrap.appendChild(bar); }
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'badges';
+        bar.addEventListener('click', e => {
+          if (e.target.closest('button[data-k="sfmom"], button[data-k="sfmom-hot"]')) window.OI_sfade?.openPlan();
+        });
+        wrap.appendChild(bar);
+      }
       const esc = t => String(t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-      const html = badges.map(([t, col, k, bg]) => `<span style="color:${col};border-color:${col}${bg ? ';background:' + bg : ''}"${k ? ` data-k="${esc(k)}"` : ''}>${esc(t)}</span>`).join('');
+      const html = badges.map(([t, col, k, bg]) => {
+        const attrs = `style="color:${col};border-color:${col}${bg ? ';background:' + bg : ''}"${k ? ` data-k="${esc(k)}"` : ''}`;
+        if (k === 'sfmom' || k === 'sfmom-hot') {
+          return `<button type="button" ${attrs}>${esc(t)} · 📋 แผน</button>`;
+        }
+        return `<span ${attrs}>${esc(t)}</span>`;
+      }).join('');
       if (bar.dataset.h !== html) { bar.dataset.h = html; bar.innerHTML = html; wrap.classList.toggle('bdg', badges.length > 0); }
     }
   });

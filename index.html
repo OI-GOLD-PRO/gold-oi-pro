@@ -240,12 +240,13 @@
   /* V3.5.7: แถบป้ายสถานะ (γ Flip, COT, Skew, EM) แยกเหนือกราฟ ไม่ซ้อนกับป้ายราคา/OI */
   #badges { position: absolute; left: 0; right: 0; top: 0; height: 22px; display: none; align-items: center; gap: 4px; padding: 0 6px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; z-index: 3; background: var(--bg); border-bottom: 1px solid var(--line); }
   #badges::-webkit-scrollbar { display: none; }
-  #badges span[data-k] { cursor: pointer; -webkit-user-select: none; user-select: none; touch-action: manipulation; padding: 0 7px; }
-  #badges span { flex: none; font: bold 10px var(--mono); line-height: 14px; padding: 0 5px; border: 1px solid; border-radius: 3px; }
+  #badges button { background: transparent; }
+  #badges [data-k] { cursor: pointer; -webkit-user-select: none; user-select: none; touch-action: manipulation; padding: 0 7px; }
+  #badges :is(span, button) { flex: none; font: bold 10px var(--mono); line-height: 14px; padding: 0 5px; border: 1px solid; border-radius: 3px; }
   /* V4.9.93: ป้าย ⚡ โมเมนตัม ATR = กรอบทองหนาเรืองแสง (สีตัวอักษรยังบอกระดับ เทา/เหลือง/แดง) */
-  #badges span[data-k="sfmom"] { border: 2px solid #f2a900 !important; border-radius: 5px; box-shadow: 0 0 6px rgba(242,169,0,.75), inset 0 0 4px rgba(242,169,0,.35); animation: sfmomGlow 2.4s ease-in-out infinite; }
+  #badges button[data-k="sfmom"] { border: 2px solid #f2a900 !important; border-radius: 5px; box-shadow: 0 0 6px rgba(242,169,0,.75), inset 0 0 4px rgba(242,169,0,.35); animation: sfmomGlow 2.4s ease-in-out infinite; }
   /* V4.9.96 ป้าย ⚡ เกิน 3×ATR: พื้นแดงกระพริบ */
-  #badges span[data-k="sfmom-hot"] { border: 2px solid #ff6b82 !important; border-radius: 5px; font-weight: 700; animation: sfmomHot 0.8s steps(1, end) infinite; }
+  #badges button[data-k="sfmom-hot"] { border: 2px solid #ff6b82 !important; border-radius: 5px; font-weight: 700; animation: sfmomHot 0.8s steps(1, end) infinite; }
   @keyframes sfmomHot { 0% { background: #d0142f; box-shadow: 0 0 10px rgba(255,40,70,.95); } 50% { background: #4a0612; box-shadow: none; } }
   @keyframes sfmomGlow { 0%, 100% { box-shadow: 0 0 5px rgba(242,169,0,.6), inset 0 0 3px rgba(242,169,0,.3); } 50% { box-shadow: 0 0 11px rgba(242,169,0,.95), inset 0 0 5px rgba(242,169,0,.45); } }
   #wrap.bdg #badges { display: flex; }
@@ -375,7 +376,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   #sfDetailsRisk { color: #7fd0ff; font-family: var(--mono); }
 </style>
 <link rel="stylesheet" href="v3-premium.css?v=30201">
-<link rel="stylesheet" href="v33-luxury.css?v=41005">
+<link rel="stylesheet" href="v33-luxury.css?v=41010">
 </head>
 <body>
   <div id="splash" aria-label="OI Gold Pro กำลังเปิด">
@@ -676,7 +677,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.109';
+  const APP_VER = '4.9.110';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   // V4.9.107: เช็กเวอร์ชันบนเว็บ (ตอนเปิด / กลับเข้าแอป / ทุก 15 นาที) → ถ้าใหม่กว่า โหลดใหม่แบบเลี่ยงแคช (กัน iPhone ค้างเวอร์ชันเก่า)
   (() => {
@@ -2939,7 +2940,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <script src="oistat.js?v=40601"></script>
 <script src="colorize.js?v=20017"></script>
 <script src="dash.js?v=40601"></script>
-<script src="live.js?v=40996"></script>
+<script src="live.js?v=41010"></script>
 <script src="intraday.js?v=20042"></script>
 <script src="retail.js?v=40952"></script>
 <script src="volume-profile.js?v=40966"></script>
@@ -2969,7 +2970,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <script src="siglog.js?v=40998"></script>
 <script src="quant.js?v=20031"></script>
 <script src="aitray.js?v=40929"></script>
-<script src="v33-luxury.js?v=41005"></script>
+<script src="v33-luxury.js?v=41010"></script>
 <script src="historical-oi.js?v=4201"></script>
 </body>
 </html>

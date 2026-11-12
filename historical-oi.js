@@ -10,7 +10,9 @@ function init(){
  const wrap=$('wrap');if(!wrap)return;
  wrap.appendChild(panel);
  window.OIHistoryZonesOpen=()=>{panel.hidden=false;if(!state.days.length)load();};
- $('oihClose').onclick=()=>panel.hidden=true;
+ const close=()=>{panel.hidden=true;};
+ $('oihClose').onclick=close;
+ window.bindRightSwipeDismiss?.(panel,close);
  $('oihOn').onchange=e=>{state.on=e.target.checked;if(state.on&&!state.days.length)load();save();window.OIHistoryZonesRedraw?.();};
  $('oihTop').onchange=e=>{state.top=Math.min(50,Math.max(1,Math.floor(+e.target.value||10)));e.target.value=state.top;save();window.OIHistoryZonesRedraw?.();};
  $('oihLoad').onclick=load;

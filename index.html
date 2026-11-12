@@ -643,6 +643,42 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   <iframe id="paneB" title="กราฟที่ 2" hidden></iframe>
 
 <script>
+  window.bindRightSwipeDismiss = function (panel, dismiss) {
+    panel.setAttribute('data-swipe-dismiss', '');
+    let start = null;
+    const reset = () => { start = null; };
+    panel.addEventListener('touchstart', e => {
+      reset();
+      if (e.touches.length !== 1 || e.target.closest('[data-swipe-dismiss]') !== panel ||
+          e.target.closest('input, select, textarea, [contenteditable="true"]')) return;
+      // A horizontal scroller gets the gesture while it has content to scroll back to.
+      for (let el = e.target; el; el = el.parentElement) {
+        if (el.scrollLeft > 0 && /^(auto|scroll)$/.test(getComputedStyle(el).overflowX)) return;
+        if (el === panel) break;
+      }
+      const t = e.touches[0];
+      start = { id: t.identifier, x: t.clientX, y: t.clientY };
+    }, { passive: true });
+    panel.addEventListener('touchmove', e => {
+      if (!start) return;
+      const t = e.touches[0];
+      if (e.touches.length !== 1 || t.identifier !== start.id) { reset(); return; }
+      const dx = t.clientX - start.x, dy = Math.abs(t.clientY - start.y);
+      if (dx < -12 || dy > 32 || (dy > 12 && dy >= dx)) { reset(); return; }
+      if (dx > 12 && dx > dy * 1.5 && e.cancelable) e.preventDefault();
+    }, { passive: false });
+    panel.addEventListener('touchcancel', reset, { passive: true });
+    panel.addEventListener('touchend', e => {
+      const origin = start;
+      reset();
+      if (!origin || e.touches.length) return;
+      const t = Array.from(e.changedTouches).find(touch => touch.identifier === origin.id);
+      if (!t || t.clientX - origin.x < 65 || Math.abs(t.clientY - origin.y) > 32) return;
+      if (e.cancelable) e.preventDefault();
+      dismiss();
+    }, { passive: false });
+  };
+
   // ---------- ทะเบียนแจ้งเตือน: แต่ละอย่าง (และอินดี้ที่เพิ่มทีหลัง) ลงชื่อไว้ ผู้ใช้เลือกเปิด/ปิดได้ในเมนู ⚙️ ----------
   window.OIAlerts = (() => {
     const list = [], KEY = 'oi_alert_types'; let pref = {}, master = () => false, onChange = () => {};
@@ -677,7 +713,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.117';
+  const APP_VER = '4.9.118';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   // V4.9.107: เช็กเวอร์ชันบนเว็บ (ตอนเปิด / กลับเข้าแอป / ทุก 15 นาที) → ถ้าใหม่กว่า โหลดใหม่แบบเลี่ยงแคช (กัน iPhone ค้างเวอร์ชันเก่า)
   (() => {
@@ -1510,6 +1546,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     clearTimeout(hideToast.t); hideToast.t = setTimeout(() => { if (!el.classList.contains('show')) el.hidden = true; }, 360);
   }
   $('toast').addEventListener('click', hideToast);
+  window.bindRightSwipeDismiss($('toast'), hideToast);
   chartEl.addEventListener('pointerdown', () => { if (!$('toast').hidden) hideToast(); });
 
   // ---------- ท่าทางสัมผัส: ปัดแกนราคา (เปิด/ปิดแกน spot) และวัดระยะสองนิ้ว ----------
@@ -1716,6 +1753,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   function closeSettings() { $('setPanel').hidden = true; }
   $('setBtn').addEventListener('click', openSettings);
   $('setClose').addEventListener('click', closeSettings);
+  window.bindRightSwipeDismiss($('setPanel'), closeSettings);
   $('introStyle').value = window.OIIntro.get();
   $('introStyle').addEventListener('change', e => window.OIIntro.set(e.target.value));
   $('setPanel').addEventListener('click', e => {
@@ -2451,6 +2489,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       return `<div class="row"><button data-ind="${d.id}" class="${c.on ? 'on' : ''}"><i style="background:${d.col}"></i>${d.name}</button><span class="ps">${ins}</span></div>`;
     }).join('') + '<div class="row"><button data-oih="1">Historical OI Zones</button></div><button class="reset" data-reset="1">คืนค่าเริ่มต้นทั้งหมด</button>';
   }
+  window.bindRightSwipeDismiss($('indMenu'), () => { $('indMenu').hidden = true; });
   $('indBtn').addEventListener('click', e => { e.stopPropagation(); const m = $('indMenu'); m.hidden = !m.hidden; $('drawBar').hidden = true; if (!m.hidden) paintIndMenu(); });
   $('indMenu').addEventListener('click', e => {
     e.stopPropagation();
@@ -2583,6 +2622,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     lockChart(!!k); paintDrawBar(); $('drawBtn').classList.toggle('has', !!k || drawings.length > 0);
     if (k) showToast(k === 'measure' ? 'แตะ/คลิกจุดแรก แล้วแตะ/คลิกจุดที่สอง (คอมใช้ Shift+คลิก ได้เลย · Esc ยกเลิก)' : k === 'erase' ? 'แตะที่เส้นที่ต้องการลบ' : k === 'hline' ? 'แตะที่ราคาที่ต้องการวางเส้น' : 'แตะค้างที่จุดแรก แล้วลากไปจุดที่สอง', 2500);
   }
+  window.bindRightSwipeDismiss($('drawBar'), () => { $('drawBar').hidden = true; setTool(null); });
   $('drawBtn').addEventListener('click', e => {
     e.stopPropagation(); const b = $('drawBar'); b.hidden = !b.hidden; $('indMenu').hidden = true;
     if (b.hidden) setTool(null); else paintDrawBar();
@@ -2707,6 +2747,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   $('tfs').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.tf) loadTF(b.dataset.tf); });
   // ปุ่ม ⟳: ขึ้นสัญลักษณ์โหลดบนกราฟ จนกว่าข้อมูลชีต + ข้อมูลสดโหลดเสร็จและกราฟวาดใหม่แล้ว
   let reloading = false;
+  window.bindRightSwipeDismiss($('reloadOv'), () => $('reloadOv').classList.remove('on'));
   $('reload').addEventListener('click', async () => {
     if (reloading) return; reloading = true;
     const ov = $('reloadOv'), btn = $('reload');
@@ -2818,6 +2859,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   // ---------- เลือกสัญลักษณ์ (ทอง XAUUSD / GC Yahoo) · V4.9.75 ตัดน้ำมันออก ----------
   $('symName').textContent = SC.name;
   $('symMenu').innerHTML = Object.keys(SYMS).map(k => `<button data-sym="${k}" class="${k === SYM ? 'on' : ''}"><em>${SYMS[k].ico}</em>${SYMS[k].label}<small>${SYMS[k].name}</small></button>`).join('');
+  window.bindRightSwipeDismiss($('symMenu'), () => { $('symMenu').hidden = true; });
   $('symBtn').addEventListener('click', e => { e.stopPropagation(); $('symMenu').hidden = !$('symMenu').hidden; });
   document.addEventListener('click', e => { if (!e.target.closest('#symMenu')) $('symMenu').hidden = true; });
   $('symMenu').addEventListener('click', e => {
@@ -2944,7 +2986,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <script src="crowd.js?v=40602"></script>
 <script src="oistat.js?v=40601"></script>
 <script src="colorize.js?v=20017"></script>
-<script src="dash.js?v=40601"></script>
+<script src="dash.js?v=41018"></script>
 <script src="live.js?v=41010"></script>
 <script src="intraday.js?v=20042"></script>
 <script src="retail.js?v=40952"></script>
@@ -2966,30 +3008,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   <p id="sfDetailsStatus"></p>
   <p id="sfDetailsRisk"></p>
 </dialog>
-<script>
-window.bindLeftSwipeDismiss = function (panel, dismiss) {
-  let start = null;
-  panel.addEventListener('touchstart', e => {
-    const touch = e.touches[0];
-    start = e.touches.length === 1 ? { id: touch.identifier, x: touch.clientX, y: touch.clientY } : null;
-  }, { passive: true });
-  panel.addEventListener('touchmove', e => {
-    if (start && (e.touches.length !== 1 || Math.abs(e.touches[0].clientY - start.y) > 32)) start = null;
-  }, { passive: true });
-  panel.addEventListener('touchcancel', () => { start = null; }, { passive: true });
-  panel.addEventListener('touchend', e => {
-    const origin = start;
-    start = null;
-    if (!origin || e.touches.length) return;
-    const touch = Array.from(e.changedTouches).find(t => t.identifier === origin.id);
-    if (!touch) return;
-    const left = origin.x - touch.clientX;
-    const vertical = Math.abs(touch.clientY - origin.y);
-    if (left >= 65 && vertical <= 32) dismiss();
-  }, { passive: true });
-};
-</script>
-<script src="osf.js?v=41015"></script>
+<script src="osf.js?v=41018"></script>
 <script src="squeeze.js?v=40316"></script>
 <script src="trap.js?v=40929"></script>
 <script src="volreg.js?v=40929"></script>
@@ -2997,8 +3016,8 @@ window.bindLeftSwipeDismiss = function (panel, dismiss) {
 <script src="dealerbox.js?v=40962"></script>
 <script src="siglog.js?v=40998"></script>
 <script src="quant.js?v=20031"></script>
-<script src="aitray.js?v=40929"></script>
-<script src="v33-luxury.js?v=41011"></script>
-<script src="historical-oi.js?v=4201"></script>
+<script src="aitray.js?v=41018"></script>
+<script src="v33-luxury.js?v=41018"></script>
+<script src="historical-oi.js?v=41018"></script>
 </body>
 </html>

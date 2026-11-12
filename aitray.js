@@ -781,10 +781,7 @@
   function open() { if (tray.classList.contains('open')) return; tray.classList.add('open'); tray.setAttribute('aria-hidden', 'false'); if (!busy) paintIdle(); loadNews(); try { navigator.vibrate && navigator.vibrate(10); } catch (e) {} }
   function close() { stopSpeak(); tray.classList.remove('open'); tray.setAttribute('aria-hidden', 'true'); }
   $('paX').onclick = close;
-  // ปัดขวาบนถาด = ปิด
-  let tx = null;
-  tray.addEventListener('touchstart', e => { if (e.touches.length === 1) tx = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() }; }, { passive: true });
-  tray.addEventListener('touchend', e => { if (!tx) return; const t = e.changedTouches[0], dx = t.clientX - tx.x, dy = t.clientY - tx.y; if (dx > 70 && Math.abs(dy) < Math.abs(dx) * 0.6 && Date.now() - tx.t < 600) close(); tx = null; }, { passive: true });
+  window.bindRightSwipeDismiss?.(tray, close);
 
   // ปัดซ้ายที่ข้อความ "OI · Powered by … · V…" บนหัวแอป = เปิดถาด (ใช้ได้ทั้งนิ้วและเมาส์)
   const src = $('src');

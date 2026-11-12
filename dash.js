@@ -174,26 +174,9 @@
   document.body.appendChild(box);
   const tabs = () => { if (Object.keys(SY).length < 2) { $('dTabs').innerHTML = ''; return; } $('dTabs').innerHTML = Object.keys(SY).map(k => `<button data-s="${k}" class="${k === cur ? 'on' : ''}">${SY[k].ico} ${SY[k].label}</button>`).join(''); };
   $('dTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; cur = b.dataset.s; tabs(); show(); });
-  $('dClose').addEventListener('click', () => { box.hidden = true; });
-  // ปัดไปทางขวาเพื่อกลับไปหน้ากราฟ (เหมือนปุ่มย้อนกลับ) · ต้องลากแนวนอนชัดเจน ≥ 80px และไม่ใช่การเลื่อนขึ้นลง
-  { let sx = null, sy = null, t0 = 0, horiz = null;
-    box.addEventListener('touchstart', e => { if (e.touches.length !== 1) { sx = null; return; } sx = e.touches[0].clientX; sy = e.touches[0].clientY; t0 = Date.now(); horiz = null; box.style.transition = 'none'; }, { passive: true });
-    box.addEventListener('touchmove', e => {
-      if (sx === null) return;
-      const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
-      if (horiz === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) horiz = Math.abs(dx) > Math.abs(dy) * 1.5 && dx > 0;
-      if (horiz) box.style.transform = `translateX(${Math.max(0, dx)}px)`;
-    }, { passive: true });
-    box.addEventListener('touchend', e => {
-      if (sx === null) return;
-      const dx = (e.changedTouches[0] || {}).clientX - sx;
-      const go = horiz && (dx > 80 || (dx > 40 && Date.now() - t0 < 250));
-      box.style.transition = 'transform .18s ease-out';
-      if (go) { box.style.transform = 'translateX(100%)'; setTimeout(() => { box.hidden = true; box.style.transform = ''; box.style.transition = ''; }, 180); }
-      else box.style.transform = '';
-      sx = null; horiz = null;
-    });
-  }
+  const closeDashboard = () => { box.hidden = true; };
+  $('dClose').addEventListener('click', closeDashboard);
+  window.bindRightSwipeDismiss?.(box, closeDashboard);
   $('dReload').addEventListener('click', () => load(true));
   // ---------- ปุ่ม "วิเคราะห์": ป๊อปอัพแอนิเมชันระหว่าง AI ทำงาน ----------
   $('dAI').addEventListener('click', runAI);
@@ -224,13 +207,18 @@
       const want = s < 2 ? 0 : s < 4 ? 1 : s < 6 ? 2 : 3; // ขั้น 4 (AI) ค้างจนได้ผล
       if (want > cur) { cur = want; setStep(cur); }
     }, 120);
+    const closeAnalysis = () => { clearInterval(iv); w.remove(); };
+    window.bindRightSwipeDismiss?.(w, closeAnalysis);
     const res = await O.aiAnalyze();
+    if (!w.isConnected) return;
     if (res && res.ok) {
       cur = 4; setStep(4);
       await new Promise(r => setTimeout(r, 500));
+      if (!w.isConnected) return;
       setStep(5); $('aiBar').style.width = '100%';
       await new Promise(r => setTimeout(r, 600));
-      clearInterval(iv); w.remove();
+      if (!w.isConnected) return;
+      closeAnalysis();
       await load(true);
       const b = $('dBody'); if (b) b.scrollTop = 0;
       if (O.showToast) O.showToast(res.cached ? 'เพิ่งวิเคราะห์ไปไม่ถึง 1 นาที แสดงผลล่าสุด' : '✅ AI วิเคราะห์เสร็จแล้ว');
@@ -238,7 +226,7 @@
       clearInterval(iv);
       const msg = !res ? 'ไม่ได้รับคำตอบ' : res.error === 'auth' ? 'รหัสผ่านใช้ไม่ได้' : res.error === 'busy' ? 'AI กำลังวิเคราะห์อยู่จากอีกเครื่อง ลองใหม่อีกครู่' : res.error;
       $('aiErr').innerHTML = `<div class="err">วิเคราะห์ไม่สำเร็จ: ${esc(msg)}</div><button id="aiClose">ปิด</button>`;
-      $('aiClose').addEventListener('click', () => w.remove());
+      $('aiClose').addEventListener('click', closeAnalysis);
     }
   }
   btn.addEventListener('click', () => { box.hidden = false; tabs(); load(true); });

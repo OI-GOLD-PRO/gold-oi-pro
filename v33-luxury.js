@@ -42,7 +42,8 @@
     setOiOpen(false);
     setActive('chart');
   }
-  window.bindLeftSwipeDismiss(sheet, closeOI);
+  window.bindRightSwipeDismiss?.(sheet, closeOI);
+  window.bindRightSwipeDismiss?.(backdrop, closeOI);
   backdrop.addEventListener('click', closeOI);
   sheet.querySelector('#v34close').addEventListener('click', closeOI);
   sheet.querySelector('#v34show').addEventListener('click', () => {

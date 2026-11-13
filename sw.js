@@ -1,6 +1,36 @@
-// OI Gold Pro: Service Worker สำหรับแจ้งเตือน Web Push เท่านั้น (ไม่แคชไฟล์ ไม่ยุ่งกับการโหลดหน้า)
+// OI Gold Pro: ดูแลการเปิดหน้าแอปและการแจ้งเตือน Web Push
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+const scope = new URL(self.registration.scope);
+const isAppPage = url => url.origin === scope.origin &&
+  (url.pathname === scope.pathname || url.pathname === scope.pathname + 'index.html');
+
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    await self.clients.claim();
+    const windows = await self.clients.matchAll({ type: 'window' });
+    for (const client of windows) {
+      const url = new URL(client.url);
+      if (!isAppPage(url) || url.searchParams.get('pane') === 'b' ||
+          url.searchParams.has('vc')) continue;
+      // กู้หน้าที่เปิดค้างก่อนมีตัวตรวจเวอร์ชัน โดยคงพารามิเตอร์เดิม
+      url.searchParams.set('vc', String(Date.now()));
+      // Navigation can wait on activation, so do not await it here.
+      client.navigate(url.href).catch(() => {});
+    }
+  })());
+});
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.mode !== 'navigate' || !isAppPage(new URL(request.url))) return;
+  event.respondWith((async () => {
+    try {
+      return await fetch(request, { cache: 'no-store' });
+    } catch (error) {
+      return fetch(request, { cache: 'force-cache' });
+    }
+  })());
+});
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: 'OI Gold Pro', body: e.data ? e.data.text() : '' }; }

@@ -55,5 +55,11 @@
       "forecast": "0.4%",
       "previous": "1.3%"
     }
-  ]
+  ],
+  "checked_at": 1794570029,
+  "coverage": {
+    "from": 1794114000,
+    "to": 1794718800,
+    "timezone": "America/New_York"
+  }
 }

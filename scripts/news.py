@@ -3,6 +3,7 @@
 เขียนผลเป็น news.json ให้หน้าแอปอ่าน"""
 import json, re, sys, difflib, urllib.request
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 UA = 'Mozilla/5.0 (oi-gold news bot)'
 
@@ -13,9 +14,14 @@ def get(url, headers=None):
 
 # ---------- Forex Factory ----------
 ff = []
+coverage_weeks = set()
 for wk in ('thisweek', 'nextweek'):
     try:
-        ff += get(f'https://nfs.faireconomy.media/ff_calendar_{wk}.json')
+        week_rows = get(f'https://nfs.faireconomy.media/ff_calendar_{wk}.json')
+        if not isinstance(week_rows, list):
+            raise ValueError('calendar is not a list')
+        ff += week_rows
+        coverage_weeks.add(wk)
     except Exception as e:
         print('FF', wk, 'failed:', e)
 try:
@@ -157,6 +163,15 @@ for e in ff_events:
         print(f"match {e['title']!r} <- {best['name']!r} ({bs:.2f}) = {e['actual']}")
 
 out = {'source': 'Forex Factory + FXStreet (actual)', 'events': ff_events}
+# Only a successfully fetched current-week feed can certify coverage.
+# Do not stamp old cached events as fresh when the calendar fetch failed.
+if 'thisweek' in coverage_weeks:
+    checked = datetime.now(timezone.utc)
+    local = checked.astimezone(ZoneInfo('America/New_York'))
+    start = (local - timedelta(days=(local.weekday() + 1) % 7)).replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=14 if 'nextweek' in coverage_weeks else 7)
+    out['checked_at'] = int(checked.timestamp())
+    out['coverage'] = {'from': int(start.timestamp()), 'to': int(end.timestamp()), 'timezone': 'America/New_York'}
 new = json.dumps(out, ensure_ascii=False, indent=2)
 try:
     cur = open('news.json').read()

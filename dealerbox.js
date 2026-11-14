@@ -156,6 +156,26 @@
       x0 -= step / 2; if (inactive) x1 += step / 2;
       if (x1 < 0 || x0 > plotW) return;
       if (cfg.line) {
+        // The compact frame covers the rejection cluster, ending at its last test.
+        const lastTestX = X(bx.tests[bx.tests.length - 1]);
+        const { top, bot } = bounds(bx);
+        const yt = Y(top), yb = Y(bot);
+        if (lastTestX !== null && yt !== null && yb !== null && yb >= 0 && yt <= plotH) {
+          const left = Math.max(0, x0), right = Math.min(plotW, lastTestX + step / 2);
+          if (left < right) {
+            ctx.globalAlpha = inactive ? 0.45 : 1;
+            if (!inactive) {
+              ctx.fillStyle = 'rgba(255,255,255,.15)';
+              ctx.fillRect(left, yt, right - left, yb - yt);
+            }
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = inactive ? 0.75 : 1;
+            ctx.setLineDash(inactive ? [4, 3] : bx.est ? [6, 2] : []);
+            ctx.strokeRect(left, yt, right - left, yb - yt);
+            ctx.setLineDash([]);
+            hit.push({ x0: left, x1: right, y1: yt - 3, y2: yb + 3, bx });
+          }
+        }
         const y = Y(bx.p);
         if (y === null || y < 0 || y > plotH) return;
         const left = Math.max(0, x0), right = Math.min(plotW, x1);

@@ -149,6 +149,44 @@
     const latestX = lastBar ? ts.timeToCoordinate(lastBar.time) : X(bars.length - 1);
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, plotW, plotH); ctx.clip();
+    if (cfg.line) {
+      // Merge only tests that map to the same visible candle.
+      const tests = new Map();
+      for (const box of boxes) {
+        const active = box.live === true && box.broke === undefined;
+        for (const i of box.tests) {
+          const bar = bars[i];
+          if (!bar) continue;
+          const time = toChart(bar.time);
+          const current = tests.get(time);
+          tests.set(time, {
+            high: Math.max(bar.high, current?.high ?? bar.high),
+            low: Math.min(bar.low, current?.low ?? bar.low),
+            active: active || current?.active,
+            box: active || !current ? box : current.box,
+          });
+        }
+      }
+      const width = step * 0.8;
+      for (const [time, test] of tests) {
+        const x = ts.timeToCoordinate(time), top = Y(test.high), bottom = Y(test.low);
+        if (x === null || top === null || bottom === null || bottom < 0 || top > plotH) continue;
+        const left = Math.max(0, x - width / 2), right = Math.min(plotW, x + width / 2);
+        if (left >= right) continue;
+        const height = Math.max(1, bottom - top);
+        ctx.globalAlpha = test.active ? 1 : 0.45;
+        if (test.active) {
+          ctx.fillStyle = 'rgba(255,255,255,.15)';
+          ctx.fillRect(left, top, right - left, height);
+        }
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = test.active ? 1 : 0.75;
+        ctx.setLineDash(test.active ? [] : [4, 3]);
+        ctx.strokeRect(left, top, right - left, height);
+        ctx.setLineDash([]);
+        hit.push({ x0: left, x1: right, y1: top - 3, y2: bottom + 3, bx: test.box });
+      }
+    }
     boxes.forEach(bx => { // Every ended/broken frame uses the same faint dashed outline.
       const inactive = bx.live !== true || bx.broke !== undefined;
       let x0 = X(bx.start), x1 = !inactive ? (latestX === null ? null : latestX + 3 * step) : X(bx.end);
@@ -156,26 +194,6 @@
       x0 -= step / 2; if (inactive) x1 += step / 2;
       if (x1 < 0 || x0 > plotW) return;
       if (cfg.line) {
-        // The compact frame covers the rejection cluster, ending at its last test.
-        const lastTestX = X(bx.tests[bx.tests.length - 1]);
-        const { top, bot } = bounds(bx);
-        const yt = Y(top), yb = Y(bot);
-        if (lastTestX !== null && yt !== null && yb !== null && yb >= 0 && yt <= plotH) {
-          const left = Math.max(0, x0), right = Math.min(plotW, lastTestX + step / 2);
-          if (left < right) {
-            ctx.globalAlpha = inactive ? 0.45 : 1;
-            if (!inactive) {
-              ctx.fillStyle = 'rgba(255,255,255,.15)';
-              ctx.fillRect(left, yt, right - left, yb - yt);
-            }
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = inactive ? 0.75 : 1;
-            ctx.setLineDash(inactive ? [4, 3] : bx.est ? [6, 2] : []);
-            ctx.strokeRect(left, yt, right - left, yb - yt);
-            ctx.setLineDash([]);
-            hit.push({ x0: left, x1: right, y1: yt - 3, y2: yb + 3, bx });
-          }
-        }
         const y = Y(bx.p);
         if (y === null || y < 0 || y > plotH) return;
         const left = Math.max(0, x0), right = Math.min(plotW, x1);

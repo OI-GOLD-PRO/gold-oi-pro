@@ -75,14 +75,15 @@ function change(value){const input={value,dataset:{}};handlers.change({target:{c
  values.set('oi_dbox', JSON.stringify({on:false,line:true,minTests:3}));
  d=runtime();fetched=candles([10,20,30]);await d.run(true);
  strokes=[];fills=[];draw();
- assert.equal(strokes.length,1,'line mode draws one compact rejection frame');
- assert.equal(fills.length,1,'active line mode highlights the rejection cluster');
- assert.equal(fills[0].color,'rgba(255,255,255,.15)');
- assert.equal(strokes[0].a[0],57);
- assert.equal(strokes[0].a[0]+strokes[0].a[2],183,'frame ends at last test, before the line endpoint');
+ assert.equal(strokes.length,3,'each rejected M5 candle has its own frame');
+ assert.equal(fills.length,3);
+ assert(fills.every(f=>f.color==='rgba(255,255,255,.15)'));
+ assert.deepEqual(strokes.map(b=>Math.round(b.a[0]+b.a[2]/2)),[60,120,180]);
+ assert(strokes.every(b=>b.a[2]<6),'frames fit within individual candles');
  fetched[40]={...fetched[40],close:103,high:104};await d.run(true);
- strokes=[];fills=[];draw();assert.equal(strokes.length,1);assert.equal(fills.length,0);
- assert.deepEqual(strokes[0].dash,[4,3]);
-
+ strokes=[];fills=[];draw();assert.equal(strokes.length,3);assert.equal(fills.length,0);
+ assert(strokes.every(b=>b.dash.join(',')==='4,3'));
+ fetched=candles([10,20]);await d.run(true);
+ strokes=[];fills=[];draw();assert.equal(strokes.length,0);assert.equal(fills.length,0);
  console.log('PASS: ended and broken frames dashed with no fill, active/estimated styles preserved, default/custom rejection threshold, support/resistance, gap spacing, closed candles, immediate rescan, persistence, thin outlines, bottom layer, 10% live-only fill and latest +3 endpoint.');
 })().catch(e=>{console.error(e);process.exit(1);});

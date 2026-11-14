@@ -149,31 +149,6 @@
     const latestX = lastBar ? ts.timeToCoordinate(lastBar.time) : X(bars.length - 1);
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, plotW, plotH); ctx.clip();
-    // Show only the M5 candles counted as rejections for confirmed levels.
-    const rejections = new Map();
-    for (const box of boxes) {
-      for (const index of box.tests) {
-        const bar = bars[index];
-        if (!bar) continue;
-        const time = toChart(bar.time);
-        const range = rejections.get(time);
-        if (range) {
-          range.high = Math.max(range.high, bar.high);
-          range.low = Math.min(range.low, bar.low);
-        } else {
-          rejections.set(time, { high: bar.high, low: bar.low });
-        }
-      }
-    }
-    ctx.fillStyle = 'rgba(255,255,255,.15)';
-    const width = step * Math.max(1, 300 / csec());
-    for (const [time, range] of rejections) {
-      const x = ts.timeToCoordinate(time), top = Y(range.high), bottom = Y(range.low);
-      if (x === null || top === null || bottom === null) continue;
-      const left = x - step / 2, right = left + width;
-      if (right < 0 || left > plotW || bottom < 0 || top > plotH) continue;
-      ctx.fillRect(left, top, width, Math.max(1, bottom - top));
-    }
     boxes.forEach(bx => { // Every ended/broken frame uses the same faint dashed outline.
       const inactive = bx.live !== true || bx.broke !== undefined;
       let x0 = X(bx.start), x1 = !inactive ? (latestX === null ? null : latestX + 3 * step) : X(bx.end);

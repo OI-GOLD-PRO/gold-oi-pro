@@ -32,9 +32,9 @@ function change(value){const input={value,dataset:{}};handlers.change({target:{c
  clock+=300000;assert.equal(d.scan(candles([10,20,49],-1,true),L).length,1);clock-=300000;
  fetched=candles([10,20,30]);await d.run(true);assert.equal(d.boxes.length,1);
  assert.equal(primitive.paneViews()[0].zOrder(),'bottom');
- let strokes=[],fills=[],highlights=[];const ctx=new Proxy({setLineDash:a=>{ctx.dash=Array.from(a);},strokeRect:(...a)=>strokes.push({width:ctx.lineWidth,alpha:ctx.globalAlpha,dash:Array.from(ctx.dash||[]),a}),fillRect:(...a)=>(ctx.fillStyle==='rgba(255,255,255,.15)'?highlights:fills).push({color:ctx.fillStyle,a})},{get:(o,k)=>k in o?o[k]:()=>{},set:(o,k,v)=>(o[k]=v,true)});
+ let strokes=[],fills=[];const ctx=new Proxy({setLineDash:a=>{ctx.dash=Array.from(a);},strokeRect:(...a)=>strokes.push({width:ctx.lineWidth,alpha:ctx.globalAlpha,dash:Array.from(ctx.dash||[]),a}),fillRect:(...a)=>fills.push({color:ctx.fillStyle,a})},{get:(o,k)=>k in o?o[k]:()=>{},set:(o,k,v)=>(o[k]=v,true)});
  const draw=()=>primitive.paneViews()[0].renderer().draw({useMediaCoordinateSpace:f=>f({context:ctx,mediaSize:{width:320,height:480}})});
- draw();assert.equal(highlights.length,3);assert.deepEqual(highlights.map(h=>h.a), [[57,100,6,55],[117,100,6,55],[177,100,6,55]]);assert.equal(strokes[0].width,1);assert.equal(fills[0].color,'rgba(255,255,255,.1)');
+ draw();assert.equal(strokes[0].width,1);assert.equal(fills[0].color,'rgba(255,255,255,.1)');
  const end=strokes[0].a[0]+strokes[0].a[2];assert(Math.abs(end-312.5)<1,'live endpoint stays at latest +3 bars');
  assert.equal(change('4'),4);assert.equal(d.boxes.length,0,'filter change rescans cached bars immediately');
  assert.equal(change('2'),2);assert.equal(d.boxes.length,1);
@@ -72,14 +72,6 @@ function change(value){const input={value,dataset:{}};handlers.change({target:{c
  b=d.scan(fetched,L);assert.equal(b[0].broke,40,'close below original bottom breaks even above strike - $2');assert.equal(b[0].bot,99.4);
  console.log('PASS: frozen confirmation bounds, later wick does not widen, original-edge breakout both directions, no extension after break.');
  assert(updates>0);
- values.set('oi_dbox', JSON.stringify({on:false,line:true,minTests:3}));
- d=runtime();
- fetched=candles([10,20,30]);
- await d.run(true);highlights=[];strokes=[];fills=[];
- draw();assert.equal(highlights.length,3,'line mode highlights the same rejection candles');
- assert.equal(strokes.length,0);assert.equal(fills.length,0);
- fetched=candles([10,20]);await d.run(true);highlights=[];
- draw();assert.equal(highlights.length,0,'unconfirmed levels have no highlights');
- console.log('PASS: exact M5 rejection highlights in frame and line modes.');
+
  console.log('PASS: ended and broken frames dashed with no fill, active/estimated styles preserved, default/custom rejection threshold, support/resistance, gap spacing, closed candles, immediate rescan, persistence, thin outlines, bottom layer, 10% live-only fill and latest +3 endpoint.');
 })().catch(e=>{console.error(e);process.exit(1);});

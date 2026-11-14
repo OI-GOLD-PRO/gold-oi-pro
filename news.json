@@ -60,15 +60,6 @@
       "better": false
     },
     {
-      "date": "2026-11-14T00:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Jefferson speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
       "date": "2026-11-16T10:00:00+00:00",
       "c": "USD",
       "i": "M",
@@ -339,7 +330,7 @@
       "src": "fxstreet"
     }
   ],
-  "checked_at": 1794612562,
+  "checked_at": 1794626994,
   "coverage": {
     "from": 1794114000,
     "to": 1794718800,

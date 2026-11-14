@@ -8,12 +8,12 @@ function candles(touches,side=-1,forming=false){return Array.from({length:50},(_
  if(touches.includes(i)){if(side<0)b.high=100;else b.low=100;}return b;
 });}
 let fetched=candles([10,20,30]);
-function runtime(){
+function runtime(tf='5m', chartBars=()=>fetched){
  const menu={hidden:false,addEventListener:(k,f)=>handlers[k]=f,querySelector:()=>null,prepend:d=>nodes.set(d.id,d)};
- const O={sym:'gold',hooks:[],lastClose:100,oi:{rows:[{strike:100,price:100}]},tf:'5m',markDirty(){},fetchTF:async()=>fetched,
+ const O={sym:'gold',hooks:[],lastClose:100,oi:{rows:[{strike:100,price:100}]},tf,markDirty(){},fetchTF:async()=>fetched,
  chartEl:{addEventListener(){},getBoundingClientRect:()=>({left:0,top:0})},
  chart:{timeScale:()=>({width:()=>320,height:()=>20,options:()=>({barSpacing:6}),timeToCoordinate:t=>(t-start)/300*6})},
- series:{data:()=>fetched,priceToCoordinate:p=>(120-p)*5,attachPrimitive:p=>{primitive=p;p.attached({requestUpdate:()=>updates++});}}};
+ series:{data:chartBars,priceToCoordinate:p=>(120-p)*5,attachPrimitive:p=>{primitive=p;p.attached({requestUpdate:()=>updates++});}}};
  const window={OI:O,OILive:{calc:{strikes:[{k:100,gex:100}]}}};
  vm.runInNewContext(code,{window,document:{getElementById:id=>id==='indMenu'?menu:nodes.get(id),addEventListener(){},createElement:()=>({remove(){nodes.delete(this.id);}})},
  localStorage:{getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)},Date:class extends Date{static now(){return clock;}},MutationObserver:class{observe(){}},setInterval(){},setTimeout(){},console});
@@ -92,5 +92,19 @@ function change(value){const input={value,dataset:{}};handlers.change({target:{c
  assert(strokes.every(b=>b.a[1]===100 && b.a[3]===5),'support markers run from the line down by $1');
  fetched=candles([10,20]);await d.run(true);
  strokes=[];fills=[];draw();assert.equal(strokes.length,0);assert.equal(fills.length,0);
+ for (const side of [-1,1]) {
+   fetched=candles([10,20,30],side);
+   const m1=fetched.flatMap((bar,i)=>Array.from({length:5},(_,j)=>({
+     ...bar,time:bar.time+j*60,
+     high:side<0 && j!==3 ? Math.min(bar.high,92) : bar.high,
+     low:side>0 && j!==3 ? Math.max(bar.low,108) : bar.low
+   }))).filter(bar=>bar.time<start+30*300 || bar.time>=start+31*300);
+   d=runtime('1m',()=>m1);await d.run(true);
+   strokes=[];fills=[];draw();
+   assert.equal(d.boxes[0].tests.length,3);
+   assert.deepEqual(strokes.map(b=>Math.round((b.a[0]+b.a[2]/2)*10)/10),[63.6,123.6],
+     'M1 markers select the extreme inside each counted M5 window and skip missing windows');
+ }
+ console.log('PASS: M1 support and resistance rejection alignment.');
  console.log('PASS: ended and broken frames dashed with no fill, active/estimated styles preserved, default/custom rejection threshold, support/resistance, gap spacing, closed candles, immediate rescan, persistence, thin outlines, bottom layer, 10% live-only fill and latest +3 endpoint.');
 })().catch(e=>{console.error(e);process.exit(1);});

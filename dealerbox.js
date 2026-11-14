@@ -138,6 +138,24 @@
 
   // ---------- วาด ----------
   const csec = () => TFS[O.tf] || 60, toChart = t => Math.floor(t / csec()) * csec();
+  function rejectionTime(time, side, chartBars) {
+    if (O.tf !== '1m') return toChart(time);
+    let lo = 0, hi = chartBars.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (chartBars[mid].time < time) lo = mid + 1;
+      else hi = mid;
+    }
+    const field = side > 0 ? 'low' : 'high';
+    let best;
+    for (let i = lo; i < chartBars.length && chartBars[i].time < time + 300; i++) {
+      const bar = chartBars[i];
+      if (!Number.isFinite(bar[field])) continue;
+      if (!best || (bar[field] - best[field]) * side < 0) best = bar;
+    }
+    return best?.time;
+  }
+
   let hit = [];
   function drawFrames(ctx, w, h) {
     hit = [];
@@ -157,7 +175,7 @@
         const bottom = Y(box.p - (box.side > 0 ? depth : 0));
         if (top === null || bottom === null || bottom < 0 || top > plotH) continue;
         // Keep each rejection attached to its own dealer level and counted candle.
-        const times = new Set(box.tests.map(i => toChart(bars[i].time)));
+        const times = new Set(box.tests.map(i => rejectionTime(bars[i].time, box.side, chartBars)));
         const height = Math.max(1, bottom - top);
         ctx.globalAlpha = active ? 1 : 0.45;
         ctx.fillStyle = 'rgba(255,255,255,.15)';
@@ -165,6 +183,7 @@
         ctx.lineWidth = active ? 1 : 0.75;
         ctx.setLineDash(active ? [] : [4, 3]);
         for (const time of times) {
+          if (time === undefined) continue;
           const x = ts.timeToCoordinate(time);
           if (x === null) continue;
           const left = Math.max(0, x - width / 2), right = Math.min(plotW, x + width / 2);

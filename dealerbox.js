@@ -150,42 +150,31 @@
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, plotW, plotH); ctx.clip();
     if (cfg.line) {
-      // Merge only tests that map to the same visible candle.
-      const tests = new Map();
+      const width = step * 0.8, depth = 1;
       for (const box of boxes) {
         const active = box.live === true && box.broke === undefined;
-        for (const i of box.tests) {
-          const bar = bars[i];
-          if (!bar) continue;
-          const time = toChart(bar.time);
-          const current = tests.get(time);
-          tests.set(time, {
-            high: Math.max(bar.high, current?.high ?? bar.high),
-            low: Math.min(bar.low, current?.low ?? bar.low),
-            active: active || current?.active,
-            box: active || !current ? box : current.box,
-          });
-        }
-      }
-      const width = step * 0.8;
-      for (const [time, test] of tests) {
-        const x = ts.timeToCoordinate(time), top = Y(test.high), bottom = Y(test.low);
-        if (x === null || top === null || bottom === null || bottom < 0 || top > plotH) continue;
-        const left = Math.max(0, x - width / 2), right = Math.min(plotW, x + width / 2);
-        if (left >= right) continue;
+        const top = Y(box.p + (box.side < 0 ? depth : 0));
+        const bottom = Y(box.p - (box.side > 0 ? depth : 0));
+        if (top === null || bottom === null || bottom < 0 || top > plotH) continue;
+        // Keep each rejection attached to its own dealer level and counted candle.
+        const times = new Set(box.tests.map(i => toChart(bars[i].time)));
         const height = Math.max(1, bottom - top);
-        ctx.globalAlpha = test.active ? 1 : 0.45;
-        if (test.active) {
-          ctx.fillStyle = 'rgba(255,255,255,.15)';
-          ctx.fillRect(left, top, right - left, height);
-        }
+        ctx.globalAlpha = active ? 1 : 0.45;
+        ctx.fillStyle = 'rgba(255,255,255,.15)';
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = test.active ? 1 : 0.75;
-        ctx.setLineDash(test.active ? [] : [4, 3]);
-        ctx.strokeRect(left, top, right - left, height);
-        ctx.setLineDash([]);
-        hit.push({ x0: left, x1: right, y1: top - 3, y2: bottom + 3, bx: test.box });
+        ctx.lineWidth = active ? 1 : 0.75;
+        ctx.setLineDash(active ? [] : [4, 3]);
+        for (const time of times) {
+          const x = ts.timeToCoordinate(time);
+          if (x === null) continue;
+          const left = Math.max(0, x - width / 2), right = Math.min(plotW, x + width / 2);
+          if (left >= right) continue;
+          if (active) ctx.fillRect(left, top, right - left, height);
+          ctx.strokeRect(left, top, right - left, height);
+          hit.push({ x0: left, x1: right, y1: top - 3, y2: bottom + 3, bx: box });
+        }
       }
+      ctx.setLineDash([]);
     }
     boxes.forEach(bx => { // Every ended/broken frame uses the same faint dashed outline.
       const inactive = bx.live !== true || bx.broke !== undefined;

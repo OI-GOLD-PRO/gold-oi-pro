@@ -73,7 +73,7 @@
       "c": "USD",
       "i": "M",
       "title": "NY Empire State Manufacturing Index",
-      "forecast": "",
+      "forecast": "17.6",
       "previous": "25.5",
       "src": "fxstreet"
     },
@@ -199,7 +199,7 @@
       "c": "USD",
       "i": "M",
       "title": "Pending Home Sales (MoM)",
-      "forecast": "",
+      "forecast": "-2.3%",
       "previous": "-7.3%",
       "src": "fxstreet"
     },
@@ -244,7 +244,7 @@
       "c": "USD",
       "i": "M",
       "title": "Philadelphia Fed Manufacturing Survey",
-      "forecast": "",
+      "forecast": "19.2",
       "previous": "20.9",
       "src": "fxstreet"
     },
@@ -330,7 +330,7 @@
       "src": "fxstreet"
     }
   ],
-  "checked_at": 1794674763,
+  "checked_at": 1794689892,
   "coverage": {
     "from": 1794114000,
     "to": 1794718800,

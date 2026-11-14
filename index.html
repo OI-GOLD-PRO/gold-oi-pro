@@ -175,6 +175,7 @@
   #indMenu .ps { display: flex; gap: 4px; flex-wrap: wrap; }
   #indMenu label { display: flex; flex-direction: column; font: 9.5px var(--sans); color: var(--muted); }
   #indMenu input { width: 46px; padding: 3px 4px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: 600 12px var(--mono); }
+  #indMenu .ps select { max-width: 160px; padding: 3px 4px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: 600 12px var(--mono); }
   #indMenu .reset { justify-content: center; font: 600 11px var(--sans); }
   /* Gold Scalping ในเมนู ƒx */
   #gsTbl { display: none; gap: 3px; padding: 0 14px 5px; }
@@ -713,7 +714,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.128';
+  const APP_VER = '4.9.129';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   // ตรวจเวอร์ชันเมื่อเปิดแอป กลับจากพื้นหลัง หรือกลับมาออนไลน์
   (() => {
@@ -2382,6 +2383,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     { id: 'ema3', type: 'ema', name: 'EMA', p: { n: 200 }, col: '#ba68c8', w: 2 },
     { id: 'sma1', type: 'sma', name: 'SMA', p: { n: 20 }, col: '#e57373' },
     { id: 'sma2', type: 'sma', name: 'SMA', p: { n: 100 }, col: '#81c784' },
+    { id: 'env', type: 'env', name: 'Envelope', p: { n: 20, dev: 0.1, method: 'ema' }, col: '#80cbc4' },
     { id: 'bb', type: 'bb', name: 'Bollinger', p: { n: 20, k: 2 }, col: '#90a4ae' },
     { id: 'st', type: 'st', name: 'Supertrend', p: { n: 10, k: 3 }, col: '#26a69a' },
     { id: 'rsi', type: 'rsi', name: 'RSI', p: { n: 14, ob: 70, os: 30 }, col: '#ffb74d', osc: true },
@@ -2389,7 +2391,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     { id: 'stoch', type: 'stoch', name: 'Stochastic', p: { k: 14, d: 3, sm: 3, ob: 80, os: 20 }, col: '#4dd0e1', osc: true },
     { id: 'atr', type: 'atr', name: 'ATR', p: { n: 14 }, col: '#ce93d8', osc: true },
   ];
-  const PLABEL = { n: 'คาบ', k: 'ตัวคูณ', ob: 'บน', os: 'ล่าง', f: 'เร็ว', s: 'ช้า', g: 'สัญญาณ', sm: 'smooth' };
+  const PLABEL = { dev: 'Deviation (%)', n: 'คาบ', k: 'ตัวคูณ', ob: 'บน', os: 'ล่าง', f: 'เร็ว', s: 'ช้า', g: 'สัญญาณ', sm: 'smooth' };
   const PLABEL_STOCH = { k: '%K', d: '%D', sm: 'smooth', ob: 'บน', os: 'ล่าง' };
   let indCfg = {};
   try { indCfg = JSON.parse(localStorage.getItem('oi_ind2' + PSFX) || 'null') || {}; } catch (e) { indCfg = {}; }
@@ -2411,6 +2413,12 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   // ---- สูตร ----
   function emaArr(v, n) { const k = 2 / (n + 1), out = []; let e = null, cnt = 0; v.forEach(x => { if (x === null) { out.push(null); return; } cnt++; e = e === null ? x : x * k + e * (1 - k); out.push(cnt >= n ? e : null); }); return out; }
   function smaArr(v, n) { const out = []; let sum = 0; v.forEach((x, i) => { sum += x; if (i >= n) sum -= v[i - n]; out.push(i >= n - 1 ? sum / n : null); }); return out; }
+  function envelopeArr(v, p) {
+    const mid = p.method === 'sma' ? smaArr(v, p.n) : emaArr(v, p.n);
+    const fraction = p.dev / 100;
+    return [mid.map(x => x === null ? null : x * (1 + fraction)), mid,
+      mid.map(x => x === null ? null : x * (1 - fraction))];
+  }
   function rmaArr(v, n) { const out = []; let r = null; v.forEach((x, i) => { if (i < n - 1) { out.push(null); return; } if (r === null) { r = v.slice(0, n).reduce((a, b) => a + b, 0) / n; } else r = (r * (n - 1) + x) / n; out.push(r); }); return out; }
   function trArr(B) { return B.map((b, i) => i ? Math.max(b.high - b.low, Math.abs(b.high - B[i - 1].close), Math.abs(b.low - B[i - 1].close)) : b.high - b.low); }
 
@@ -2420,6 +2428,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     const on = IND.filter(d => cfgOf(d).on);
     on.filter(d => !d.osc).forEach(d => {
       if (d.type === 'ema' || d.type === 'sma') indSeries[d.id] = [add(lineOpt(d.col, { lineWidth: d.w || 1 }))];
+      else if (d.type === 'env') indSeries.env = [add(lineOpt(d.col)), add(lineOpt(d.col, { lineStyle: 2 })), add(lineOpt(d.col))];
       else if (d.type === 'bb') indSeries.bb = [add(lineOpt(d.col, { lineStyle: 2 })), add(lineOpt(d.col)), add(lineOpt(d.col, { lineStyle: 2 }))];
       else if (d.type === 'st') indSeries.st = [add(lineOpt('#26a69a', { lineWidth: 2 })), add(lineOpt('#ef5350', { lineWidth: 2 }))];
     });
@@ -2458,6 +2467,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
         const p = cfgOf(d).p;
         if (d.type === 'ema') S[0].setData(line(emaArr(C, p.n)));
         else if (d.type === 'sma') S[0].setData(line(smaArr(C, p.n)));
+        else if (d.type === 'env') envelopeArr(C, p).forEach((arr, i) => S[i].setData(line(arr)));
         else if (d.type === 'bb') {
           const n = p.n, up = [], mid = [], lo = [];
           C.forEach((_, i) => {
@@ -2517,7 +2527,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   function paintIndMenu() {
     $('indMenu').innerHTML = '<div class="t">อินดิเคเตอร์ · แตะชื่อเพื่อเปิด/ปิด แก้ตัวเลขเพื่อปรับค่า</div>' + IND.map(d => {
       const c = cfgOf(d), lab = d.type === 'stoch' ? PLABEL_STOCH : PLABEL;
-      const ins = Object.keys(d.p).map(k => `<label>${lab[k] || k}<input type="number" inputmode="decimal" step="any" data-id="${d.id}" data-k="${k}" value="${c.p[k]}"></label>`).join('');
+      const ins = Object.keys(d.p).map(k => k === 'method' ? `<label>วิธีเฉลี่ย<select data-id="${d.id}" data-k="method"><option value="sma" ${c.p.method === 'sma' ? 'selected' : ''}>Simple (SMA)</option><option value="ema" ${c.p.method === 'ema' ? 'selected' : ''}>Exponential (EMA)</option></select></label>` : `<label>${lab[k] || k}<input type="number" inputmode="decimal" step="any" data-id="${d.id}" data-k="${k}" value="${c.p[k]}"></label>`).join('');
       return `<div class="row"><button data-ind="${d.id}" class="${c.on ? 'on' : ''}"><i style="background:${d.col}"></i>${d.name}</button><span class="ps">${ins}</span></div>`;
     }).join('') + '<div class="row"><button data-oih="1">Historical OI Zones</button></div><button class="reset" data-reset="1">คืนค่าเริ่มต้นทั้งหมด</button>';
   }
@@ -2532,11 +2542,16 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     c.on = !c.on; saveInd(); paintIndMenu(); rebuildSeries();
   });
   $('indMenu').addEventListener('change', e => {
-    const inp = e.target.closest('input[data-id]'); if (!inp) return;
+    const inp = e.target.closest('input[data-id], select[data-id]'); if (!inp) return;
     const d = IND.find(x => x.id === inp.dataset.id), k = inp.dataset.k;
+    if (d.type === 'env' && k === 'method') {
+      const c = indCfg[d.id] = indCfg[d.id] || {};
+      c.p = Object.assign({}, c.p || {}, { method: inp.value === 'sma' ? 'sma' : 'ema' });
+      saveInd(); if (c.on) rebuildSeries(); return;
+    }
     let v = parseFloat(inp.value);
-    const isInt = !['k', 'ob', 'os'].includes(k) || d.type === 'stoch' && k === 'k';
-    if (!isFinite(v) || v <= 0) v = d.p[k];
+    const isInt = !['k', 'ob', 'os', 'dev'].includes(k) || d.type === 'stoch' && k === 'k';
+    if (!isFinite(v) || (k === 'dev' ? v < 0 || v >= 100 : v <= 0)) v = d.p[k];
     if (isInt) v = Math.max(1, Math.min(500, Math.round(v)));
     inp.value = v;
     const c = indCfg[d.id] = indCfg[d.id] || {};

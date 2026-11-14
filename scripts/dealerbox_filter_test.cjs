@@ -80,7 +80,7 @@ function change(value){const input={value,dataset:{}};handlers.change({target:{c
  assert(fills.every(f=>f.color==='rgba(255,255,255,.15)'));
  assert.deepEqual(strokes.map(b=>Math.round(b.a[0]+b.a[2]/2)),[60,120,180]);
  assert(strokes.every(b=>b.a[2]<6),'frames fit within individual candles');
- assert(strokes.every(b=>b.a[1]===95 && b.a[3]===5),'resistance markers run from the line up by $1');
+ assert(strokes.every(b=>b.a[1]===100 && b.a[3]===5),'resistance markers run toward candles below the line by $1');
  fetched[40]={...fetched[40],close:103,high:104};await d.run(true);
  strokes=[];fills=[];draw();assert.equal(strokes.length,3);assert.equal(fills.length,0);
  assert(strokes.every(b=>b.dash.join(',')==='4,3'));
@@ -89,7 +89,7 @@ function change(value){const input={value,dataset:{}};handlers.change({target:{c
  await d.run(true);strokes=[];fills=[];draw();
  assert.equal(d.boxes[0].tests.length,4);
  assert.deepEqual(strokes.map(b=>Math.round(b.a[0]+b.a[2]/2)),[60,120,180,204]);
- assert(strokes.every(b=>b.a[1]===100 && b.a[3]===5),'support markers run from the line down by $1');
+ assert(strokes.every(b=>b.a[1]===95 && b.a[3]===5),'support markers run toward candles above the line by $1');
  fetched=candles([10,20]);await d.run(true);
  strokes=[];fills=[];draw();assert.equal(strokes.length,0);assert.equal(fills.length,0);
  for (const side of [-1,1]) {

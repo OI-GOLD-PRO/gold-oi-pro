@@ -171,8 +171,8 @@
       const width = step * 0.8, depth = 1;
       for (const box of boxes) {
         const active = box.live === true && box.broke === undefined;
-        const top = Y(box.p + (box.side < 0 ? depth : 0));
-        const bottom = Y(box.p - (box.side > 0 ? depth : 0));
+        const top = Y(box.p + (box.side > 0 ? depth : 0));
+        const bottom = Y(box.p - (box.side < 0 ? depth : 0));
         if (top === null || bottom === null || bottom < 0 || top > plotH) continue;
         // Keep each rejection attached to its own dealer level and counted candle.
         const times = new Set(box.tests.map(i => rejectionTime(bars[i].time, box.side, chartBars)));

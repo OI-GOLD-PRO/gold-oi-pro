@@ -2,7 +2,55 @@
   "source": "Forex Factory + FXStreet (actual)",
   "events": [
     {
-      "date": "2026-11-10T04:00:00-05:00",
+      "date": "2026-11-16T12:00:00-05:00",
+      "c": "USD",
+      "i": "H",
+      "title": "Fed Chairman Warsh Speaks",
+      "forecast": "",
+      "previous": ""
+    },
+    {
+      "date": "2026-11-17T08:30:00-05:00",
+      "c": "USD",
+      "i": "H",
+      "title": "Core Retail Sales m/m",
+      "forecast": "0.4%",
+      "previous": "0.9%"
+    },
+    {
+      "date": "2026-11-17T08:30:00-05:00",
+      "c": "USD",
+      "i": "H",
+      "title": "Retail Sales m/m",
+      "forecast": "0.2%",
+      "previous": "0.8%"
+    },
+    {
+      "date": "2026-11-18T14:00:00-05:00",
+      "c": "USD",
+      "i": "H",
+      "title": "FOMC Meeting Minutes",
+      "forecast": "",
+      "previous": ""
+    },
+    {
+      "date": "2026-11-19T08:30:00-05:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Philly Fed Manufacturing Index",
+      "forecast": "19.2",
+      "previous": "20.9"
+    },
+    {
+      "date": "2026-11-19T08:30:00-05:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Unemployment Claims",
+      "forecast": "199K",
+      "previous": "200K"
+    },
+    {
+      "date": "2026-11-20T08:25:00-05:00",
       "c": "USD",
       "i": "M",
       "title": "FOMC Member Waller Speaks",
@@ -10,330 +58,26 @@
       "previous": ""
     },
     {
-      "date": "2026-11-10T08:30:00-05:00",
-      "c": "USD",
-      "i": "H",
-      "title": "Core CPI m/m",
-      "forecast": "0.2%",
-      "previous": "0.3%",
-      "actual": "0.3%",
-      "better": true
-    },
-    {
-      "date": "2026-11-10T08:30:00-05:00",
-      "c": "USD",
-      "i": "H",
-      "title": "CPI m/m",
-      "forecast": "0.3%",
-      "previous": "0.6%",
-      "actual": "0.4%",
-      "better": true
-    },
-    {
-      "date": "2026-11-12T08:30:00-05:00",
+      "date": "2026-11-20T10:00:00-05:00",
       "c": "USD",
       "i": "M",
-      "title": "Unemployment Claims",
-      "forecast": "194K",
-      "previous": "189K",
-      "actual": "200K",
-      "better": false
+      "title": "Revised UoM Consumer Sentiment",
+      "forecast": "52.1",
+      "previous": "51.0"
     },
     {
-      "date": "2026-11-13T08:30:00-05:00",
-      "c": "USD",
-      "i": "H",
-      "title": "Core PPI m/m",
-      "forecast": "0.3%",
-      "previous": "0.7%",
-      "actual": "0.3%",
-      "better": null
-    },
-    {
-      "date": "2026-11-13T08:30:00-05:00",
-      "c": "USD",
-      "i": "H",
-      "title": "PPI m/m",
-      "forecast": "0.4%",
-      "previous": "1.3%",
-      "actual": "0.3%",
-      "better": false
-    },
-    {
-      "date": "2026-11-16T10:00:00+00:00",
+      "date": "2026-11-20T10:00:00-05:00",
       "c": "USD",
       "i": "M",
-      "title": "Fed's Barr speech",
+      "title": "Revised UoM Inflation Expectations",
       "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-16T13:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "NY Empire State Manufacturing Index",
-      "forecast": "17.6",
-      "previous": "25.5",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-16T14:05:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Williams speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-16T17:00:00+00:00",
-      "c": "USD",
-      "i": "H",
-      "title": "Fed's Chair Warsh speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-17T12:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Musalem speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-17T13:15:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "ADP Employment Change 4-week average",
-      "forecast": "",
-      "previous": "19.75",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-17T13:30:00+00:00",
-      "c": "USD",
-      "i": "H",
-      "title": "Retail Sales (MoM)",
-      "forecast": "0%",
-      "previous": "0.8%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-17T13:30:00+00:00",
-      "c": "USD",
-      "i": "H",
-      "title": "Retail Sales Control Group",
-      "forecast": "",
-      "previous": "0.1%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-17T13:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Retail Sales ex Autos (MoM)",
-      "forecast": "0.4%",
-      "previous": "0.9%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-17T14:10:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Waller speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-17T14:15:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Industrial Production (MoM)",
-      "forecast": "0.1%",
-      "previous": "0.7%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-17T14:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Hammack speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-17T19:25:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Williams speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-18T13:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Building Permits (MoM)",
-      "forecast": "1.38",
-      "previous": "1.4",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-18T13:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Housing Starts (MoM)",
-      "forecast": "1.23",
-      "previous": "1.221",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-18T15:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Pending Home Sales (MoM)",
-      "forecast": "-2.3%",
-      "previous": "-7.3%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-18T18:35:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Barr speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-18T19:00:00+00:00",
-      "c": "USD",
-      "i": "H",
-      "title": "FOMC Minutes",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-18T19:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Williams speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-19T13:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Initial Jobless Claims",
-      "forecast": "200",
-      "previous": "200",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-19T13:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Philadelphia Fed Manufacturing Survey",
-      "forecast": "19.2",
-      "previous": "20.9",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-19T17:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Goolsbee speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-19T19:15:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Barr speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-19T23:30:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Paulson speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-20T13:25:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Waller speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-20T15:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Michigan Consumer Expectations Index",
-      "forecast": "",
-      "previous": "50.9",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-20T15:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Michigan Consumer Sentiment Index",
-      "forecast": "51",
-      "previous": "51",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-20T15:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "UoM 1-year Consumer Inflation Expectations",
-      "forecast": "",
-      "previous": "4.3%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-20T15:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "UoM 5-year Consumer Inflation Expectation",
-      "forecast": "3.4%",
-      "previous": "3.4%",
-      "src": "fxstreet"
-    },
-    {
-      "date": "2026-11-20T17:15:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Cook speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
+      "previous": "4.3%"
     }
   ],
-  "checked_at": 1794704145,
+  "checked_at": 1794728144,
   "coverage": {
-    "from": 1794114000,
-    "to": 1794718800,
+    "from": 1794718800,
+    "to": 1795323600,
     "timezone": "America/New_York"
   }
 }

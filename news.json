@@ -22,7 +22,7 @@
       "c": "USD",
       "i": "H",
       "title": "Retail Sales m/m",
-      "forecast": "0.2%",
+      "forecast": "0.1%",
       "previous": "0.8%"
     },
     {
@@ -66,7 +66,7 @@
       "previous": "4.3%"
     }
   ],
-  "checked_at": 1794843492,
+  "checked_at": 1794873019,
   "coverage": {
     "from": 1794718800,
     "to": 1795323600,

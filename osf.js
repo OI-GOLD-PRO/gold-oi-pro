@@ -392,7 +392,7 @@
     }
     // V4.9.102: โซนที่ระบบกลางตั้ง Limit ไม้จริงรออยู่ + ราคาห่างขอบเข้า ≤ $0.5 → กะพริบ · V4.9.103: อยู่ในกรอบแล้วกะพริบต่อ (หยุดเมื่อออกจากกรอบ/ถอยห่าง)
     nearZones = [];
-    if (shared?.ready && shared.until + 60 > Date.now() / 1000 && O.lastClose != null) { // แผนเปลี่ยนเฉพาะตอนแท่งปิด → ใช้ต่อได้ระหว่างรอดึงรอบถัดไป
+    if (sharedReady() && shared.day + THAI === dayStart(Date.now() / 1000 + THAI) && shared.session === sessOf(Date.now() / 1000 + THAI)?.id && O.lastClose != null) { // Only current, unexpired OI SS execution plans may flash.
       const SN = SESS.find(x => x.id === shared.session);
       if (SN && SN.real) shared.plans.filter(q => q[5] === 1).forEach(q => {
         const [k, side, grade, dir, touch, , entry] = q, d = dir > 0 ? O.lastClose - entry : entry - O.lastClose;

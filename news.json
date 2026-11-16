@@ -50,14 +50,6 @@
       "previous": "200K"
     },
     {
-      "date": "2026-11-20T08:25:00-05:00",
-      "c": "USD",
-      "i": "M",
-      "title": "FOMC Member Waller Speaks",
-      "forecast": "",
-      "previous": ""
-    },
-    {
       "date": "2026-11-20T10:00:00-05:00",
       "c": "USD",
       "i": "M",
@@ -74,7 +66,7 @@
       "previous": "4.3%"
     }
   ],
-  "checked_at": 1794787178,
+  "checked_at": 1794809302,
   "coverage": {
     "from": 1794718800,
     "to": 1795323600,

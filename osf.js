@@ -189,6 +189,16 @@
       }
     } catch (e) { sharedHistAt = Date.now() - 29 * 60e3; }
   }
+  const entryMismatches = new Map();
+  function validateFadeEntry(s, centralBar, chartBar, live) {
+    if (s.bo) return null; // Breakout uses the preceding close, not a limit touch.
+    const usable = b => b && Number.isFinite(b.low) && Number.isFinite(b.high);
+    const touches = b => usable(b) && Number.isFinite(s.entry) && b.low <= s.entry + 1e-7 && b.high >= s.entry - 1e-7;
+    if (!touches(centralBar)) return 'แท่งระบบกลางไม่แตะราคาเข้า';
+    if (usable(chartBar) && !touches(chartBar)) return 'แท่งกราฟไม่แตะราคาเข้า';
+    if (live && !usable(chartBar)) return 'ยังไม่มีแท่งกราฟยืนยันราคาเข้า';
+    return null;
+  }
   function sharedTrades(book, follow = [], live = false) {
     if (!book?.day) return [];
     const B = book.bars.concat(follow).map(([t, open, high, low, close]) => ({ time: t + THAI, open, high, low, close }));
@@ -198,9 +208,16 @@
       for (const time of [...chartStops.keys()].filter(t => t > last).sort((a, b) => a - b)) B.push({ time });
     }
     const indexes = new Map(B.map((b, i) => [b.time, i]));
+    for (const [id, item] of entryMismatches) if (item.day === book.day) entryMismatches.delete(id);
     const trades = book.events.flatMap(s => {
       const S = SESS.find(x => x.id === s.sid), ei = indexes.get(s.t + THAI);
-      return !S || ei === undefined ? [] : [{ ...s, S, ei, tf: 'M1', live, central: true, day: ymd(book.day + THAI) }];
+      if (!S || ei === undefined) return [];
+      const reason = validateFadeEntry(s, B[ei], chartStops.get(s.t + THAI), live);
+      if (reason) {
+        entryMismatches.set(book.day + '|' + s.key, { day: book.day, time: s.t + THAI, entry: s.entry, reason });
+        return [];
+      }
+      return [{ ...s, S, ei, tf: 'M1', live, central: true, day: ymd(book.day + THAI) }];
     });
     return trackSetups(B, trades, chartStops);
   }
@@ -315,9 +332,9 @@
     for (const b of tail) chartStops.set(b.time, b);
     if (!active.some(s => tail.some(b => b.time >= s.t0 && hitsStop(b, s.dir, s.sl)))) return;
     const next = new Map(sharedTrades(shared, [], true).map(s => [s.key, s]));
-    const refresh = s => s.live && s.central ? next.get(s.key) || s : s;
-    today = today.map(refresh);
-    setups = setups.map(refresh);
+    const refresh = s => s.live && s.central ? next.get(s.key) : s;
+    today = today.map(refresh).filter(Boolean);
+    setups = setups.map(refresh).filter(Boolean);
     notify(new Set(today.map(key)));
   }
 
@@ -595,6 +612,10 @@
       + (mm ? `<br>⚡ ${mm.dn ? 'ลง' : 'ขึ้น'} ${mm.mv}×ATR (${mm.usd}$/5น.) ${mm.mv > MOM_MAX ? C(Rd, cur && cur.id === 'AM' ? '· เกิน 3×ATR ข้ามไม้' : '· เกิน 3×ATR') : C(G, '· ปกติ')}` : '')
       + `<br>${nb ? C(Rd, `⛔ ช่วงข่าวแดง ${hm(nb)} น. ห้ามเข้าถึง ${hm(nb + NA)} น.`) : C(G, '✓ ไม่ติดข่าว')}`
       + (P != null ? `<br>ราคาตอนนี้ ${C('#fff', f1(P))}` : '') + `</div>`);
+    const unconfirmed = [...entryMismatches.values()].filter(x => x.day + THAI === d0);
+    if (unconfirmed.length) h.push('<div class="sp-card"><div class="sp-h">⚠️ รายการกลางยังไม่ยืนยันกับกราฟ (' + unconfirmed.length + ')</div>' +
+      unconfirmed.map(x => '<div class="sp-row">' + hm(x.time) + ' น. · ราคา ' + f1(x.entry) + ' · ' + x.reason + '</div>').join('') +
+      '<div class="sp-mu">ไม่นับเป็นไม้เข้าและไม่รวมผล TP/SL ในแอป · ไม่ได้ยกเลิกหรือแก้ไขออเดอร์ MT5</div></div>');
     // 2) ตารางเส้น
     const plans = sharedReady() ? shared.plans.filter(q => q[5] === 1) : [];
     const half = S ? S.half : 1.5;

@@ -42,7 +42,7 @@
       "c": "USD",
       "i": "M",
       "title": "Philly Fed Manufacturing Index",
-      "forecast": "19.2",
+      "forecast": "20.6",
       "previous": "20.9"
     },
     {
@@ -50,7 +50,7 @@
       "c": "USD",
       "i": "M",
       "title": "Unemployment Claims",
-      "forecast": "199K",
+      "forecast": "198K",
       "previous": "200K"
     },
     {
@@ -58,7 +58,7 @@
       "c": "USD",
       "i": "M",
       "title": "Revised UoM Consumer Sentiment",
-      "forecast": "52.1",
+      "forecast": "51.7",
       "previous": "51.0"
     },
     {
@@ -70,7 +70,7 @@
       "previous": "4.3%"
     }
   ],
-  "checked_at": 1794926375,
+  "checked_at": 1794955164,
   "coverage": {
     "from": 1794718800,
     "to": 1795323600,

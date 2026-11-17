@@ -1,7 +1,7 @@
-// Trial: closed M1 large candle body crossing EMA50. No trade execution or alerts.
+// Trial: closed M1 large candle body crossing EMA50 or an Envelope band. No trade execution or alerts.
 (function(root){
   'use strict';
-  function scan(B,now,period=20){
+  function scan(B,now,period=20,upper=[],lower=[]){
     period=Number.isInteger(period)&&period>=1&&period<=500?period:20;
     const hits=[],alpha=2/51,bodies=[];
     let ema=null,bodySum=0;
@@ -12,8 +12,10 @@
       const body=Math.abs(b.close-b.open);
       if(i>=Math.max(49,period)&&b.time+60<=now){
         const avg=bodySum/period;
-        const dir=b.open<ema&&b.close>ema?1:b.open>ema&&b.close<ema?-1:0;
-        if(avg>0&&body>=avg*2&&dir)hits.push({...b,ema,ratio:body/avg,dir});
+        const crosses=level=>Number.isFinite(level)&&Math.min(b.open,b.close)<level&&Math.max(b.open,b.close)>level;
+        if(avg>0&&body>=avg*2&&(crosses(ema)||crosses(upper[i])||crosses(lower[i]))){
+          hits.push({...b,ema,ratio:body/avg,dir:b.close>b.open?1:-1});
+        }
       }
       bodies.push(body);
       bodySum+=body;
@@ -33,7 +35,8 @@
     hits=[];
     if(!on||O.tf!=='1m')return;
     const bars=O.chartM1();
-    hits=scan(bars,Date.now()/1000+(O.tzShift??25200),period);
+    const [upper,,lower]=O.envelopeBands(bars.map(b=>b.close));
+    hits=scan(bars,Date.now()/1000+(O.tzShift??25200),period,upper,lower);
     const ts=O.chart.timeScale(),width=ts.width(),step=ts.options().barSpacing||6;
     ctx.save();ctx.beginPath();ctx.rect(0,0,width,h);ctx.clip();
     ctx.strokeStyle='#ffdf35';ctx.fillStyle='rgba(255,223,53,.045)';ctx.lineWidth=1.5;ctx.setLineDash([]);
@@ -53,7 +56,7 @@
   function mount(){
     const m=$('indMenu');if(!m||m.hidden||$('volEmaBox'))return;
     const el=document.createElement('div');el.id='volEmaBox';el.className='gsbox';
-    el.innerHTML=`<div class="row"><button data-vebox class="gsb${on?' on':''}"><i style="background:#ffdf35"></i>ขนาดตัวแท่ง × EMA50 · กรอบเหลือง M1</button></div><div class="row ps"><label>เฉลี่ยขนาดตัวแท่ง (จำนวนแท่ง)<input data-veperiod type="number" inputmode="numeric" min="1" max="500" step="1" value="${period}" style="width:70px"></label></div><div class="gsinfo">แท่งปิด M1 · ตัวแท่งคร่อม EMA50 · ขนาดเปิด–ปิด ≥ 2× ค่าเฉลี่ย ${period} แท่งก่อนหน้า<br>กรอบเฉพาะแท่งที่ผ่าน รวมไส้ · ดูบน M1 · ยังไม่แจ้งเตือน</div>`;
+    el.innerHTML=`<div class="row"><button data-vebox class="gsb${on?' on':''}"><i style="background:#ffdf35"></i>ขนาดตัวแท่ง × EMA50 / Envelope</button></div><div class="row ps"><label>เฉลี่ยขนาดตัวแท่ง (จำนวนแท่ง)<input data-veperiod type="number" inputmode="numeric" min="1" max="500" step="1" value="${period}" style="width:70px"></label></div><div class="gsinfo">แท่งปิด M1 · ตัวแท่งคร่อม EMA50 หรือขอบบน/ล่าง Envelope ตามค่าที่ตั้ง · ขนาดเปิด–ปิด ≥ 2× ค่าเฉลี่ย ${period} แท่งก่อนหน้า<br>กรอบเฉพาะแท่งที่ผ่าน รวมไส้ · ดูบน M1 · ยังไม่แจ้งเตือน</div>`;
     m.querySelector('.t')?.after(el);
   }
   const menu=$('indMenu');

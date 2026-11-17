@@ -338,6 +338,49 @@
     notify(new Set(today.map(key)));
   }
 
+  // Shared geometry keeps the background fills aligned with foreground price lines.
+  function tradeGeometry(s, X, Y, plotW, bw, lastT) {
+    // V4.9.80: แท่งเข้าไม่อยู่ในกราฟ (เลื่อนเกิน/ข้อมูลกราฟไม่ถึง) = ไม่วาด · แท่งออกไม่อยู่ในกราฟ: ไม้เปิดอยู่ = ถึงขอบขวา, ไม้จบแล้ว = ไม่วาด (เดิมยืดเต็มจอ ทับกันทั้งกราฟ)
+    const exitX = s.t1 !== null ? X(s.t1) : null;
+    const x0 = X(s.t0);
+    let x1 = s.t1 !== null ? exitX : X(lastT || s.t0);
+    if (x0 === null) return null;
+    if (x1 === null) { if (s.t1 !== null) return; x1 = plotW; }
+    x1 = Math.max(x1 + (exitX === null ? bw : bw / 2), x0 + 6); if (x1 < 0 || x0 > plotW) return;
+    const ye = Y(s.entry), yt = Y(s.tp), ys = Y(s.sl); if (ye === null || yt === null || ys === null) return;
+    const a = s.tf === 'M5' ? 0.75 : 1;
+    return { x0, x1, exitX, ye, yt, ys, a };
+  }
+  let requestTradeFillUpdate = () => {};
+  let tradeFillSignature = '';
+  const tradeFillRenderer = {
+    draw(target) {
+      if (!isOn()) return;
+      target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
+        const ts = O.chart.timeScale(), X = t => ts.timeToCoordinate(toChart(t));
+        const Y = p => O.series.priceToCoordinate(p), lastT = bars.length ? bars[bars.length - 1].time : null;
+        const bw = Math.max(2, (X(lastT || 0) || 0) - (X((lastT || 0) - csec()) || 0));
+        ctx.save(); ctx.beginPath(); ctx.rect(0, 0, mediaSize.width, mediaSize.height); ctx.clip();
+        setups.filter(s => s.real).forEach(s => {
+          const g = tradeGeometry(s, X, Y, mediaSize.width, bw, lastT); if (!g) return;
+          const { x0, x1, ye, yt, ys, a } = g;
+          ctx.globalAlpha = 0.32 * a;
+          ctx.fillStyle = '#22e39a'; ctx.fillRect(x0, Math.min(ye, yt), x1 - x0, Math.abs(yt - ye));
+          ctx.fillStyle = '#ff4d6a'; ctx.fillRect(x0, Math.min(ye, ys), x1 - x0, Math.abs(ys - ye));
+        });
+        ctx.restore();
+      });
+    },
+  };
+  const tradeFillViews = [{ zOrder: () => 'bottom', renderer: () => tradeFillRenderer }];
+  if (typeof O.series.attachPrimitive === 'function') {
+    O.series.attachPrimitive({
+      attached({ requestUpdate }) { requestTradeFillUpdate = requestUpdate; requestUpdate(); },
+      detached() { requestTradeFillUpdate = () => {}; },
+      paneViews() { return tradeFillViews; },
+    });
+  }
+
   const entryTargets = [];
   const details = $('sfDetails');
   if (details) window.bindRightSwipeDismiss?.(details, () => details.close());
@@ -365,8 +408,14 @@
   });
   O.hooks.push((ctx, w, h) => {
     entryTargets.length = 0;
+    if (isOn()) checkChartStops();
+    // Refresh on data/settings changes, including hiding the indicator; chart handles pan/zoom.
+    const fillSignature = JSON.stringify([isOn(), O.tf, bars.length ? bars[bars.length - 1].time : null,
+      setups.filter(s => s.real).map(s => [s.t0, s.t1, s.entry, s.tp, s.sl, s.tf])]);
+    if (fillSignature !== tradeFillSignature) {
+      tradeFillSignature = fillSignature; requestTradeFillUpdate();
+    }
     if (!isOn()) return;
-    checkChartStops();
     const ts = O.chart.timeScale(), sr = O.series, plotW = ts.width(), plotH = h - ts.height();
     const X = t => ts.timeToCoordinate(toChart(t)), Y = p => sr.priceToCoordinate(p), bw = Math.max(2, (X(bars.length ? bars[bars.length - 1].time : 0) || 0) - (X((bars.length ? bars[bars.length - 1].time : 0) - csec()) || 0));
     const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
@@ -411,17 +460,8 @@
     // ไม้ (แบ็กเทส + วันนี้): กรอบ TP เขียว / SL แดง จากแท่งเข้าถึงแท่งออก (ยังเปิด = ถึงแท่งล่าสุด)
     const lastT = bars.length ? bars[bars.length - 1].time : null;
     setups.filter(s => s.real).forEach(s => {
-      // V4.9.80: แท่งเข้าไม่อยู่ในกราฟ (เลื่อนเกิน/ข้อมูลกราฟไม่ถึง) = ไม่วาด · แท่งออกไม่อยู่ในกราฟ: ไม้เปิดอยู่ = ถึงขอบขวา, ไม้จบแล้ว = ไม่วาด (เดิมยืดเต็มจอ ทับกันทั้งกราฟ)
-      const exitX = s.t1 !== null ? X(s.t1) : null;
-      const x0 = X(s.t0);
-      let x1 = s.t1 !== null ? exitX : X(lastT || s.t0);
-      if (x0 === null) return;
-      if (x1 === null) { if (s.t1 !== null) return; x1 = plotW; }
-      x1 = Math.max(x1 + (exitX === null ? bw : bw / 2), x0 + 6); if (x1 < 0 || x0 > plotW) return;
-      const ye = Y(s.entry), yt = Y(s.tp), ys = Y(s.sl); if (ye === null || yt === null || ys === null) return;
-      const a = s.tf === 'M5' ? 0.75 : 1;
-      ctx.globalAlpha = 0.32 * a; ctx.fillStyle = '#22e39a'; ctx.fillRect(x0, Math.min(ye, yt), x1 - x0, Math.abs(yt - ye));
-      ctx.fillStyle = '#ff4d6a'; ctx.fillRect(x0, Math.min(ye, ys), x1 - x0, Math.abs(ys - ye));
+      const g = tradeGeometry(s, X, Y, plotW, bw, lastT); if (!g) return;
+      const { x0, x1, exitX, ye, yt, ys, a } = g;
       ctx.globalAlpha = a; ctx.lineWidth = 1.5;
       ctx.strokeStyle = '#22e39a'; ctx.beginPath(); ctx.moveTo(x0, yt); ctx.lineTo(x1, yt); ctx.stroke();
       ctx.strokeStyle = '#ff4d6a'; ctx.beginPath(); ctx.moveTo(x0, ys); ctx.lineTo(x1, ys); ctx.stroke();

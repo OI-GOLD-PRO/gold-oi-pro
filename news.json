@@ -15,7 +15,9 @@
       "i": "H",
       "title": "Core Retail Sales m/m",
       "forecast": "0.4%",
-      "previous": "0.9%"
+      "previous": "0.9%",
+      "actual": "0.6%",
+      "better": true
     },
     {
       "date": "2026-11-17T08:30:00-05:00",
@@ -23,7 +25,9 @@
       "i": "H",
       "title": "Retail Sales m/m",
       "forecast": "0.1%",
-      "previous": "0.8%"
+      "previous": "0.8%",
+      "actual": "0.2%",
+      "better": null
     },
     {
       "date": "2026-11-18T14:00:00-05:00",
@@ -66,7 +70,7 @@
       "previous": "4.3%"
     }
   ],
-  "checked_at": 1794892610,
+  "checked_at": 1794926375,
   "coverage": {
     "from": 1794718800,
     "to": 1795323600,

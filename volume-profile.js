@@ -46,12 +46,79 @@
     v[side > 0 ? 0 : 1] += q; b.prices.set(price, v);
     b.first = Math.min(b.first, t); b.last = Math.max(b.last, t);
     dirty = true; revision++;
+    if (diamondsOn) deltaPending.add(key);
     if (needsFootprint() && repaint === null) repaint = setTimeout(() => {
       repaint = null;
       if (needsFootprint() && !O.paused && document.visibilityState === 'visible') O.markDirty();
     }, 100);
   }
   window.OIVolumeSink = sink;
+  const DELTA_KEEP = 30 * 86400e3;
+  const deltaArchive = new Map(), deltaPending = new Set();
+  let deltaDB = null;
+
+  function bucketTotals(bucket) {
+    let buy = 0, sell = 0;
+    if (bucket) for (const [b, s] of bucket.prices.values()) { buy += b; sell += s; }
+    return { delta: buy - sell, total: buy + sell };
+  }
+  function openDeltaArchive() {
+    if (deltaDB || !window.indexedDB) return;
+    const request = window.indexedDB.open('oi_delta_history', 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore('minutes', { keyPath: 'key' }).createIndex('time', 'time');
+    };
+    request.onsuccess = () => {
+      deltaDB = request.result;
+      const tx = deltaDB.transaction('minutes', 'readwrite');
+      const index = tx.objectStore('minutes').index('time');
+      const cutoff = Date.now() - DELTA_KEEP;
+      index.getAll(IDBKeyRange.lowerBound(cutoff)).onsuccess = e => {
+        for (const row of e.target.result) {
+          if (row.total > (deltaArchive.get(row.key)?.total ?? 0)) deltaArchive.set(row.key, row);
+        }
+        O.markDirty();
+      };
+      index.openCursor(IDBKeyRange.upperBound(cutoff, true)).onsuccess = e => {
+        const cursor = e.target.result;
+        if (cursor) { cursor.delete(); cursor.continue(); }
+      };
+      tx.oncomplete = flushDeltaArchive;
+    };
+  }
+  function flushDeltaArchive() {
+    const now = Date.now(), cutoff = now - DELTA_KEEP, rows = [];
+    for (const key of deltaPending) {
+      const bucket = buckets.get(key);
+      if (!bucket || bucket.time < cutoff) { deltaPending.delete(key); continue; }
+      if (bucket.time + MINUTE > now) continue;
+      const value = bucketTotals(bucket);
+      if (value.total <= 0) continue;
+      // Backfill may initially have fewer trades than the copy already saved.
+      const current = deltaArchive.get(key);
+      if (!current || value.total > current.total) {
+        const row = { key, time: bucket.time, ...value };
+        deltaArchive.set(key, row);
+      }
+      if (deltaDB) { rows.push(deltaArchive.get(key)); deltaPending.delete(key); }
+    }
+    for (const [key, row] of deltaArchive) if (row.time < cutoff) deltaArchive.delete(key);
+    if (!rows.length) return;
+    const tx = deltaDB.transaction('minutes', 'readwrite');
+    const store = tx.objectStore('minutes');
+    for (const row of rows) {
+      const request = store.get(row.key);
+      request.onsuccess = () => {
+        if (row.total > (request.result?.total ?? 0)) store.put(row);
+      };
+    }
+    const expired = store.index('time').openCursor(IDBKeyRange.upperBound(cutoff, true));
+    expired.onsuccess = () => {
+      const cursor = expired.result;
+      if (cursor) { cursor.delete(); cursor.continue(); }
+    };
+    tx.onabort = () => { for (const row of rows) deltaPending.add(row.key); };
+  }
   function saveData() {
     if (!dirty) return;
     try {
@@ -98,20 +165,37 @@
     return [...prices.values()].sort((a, b) => b.price - a.price);
   }
   function footprintTotals(start, end) {
-    const src = source();
-    let buy = 0, sell = 0;
-    if (src) {
-      const firstMinute = Math.ceil(Math.max(start, Date.now() - KEEP) / MINUTE) * MINUTE;
+    const preferred = source(), now = Date.now();
+    function sum(src, archivedOnly) {
+      let delta = 0, total = 0;
+      const firstMinute = Math.ceil(Math.max(start, now - DELTA_KEEP) / MINUTE) * MINUTE;
       for (let time = firstMinute; time < end; time += MINUTE) {
-        const bucket = buckets.get(src + '|' + time);
-        if (bucket) for (const [b, s] of bucket.prices.values()) { buy += b; sell += s; }
+        const key = src + '|' + time;
+        const stored = deltaArchive.get(key);
+        const live = archivedOnly ? null : buckets.get(key);
+        const current = live ? bucketTotals(live) : null;
+        const value = current && current.total >= (stored?.total ?? 0) ? current : stored;
+        if (value) { delta += value.delta; total += value.total; }
       }
+      return { delta, total };
     }
-    return { delta: buy - sell, total: buy + sell };
+    const current = preferred ? sum(preferred, false) : { delta: 0, total: 0 };
+    if (current.total || end > now) return current;
+    // Use a saved exchange only when the preferred one has no data for the candle.
+    const fallback = preferred === 'binance' ? ['bitget'] : preferred === 'bitget' ? ['binance'] : ['binance', 'bitget'];
+    for (const src of fallback) {
+      const saved = sum(src, true);
+      if (saved.total) return saved;
+    }
+    return current;
   }
   function setDiamonds(on) {
     if (diamondsOn === on) return;
     diamondsOn = on;
+    if (on) {
+      openDeltaArchive();
+      for (const key of buckets.keys()) deltaPending.add(key);
+    } else flushDeltaArchive();
     if (on || !collecting()) feed()?.syncCollection();
     if (!collecting()) saveData();
   }
@@ -240,6 +324,8 @@
   });
   setInterval(() => { if (!cfg.on || O.paused || document.visibilityState !== 'visible') return; O.markDirty(); const e = $('vpInfo'); if (e) e.textContent = info(); }, 1000);
   setInterval(saveData, 60000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveData(); });
+  setInterval(flushDeltaArchive, 30000);
+  window.addEventListener('pagehide', flushDeltaArchive);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { flushDeltaArchive(); saveData(); } });
   window.OI_volumeProfile = { cfg, profile, needFull, historyHours, footprintWindow, footprint, footprintTotals, setFootprint, setDiamonds, offset, save: saveData };
 })();

@@ -36,7 +36,8 @@
     const duration = frames[O.tf] * 1000, shift = O.tzShift * 1000;
     const width = scale.width(), height = h - scale.height();
     if (!duration || width <= 0 || height <= 0) return;
-    const { start, end } = volume.footprintWindow();
+    const { end } = volume.footprintWindow();
+    const start = Date.now() - 30 * 86400e3;
     const until = Math.min(end, Date.now() + 1);
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
@@ -69,7 +70,7 @@
     panel.id = 'deltaDiamondsBox'; panel.className = 'gsbox';
     const levels = ['เล็กมาก', 'เล็ก', 'กลาง', 'ใหญ่'];
     const fields = thresholds.map((n, j) => `<label>${levels[j]} (%)<input data-odd-tier="${j}" type="number" inputmode="decimal" min="0" max="100" step="any" value="${n}" style="width:54px"></label>`).join('');
-    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps">${fields}</div><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · ใช้ข้อมูล Footprint ที่โหลดได้</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span>`;
+    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps">${fields}</div><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span>`;
     const anchor = menu.querySelector('.t');
     if (anchor) anchor.after(panel);
     else menu.prepend(panel);

@@ -166,7 +166,7 @@
       hit.push({ x, y, bottom: Math.max(bottom, y + 3), r, p });
     });
     if (cfg.poc && P.poc) { const p = P.poc.p - shift, y = O.series.priceToCoordinate(p);
-      if (y !== null && y >= 0 && y <= height) { ctx.globalAlpha = 0.85; ctx.strokeStyle = '#e8c36a'; ctx.lineWidth = 1; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = '#e8c36a'; ctx.textAlign = 'left'; ctx.fillText('VP POC ' + p.toFixed(2), 6, Math.max(7, y - 8)); }
+      if (y !== null && y >= 0 && y <= height) { ctx.globalAlpha = 0.85; ctx.strokeStyle = '#a7f3b5'; ctx.lineWidth = 1; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = '#a7f3b5'; ctx.textAlign = 'left'; ctx.fillText('VP POC ' + p.toFixed(2), 6, Math.max(7, y - 8)); }
     }
     ctx.restore();
   });

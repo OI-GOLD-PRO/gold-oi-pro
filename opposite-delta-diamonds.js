@@ -58,7 +58,7 @@
       ctx.beginPath();
       ctx.moveTo(x, y - radius); ctx.lineTo(x + radius, y);
       ctx.lineTo(x, y + radius); ctx.lineTo(x - radius, y); ctx.closePath();
-      ctx.fillStyle = signal.below ? '#43e58e' : '#ff5d71';
+      ctx.fillStyle = signal.below ? '#43e58e' : '#ff7900';
       ctx.fill();
     }
     ctx.restore();

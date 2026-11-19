@@ -301,9 +301,9 @@
         for (let i = i0; i <= i1; i++) {
           const b = B[i], d = delta.get(b.time); if (!d) continue;
           const x = ts.timeToCoordinate(b.time); if (x === null) continue;
-          const v = d.b - d.s, col = v >= 0 ? '#22e39a' : '#ff4d6a';
+          const v = d.b - d.s, col = v >= 0 ? '#22e39a' : '#ff7900';
           if (sp >= 26) { ctx.globalAlpha = 0.95; ctx.font = `bold 9px ${mono}`; ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText((v > 0 ? '+' : '') + (Math.abs(v) >= 100 ? Math.round(v) : v.toFixed(1)), x, base); }
-          else { const hh = Math.max(1, Math.abs(v) / mx * H); ctx.globalAlpha = 0.75; ctx.fillStyle = col; ctx.fillRect(x - Math.max(1, sp * 0.35), v >= 0 ? base - hh : base - H, Math.max(2, sp * 0.7), v >= 0 ? hh : Math.max(1, hh)); }
+          else { const hh = Math.max(1, Math.abs(v) / mx * H); ctx.globalAlpha = 0.75; ctx.fillStyle = col; ctx.fillRect(x - Math.max(1, sp * 0.35), base - hh, Math.max(2, sp * 0.7), hh); }
         }
         ctx.globalAlpha = 0.6; ctx.font = `9px ${mono}`; ctx.fillStyle = '#8a93ad'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillText('Δ ซื้อ−ขาย', 4, base - (sp >= 26 ? 10 : H + 1));
       }

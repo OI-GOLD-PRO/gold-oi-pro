@@ -1,5 +1,5 @@
 #property copyright "OI Gold Pro"
-#property version "1.00"
+#property version "1.01"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -299,7 +299,7 @@ void OnTimer()
    Manage();
    char body[], result[];
    string headers;
-   const int status = WebRequest("GET",endpoint,"",2200,body,result,headers);
+   const int status = WebRequest("GET",endpoint,"",5000,body,result,headers);
    if(status != 200)
    {
       if(status != 204) Comment("OI Opposite Delta: feed error ",status," / ",GetLastError());

@@ -3,7 +3,7 @@ main = "index.mjs"
 compatibility_date = "2026-07-01"
 
 [vars]
-APP_ORIGIN = "https://oi-gold-pro.github.io"
+PRICE_ORIGIN = "https://gc-yahoo.oigoldpro.workers.dev"
 
 [[durable_objects.bindings]]
 name = "STREAM"

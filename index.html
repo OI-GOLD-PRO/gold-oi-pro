@@ -378,6 +378,12 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 </style>
 <link rel="stylesheet" href="v3-premium.css?v=30201">
 <link rel="stylesheet" href="v33-luxury.css?v=41010">
+<style>
+  #tfs button[data-trend="up"] { background: #135439; color: #e5fff1; border-color: #25865d; }
+  #tfs button[data-trend="down"] { background: #702b37; color: #fff0f2; border-color: #a64856; }
+  #tfs button[data-trend="inside"] { background: #174b70; color: #e9f7ff; border-color: #307aa8; }
+  #tfs button[data-trend].on { border-color: #f0d58d; box-shadow: inset 0 0 0 1px #f0d58d; }
+</style>
 </head>
 <body>
   <div id="splash" aria-label="OI Gold Pro กำลังเปิด">
@@ -714,7 +720,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.147';
+  const APP_VER = '4.9.148';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   // ตรวจเวอร์ชันเมื่อเปิดแอป กลับจากพื้นหลัง หรือกลับมาออนไลน์
   (() => {
@@ -2959,6 +2965,54 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     sp.addEventListener('dblclick', () => { try { localStorage.removeItem('oi_split_' + LAY); } catch (e) {} applySplit(.5); });
   }
   const ftCache = new Map();
+  // Apply the same price and deviation to each TF's independent EMA 50.
+  const trendButtons = [...document.querySelectorAll('#tfs button[data-tf]')];
+  const trendHistory = new Map(), trendRequested = new Map();
+  const trendPending = new Set();
+  const trendEnvelope = IND.find(d => d.type === 'env');
+  function paintTfTrends() {
+    if (!started || paused || document.hidden || !Number.isFinite(lastClose)) return;
+    const stamp = Date.now();
+    const chartTime = stamp / 1000 + TZ_SHIFT;
+    const dev = cfgOf(trendEnvelope).p.dev;
+    for (const button of trendButtons) {
+      const frame = button.dataset.tf;
+      const active = frame === displayedTF && frame === tf;
+      const bars = active ? rawBars.slice(-300).map(toBar) : trendHistory.get(frame);
+      const last = bars?.at(-1);
+      if (!active && trendPending.size < 3 && !trendPending.has(frame) &&
+          stamp - (trendRequested.get(frame) ?? -Infinity) >= 60000 &&
+          (!last || (!cmeClosed(stamp) && chartTime >= last.time + tfSec[frame]) ||
+            stamp - trendRequested.get(frame) >= 300000)) {
+        trendRequested.set(frame, stamp);
+        trendPending.add(frame);
+        window.OI.fetchTF(frame, 300).then(rows => {
+          if (rows?.length >= 50) trendHistory.set(frame, rows);
+        }).catch(() => {}).finally(() => {
+          trendPending.delete(frame);
+          paintTfTrends();
+        });
+      }
+      if (!last || bars.length < 50) {
+        delete button.dataset.trend;
+        continue;
+      }
+      const closes = bars.map(bar => bar.close);
+      if (!cmeClosed(stamp) && chartTime >= last.time && chartTime < last.time + tfSec[frame]) {
+        closes[closes.length - 1] = lastClose;
+      }
+      const [upper, , lower] = envelopeArr(closes, { n: 50, method: 'ema', dev });
+      const hi = upper.at(-1), lo = lower.at(-1);
+      if (!Number.isFinite(hi) || !Number.isFinite(lo)) {
+        delete button.dataset.trend;
+        continue;
+      }
+      button.dataset.trend = lastClose > hi ? 'up' : lastClose < lo ? 'down' : 'inside';
+    }
+  }
+  setInterval(paintTfTrends, 2000);
+  document.addEventListener('visibilitychange', paintTfTrends);
+
   window.OI = {
     // V4.9.29: แคช 15 วิ แชร์ทุกอินดี้ (เดิมแต่ละอินดี้ดึงเอง ~10 ครั้ง/นาที) · ปัดจำนวนแท่งเป็น 300/1000 · พักอยู่ = ใช้ของเดิม ไม่ดึงใหม่
     fetchTF: async (t, n, force) => { // force = ดึงแม้พัก (เช่นกดวิเคราะห์ AI ในหน้าต่างที่ทับกราฟ)

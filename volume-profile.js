@@ -164,7 +164,7 @@
     }
     return [...prices.values()].sort((a, b) => b.price - a.price);
   }
-  function footprintTotals(start, end) {
+  function footprintTotals(start, end, preferredOnly = false) {
     const preferred = source(), now = Date.now();
     function sum(src, archivedOnly) {
       let delta = 0, total = 0;
@@ -180,7 +180,7 @@
       return { delta, total };
     }
     const current = preferred ? sum(preferred, false) : { delta: 0, total: 0 };
-    if (current.total || end > now) return current;
+    if (preferredOnly || current.total || end > now) return current;
     // Use a saved exchange only when the preferred one has no data for the candle.
     const fallback = preferred === 'binance' ? ['bitget'] : preferred === 'bitget' ? ['binance'] : ['binance', 'bitget'];
     for (const src of fallback) {

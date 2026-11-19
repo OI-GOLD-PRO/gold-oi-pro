@@ -63,6 +63,41 @@
     }
     ctx.restore();
   });
+  // A designated chart publishes only bars covered end-to-end by its live trade feed.
+  let publisher = null, publishing = false, lastPublished = '';
+  function publishStatus(message) {
+    const status = $('deltaDiamondsBox')?.querySelector('[data-odd-publish-status]');
+    if (status) status.textContent = message;
+  }
+  async function publishClosedBar() {
+    if (!publisher || !enabled || publishing || O.paused || O.tf !== O.displayedTF) return;
+    const feed = root.OI_bigtr;
+    const duration = frames[O.tf], bars = O.series.data(), next = bars.at(-1), bar = bars.at(-2);
+    if (!duration || !next || !bar || next.time < bar.time + duration) return;
+    const opened = bar.time - O.tzShift, closed = opened + duration;
+    const now = Date.now() / 1000, stream = O.sym + '/' + O.tf;
+    const key = stream + '/' + closed;
+    if (now < closed || now - closed >= 58 || key === lastPublished ||
+        !feed?.coversLive(opened * 1000, closed * 1000)) return;
+    const { delta, total } = volume.footprintTotals(opened * 1000, closed * 1000, true);
+    if (!(total > 0)) return;
+    const signal = marker(bar.open, bar.close, delta, total, thresholds);
+    const side = signal ? (signal.below ? 'SELL' : 'BUY') : 'NONE';
+    publishing = true;
+    try {
+      const result = await fetch(publisher.url + '/odd/v1/' + stream, {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + publisher.token, 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(4000),
+        body: JSON.stringify({ closed, side, delta, total, source: feed.src })
+      });
+      if (!result.ok) throw new Error('HTTP ' + result.status);
+      lastPublished = key;
+      publishStatus('ส่งแท่งปิดแล้ว · ' + stream + ' · ' + side + ' · Δ ' + delta.toFixed(2));
+    } catch (error) {
+      publishStatus('ส่งข้อมูลไม่สำเร็จ · ' + error.message);
+    } finally { publishing = false; }
+  }
+  setInterval(publishClosedBar, 2500);
   function mount() {
     const menu = $('indMenu');
     if (!menu || menu.hidden || $('deltaDiamondsBox')) return;
@@ -70,7 +105,24 @@
     panel.id = 'deltaDiamondsBox'; panel.className = 'gsbox';
     const levels = ['เล็กมาก', 'เล็ก', 'กลาง', 'ใหญ่'];
     const fields = thresholds.map((n, j) => `<label>${levels[j]} (%)<input data-odd-tier="${j}" type="number" inputmode="decimal" min="0" max="100" step="any" value="${n}" style="width:54px"></label>`).join('');
-    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps">${fields}</div><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span>`;
+    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps">${fields}</div><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span><details><summary>ส่งสัญญาณให้ EA</summary><form data-odd-publish autocomplete="off"><label>Worker URL <input name="endpoint" type="url" required placeholder="https://…workers.dev"></label><label>Publish token <input name="token" type="password" required></label><button type="submit">เริ่มส่ง</button><button type="button" data-odd-stop>หยุดส่ง</button></form><span class="gsinfo" data-odd-publish-status></span></details>`;
+    panel.querySelector('[data-odd-publish-status]').textContent = publisher ? 'กำลังส่งจากกราฟนี้' : 'เปิดกราฟและอินดี้ค้างไว้ที่ TF สำหรับ EA';
+    panel.querySelector('[data-odd-publish]').addEventListener('submit', event => {
+      event.preventDefault();
+      const form = event.currentTarget, url = new URL(form.elements.endpoint.value);
+      if (url.protocol !== 'https:' || url.pathname !== '/' || url.username || url.password || url.search || url.hash) {
+        publishStatus('ใส่ Worker URL แบบ HTTPS โดยระบุเฉพาะโดเมน');
+        return;
+      }
+      publisher = { url: url.origin, token: form.elements.token.value };
+      lastPublished = '';
+      form.elements.token.value = '';
+      publishStatus('รอแท่งปิดที่ได้รับข้อมูลสดครบทั้งแท่ง');
+    });
+    panel.querySelector('[data-odd-stop]').onclick = () => {
+      publisher = null;
+      publishStatus('หยุดส่งสัญญาณแล้ว');
+    };
     const anchor = menu.querySelector('.t');
     if (anchor) anchor.after(panel);
     else menu.prepend(panel);

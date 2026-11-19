@@ -11,7 +11,7 @@ function runtime() {
     series: { data: () => chartBars, priceToCoordinate: p => (4010 - p) * 10 },
     chartEl: { addEventListener(k, f) { chartEvents[k] = f; }, getBoundingClientRect: () => ({ left: 0, top: 0 }) }, markDirty() {}, showToast() {} };
   const document = { visibilityState: 'visible', getElementById: id => id === 'indMenu' ? menu : boxes.get(id), addEventListener() {}, createElement() { return { remove() { boxes.delete(this.id); } }; } };
-  const window = { OI: O, OI_bigtr: feed };
+  const window = { OI: O, OI_bigtr: feed, addEventListener() {} };
   const context = vm.createContext({ window, document, localStorage: { getItem: k => values.get(k), setItem: (k, v) => values.set(k, v) }, MutationObserver: class { observe() {} }, Date: class extends Date { static now() { return now; } }, setInterval: f => timers.push(f), setTimeout: f => f(), console });
   vm.runInContext(code, context); return window;
 }

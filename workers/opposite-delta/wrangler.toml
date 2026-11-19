@@ -1,0 +1,14 @@
+name = "oi-gold-opposite-delta"
+main = "index.mjs"
+compatibility_date = "2026-07-01"
+
+[vars]
+APP_ORIGIN = "https://oi-gold-pro.github.io"
+
+[[durable_objects.bindings]]
+name = "STREAM"
+class_name = "DeltaStream"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DeltaStream"]

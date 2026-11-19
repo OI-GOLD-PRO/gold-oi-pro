@@ -2980,7 +2980,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
     chartM1: n => tf === '1m' && displayedTF === '1m' ? (n ? rawBars.slice(-n) : rawBars).map(toBar) : [],
     get paused() { return paused; },
     get unlimited() { return !!authCode && (!authExpire || String(authExpire) >= '9999'); }, // V4.9.32 รหัสไม่จำกัดวัน
-    get tf() { return tf; }, tzShift: TZ_SHIFT, sym: SYM, cfg: SC, sfx: SYMSFX, psfx: PSFX,
+    get tf() { return tf; }, get displayedTF() { return displayedTF; }, tzShift: TZ_SHIFT, sym: SYM, cfg: SC, sfx: SYMSFX, psfx: PSFX,
     chart, series, chartEl, hooks: overlayHooks, bgHooks,
     get drawingActive() { return !!drawTool || clickMeas || !!(g1 && meas); },
     get oi() { return oi; }, get lastClose() { return lastClose; }, get cfgData() { return lastCfg; }, setLevels, get rawBars() { return rawBars; }, get adj() { return adj; }, get src() { return prov ? prov.id : null; }, worker: GC_WORKER, beep: () => { try { beep(); } catch (e) {} },
@@ -3031,10 +3031,10 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <script src="live.js?v=41010"></script>
 <script src="intraday.js?v=20042"></script>
 <script src="retail.js?v=40952"></script>
-<script src="volume-profile.js?v=409144"></script>
-<script src="bigtrade.js?v=409147"></script>
+<script src="volume-profile.js?v=409150"></script>
+<script src="bigtrade.js?v=409148"></script>
 <script src="footprint.js?v=40966"></script>
-<script src="opposite-delta-diamonds.js?v=409145"></script>
+<script src="opposite-delta-diamonds.js?v=409149"></script>
 <script src="tpo.js?v=409146"></script>
 <script src="dealer.js?v=40929"></script>
 <script src="ivbadge.js?v=40504"></script>

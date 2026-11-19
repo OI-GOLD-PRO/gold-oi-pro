@@ -43,7 +43,9 @@
       "i": "M",
       "title": "Philly Fed Manufacturing Index",
       "forecast": "20.6",
-      "previous": "20.9"
+      "previous": "20.9",
+      "actual": "6.3",
+      "better": false
     },
     {
       "date": "2026-11-19T08:30:00-05:00",
@@ -51,7 +53,9 @@
       "i": "M",
       "title": "Unemployment Claims",
       "forecast": "198K",
-      "previous": "200K"
+      "previous": "200K",
+      "actual": "203K",
+      "better": false
     },
     {
       "date": "2026-11-20T10:00:00-05:00",
@@ -70,7 +74,7 @@
       "previous": "4.3%"
     }
   ],
-  "checked_at": 1795083219,
+  "checked_at": 1795114827,
   "coverage": {
     "from": 1794718800,
     "to": 1795323600,

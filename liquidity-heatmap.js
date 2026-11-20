@@ -1,11 +1,12 @@
+import { rankBook } from './liquidity-levels.mjs';
 // Sample displayed Binance limit orders. Each column is one book, not traded volume.
 (() => {
   'use strict';
   const O = window.OI;
   if (!O || O.sym !== 'gold') return;
   const pref = 'oi_liquidity_enabled' + (O.psfx || '');
-  const historyKey = 'oi_liquidity_xau_depth_v1' + (O.psfx || '');
-  const interval = 5000, retention = 3600000, row = 0.50;
+  const historyKey = 'oi_liquidity_xau_depth_ranked_v2' + (O.psfx || '');
+  const interval = 30000, retention = 3600000, row = 1;
   const periods = {'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400};
   const scale = O.chart.timeScale();
   let enabled = false, samples = [], status = '', busy = false, retryAt = 0, redraw;
@@ -16,22 +17,40 @@
   } catch (_) {}
   function saveHistory() {
     if (!samples.length) return;
-    try { localStorage.setItem(historyKey, JSON.stringify(samples)); } catch (_) {}
+    try { localStorage.setItem(historyKey, JSON.stringify(samples.filter(s=>!s.remote))); } catch (_) {}
   }
   function setStatus(value) {
     status = value;
     const node = document.getElementById('liqStatus');
     if (node) node.textContent = value;
   }
-  function aggregate(entries) {
-    const levels = new Map();
-    for (const [price, size] of entries) {
-      const tick = Math.floor(Math.round(Number(price) * 100) / (row * 100));
-      const qty = Number(size);
-      if (Number.isFinite(tick) && tick > 0 && Number.isFinite(qty) && qty > 0)
-        levels.set(tick, (levels.get(tick) || 0) + qty);
-    }
-    return [...levels];
+  let loadingHistory = false;
+  async function loadHistory() {
+    if (loadingHistory || document.hidden) return;
+    loadingHistory = true;
+    try {
+      let after = Date.now() - retention;
+      const remote = [];
+      for (let page = 0; page < 15; page++) {
+        const res = await fetch('https://oi-gold-liquidity.oigoldpro.workers.dev/history?after=' + after,
+          {cache:'no-store',signal:AbortSignal.timeout(12000)});
+        if (!res.ok) throw Error('HTTP ' + res.status);
+        const batch = await res.json();
+        for (const book of batch.samples) {
+          if (!Number.isSafeInteger(book.time) || book.time <= after || !Array.isArray(book.rows) || !book.rows.length)
+            throw Error('Invalid book');
+          after = book.time;
+          remote.push({...book,step:row,remote:true,peak:Math.max(...book.rows.map(r=>Math.abs(r[1])))});
+        }
+        if (!batch.more || !batch.samples.length) break;
+      }
+      const merged = new Map(remote.map(s=>[s.time,s]));
+      for (const s of samples) merged.set(s.time,s);
+      samples = [...merged.values()].filter(s=>s.time > Date.now()-retention).sort((a,b)=>a.time-b.time);
+      if (enabled) redraw?.();
+    } catch (error) {
+      console.warn('Liquidity history unavailable',error.message);
+    } finally { loadingHistory = false; }
   }
   async function sample() {
     if (busy || document.hidden || Date.now() < retryAt) return;
@@ -49,12 +68,12 @@
       if (document.hidden) return;
       if (!Number.isFinite(time) || Math.abs(time - Date.now()) > 30000) throw Error('ข้อมูลล่าช้า');
       if (time <= (samples.at(-1)?.time || 0)) { setStatus('รอสมุดคำสั่งชุดใหม่'); return; }
-      const bids = aggregate(book.bids), asks = aggregate(book.asks);
-      if (!bids.length || !asks.length || !Number.isFinite(O.adj)) throw Error('รอข้อมูลระดับราคา');
-      const rows = [...bids, ...asks.map(([p,q]) => [p,-q])];
+      if (!Number.isFinite(O.adj)) throw Error('รอข้อมูลระดับราคา');
+      const snapshot = rankBook(book);
+      const rows = snapshot.rows;
       samples = samples.filter(s => s.time > time - retention);
-      samples.push({time, rows, step:row, offset:O.adj, peak:Math.max(...rows.map(r => Math.abs(r[1])))});
-      setStatus('รับข้อมูลล่าสุด ' + new Date(time).toLocaleTimeString('th-TH'));
+      samples.push({time, ...snapshot, step:row, offset:O.adj, peak:Math.max(...rows.map(r => Math.abs(r[1])))});
+      setStatus('ข้อมูลล่าสุด ' + new Date(time).toLocaleTimeString('th-TH') + ' · ระยะที่เห็นจริง Bid −$' + snapshot.coverage[0].toFixed(2) + ' / Ask +$' + snapshot.coverage[1].toFixed(2));
       if (enabled) redraw?.();
     } catch (err) {
       setStatus('อ่านสมุดคำสั่ง Binance ไม่ได้ · ' + err.message + ' · จะลองใหม่อัตโนมัติ');
@@ -85,9 +104,10 @@
         if (x >= mediaSize.width || x === lastPixel) continue;
         lastPixel = x;
         const step = s.step || 0.10;
+        const offset = s.remote ? O.adj : s.offset;
         for (const [tick, signed] of s.rows) {
-          const y = O.series.priceToCoordinate((tick + 1) * step - s.offset);
-          const bottom = O.series.priceToCoordinate(tick * step - s.offset);
+          const y = O.series.priceToCoordinate((tick + 1) * step - offset);
+          const bottom = O.series.priceToCoordinate(tick * step - offset);
           if (!Number.isFinite(y) || !Number.isFinite(bottom) || y > mediaSize.height || bottom < 0) continue;
           const intensity = Math.abs(signed) / s.peak;
           const alpha = 0.12 + 0.78 * Math.sqrt(intensity);
@@ -102,12 +122,13 @@
       const liveX = scale.timeToCoordinate(bars.at(-1).time);
       const age = Date.now() - latest.time;
       const barAge = latest.time / 1000 + O.tzShift - bars.at(-1).time;
-      if (age >= 0 && age < 15000 && barAge >= 0 && barAge < duration &&
+      if (age >= 0 && age < interval * 1.5 && barAge >= 0 && barAge < duration &&
           Number.isFinite(liveX) && liveX >= 0 && liveX <= mediaSize.width) {
         const step = latest.step || 0.10;
+        const offset = latest.remote ? O.adj : latest.offset;
         const visible = [];
         for (const [tick, qty] of latest.rows) {
-          const price = tick * step - latest.offset;
+          const price = tick * step - offset;
           const top = O.series.priceToCoordinate(price + step);
           const bottom = O.series.priceToCoordinate(price);
           if (!Number.isFinite(top) || !Number.isFinite(bottom)) continue;
@@ -116,7 +137,7 @@
           visible.push({price, qty, y, height:Math.max(4, Math.abs(bottom-top))});
         }
         visible.sort((a,b) => Math.abs(b.qty) - Math.abs(a.qty));
-        const walls = [1,-1].flatMap(sign => visible.filter(w => Math.sign(w.qty) === sign).slice(0,3));
+        const walls = [1,-1].flatMap(sign => visible.filter(w => Math.sign(w.qty) === sign).slice(0,10));
         const peak = Math.abs(visible[0]?.qty || 1);
         ctx.save();
         const right = mediaSize.width;
@@ -154,7 +175,7 @@
     if (!menu || menu.hidden || document.getElementById('liquidityBookBox')) return;
     const box = document.createElement('div');
     box.id = 'liquidityBookBox'; box.className = 'gsbox';
-    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · 1,000 ระดับต่อฝั่ง · รวมทุก $0.50 · แถบ LIVE แสดง 3 ระดับที่มีปริมาณรอสูงสุดต่อฝั่งในจอ · แถบยิ่งยาวและสว่าง ปริมาณยิ่งมาก · ประวัติแสดงตามเวลาที่เก็บจริง · เก็บข้อมูลแม้ซ่อนอินดี้ ขณะเปิดหน้ากราฟทอง ทุก 5 วินาที สูงสุด 1 ชม.</span><span class="gsinfo" id="liqStatus"></span>';
+    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · ช่วง ±$100 จากราคากลาง Binance · รวมช่องละ $1 · สูงสุด 10 แนวต่อฝั่ง เรียงตามปริมาณ · เก็บทุก 30 วินาที ย้อนหลัง 1 ชม. · ประวัติส่วนกลางใช้ส่วนต่างราคาปัจจุบันของกราฟ</span><span class="gsinfo" id="liqStatus"></span>';
     const btn = box.querySelector('button');
     function paint() { btn.classList.toggle('on',enabled); btn.setAttribute('aria-pressed',String(enabled)); }
     btn.onclick = () => {
@@ -165,9 +186,11 @@
     paint(); menu.append(box); setStatus(status || 'กำลังอ่านสมุดคำสั่ง');
   }
   if (menu) { new MutationObserver(mount).observe(menu,{childList:true,attributes:true,attributeFilter:['hidden']}); mount(); }
+  setInterval(() => { if (enabled) loadHistory(); }, 300000);
   setInterval(sample, interval);
   setInterval(() => { if (!document.hidden) saveHistory(); },60000);
-  document.addEventListener('visibilitychange',()=>{ if (document.hidden) saveHistory(); else sample(); });
+  document.addEventListener('visibilitychange',()=>{ if (document.hidden) saveHistory(); else { loadHistory(); sample(); } });
   window.addEventListener('pagehide',saveHistory);
+  loadHistory();
   sample();
 })();

@@ -13,19 +13,24 @@ export class LiquidityBook {
 
   async fetch(request) {
     const url = new URL(request.url);
+    let nextAttempt = await this.storage.getAlarm();
+    if (nextAttempt === null) {
+      nextAttempt = Date.now()+1;
+      await this.storage.setAlarm(nextAttempt);
+    }
     if (url.pathname === '/wake') {
-      if (await this.storage.getAlarm() === null) await this.storage.setAlarm(Date.now()+1);
       return new Response(null,{status:204});
     }
     const cutoff = Math.max(Date.now()-HOUR, Number(url.searchParams.get('after')) || 0);
     const batch = this.sql.exec('SELECT time,rows FROM ranked_books WHERE time > ? ORDER BY time LIMIT 60',cutoff).toArray();
-    return Response.json({samples:batch.map(b=>({time:b.time,...JSON.parse(b.rows)})),more:batch.length===60},
+    return Response.json({samples:batch.map(b=>({time:b.time,...JSON.parse(b.rows)})),more:batch.length===60,nextAttempt,lastAttempt:await this.storage.get('lastAttempt') ?? null},
       {headers:{'Access-Control-Allow-Origin':'*','Cache-Control':'no-store'}});
   }
 
   async alarm() {
     const start = Date.now();
     let delay = PERIOD;
+    let outcome = 'ok';
     try {
       this.sql.exec('DELETE FROM ranked_books WHERE time <= ?',start-HOUR);
       const response = await fetch(DEPTH,{cache:'no-store',signal:AbortSignal.timeout(7000)});
@@ -39,10 +44,12 @@ export class LiquidityBook {
       const snapshot = rankBook(book);
       this.sql.exec('INSERT OR IGNORE INTO ranked_books VALUES (?,?)',time,JSON.stringify(snapshot));
     } catch (error) {
-      console.warn('Liquidity capture',error.message);
+      outcome = error.message;
+      console.warn('Liquidity capture',outcome);
       delay = Math.max(delay,15000);
     } finally {
       await this.storage.setAlarm(Math.max(Date.now()+250,start+delay));
+      await this.storage.put('lastAttempt',{time:start,outcome});
     }
   }
 }

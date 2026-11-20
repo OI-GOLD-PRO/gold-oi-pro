@@ -170,7 +170,7 @@
       ctx.fill();
     }
     const { positive, negative } = totals(bars, now, duration, shift, until);
-    label(ctx, [[hours + ' ชม.  ', '#c7d7ef'], ['◆ ' + signed(positive), green],
+    label(ctx, [['รวม Δ ' + hours + ' ชม.  ', '#c7d7ef'], ['◆ ' + signed(positive), green],
       ['   ', '#c7d7ef'], ['◆ ' + signed(negative), orange]], width / 2, 5, width);
     const hit = hits.find(item => item.time === selected);
     if (hit) {

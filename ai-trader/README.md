@@ -22,3 +22,7 @@ Open http://127.0.0.1:4173/. The dashboard reads `GET /api/oi-snapshot` from the
 | Sheet and historical OI | The chart has authenticated Apps Script routes `api=data` and `api=oi_history`. This adapter reads `/opt` and requires no Apps Script access code. |
 
 Quote timestamps are checked against the same 15-minute freshness window used by the hourly backup. Expired, stale, missing and implausibly future timestamps return metadata with empty market rows. Upstream failures return HTTP 502. The feed covers the selected contract and the strikes available from `/opt`.
+
+## MT5 daily journal
+
+Compile OI_Trader_Journal.mq5 in MetaEditor and attach it to a separate chart in the account to monitor. The exporter records BUY/SELL deals from all symbols and magic numbers for the last 30 broker dates. Its Experts log prints the file path. Set OI_JOURNAL_FILE to that path before starting the Node server on the same PC. The dashboard shows the last broker export time. Daily net sums profit, swap, commission and fee on those deals, including entry costs booked that day. Separate balance adjustments and commission-only ledger entries are outside this total.

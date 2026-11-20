@@ -2,6 +2,8 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { createOptionsReader } from './oi-snapshot.mjs';
 
+import { dailyJournal } from './journal.mjs';
+
 const readOptions = createOptionsReader();
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
@@ -62,6 +64,14 @@ const server = createServer(async (request, response) => {
   }
 
   const path = request.url.split('?', 1)[0];
+  if (path === '/api/journal') {
+    const day = new URL(request.url, 'http://localhost').searchParams.get('day');
+    const send = (status, result) => reply(response, status, 'application/json', JSON.stringify(result));
+    if (day && !/^\d{4}-\d{2}-\d{2}$/.test(day)) return send(400, { error: 'วันที่ไม่ถูกต้อง' });
+    if (!process.env.OI_JOURNAL_FILE) return send(503, { error: 'รอเชื่อมไฟล์ประวัติ MT5' });
+    try { return send(200, await dailyJournal(process.env.OI_JOURNAL_FILE, day)); }
+    catch { return send(503, { error: 'อ่านรายงาน MT5 ไม่สำเร็จ' }); }
+  }
   if (path === '/api/oi-snapshot') {
     try {
       return reply(response, 200, 'application/json', JSON.stringify(await readOptions()));

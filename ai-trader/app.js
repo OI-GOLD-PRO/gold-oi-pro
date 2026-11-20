@@ -78,3 +78,38 @@ analyzeButton.addEventListener('click', async () => {
     analyzeButton.disabled = false;
   }
 });
+
+const journalDay = document.getElementById('day');
+journalDay.value = '';
+let journalRequest = 0;
+async function refreshJournal() {
+  const sequence = ++journalRequest;
+  const body = document.getElementById('journalRows');
+  const status = document.getElementById('journalStatus');
+  try {
+    const response = await fetch('./api/journal?day=' + encodeURIComponent(journalDay.value), {cache:'no-store'});
+    const data = await response.json();
+    if (sequence !== journalRequest) return;
+    if (!response.ok) throw Error(data.error);
+    journalDay.value = data.day;
+    journalDay.min = data.first;
+    journalDay.max = data.last.slice(0,10);
+    body.replaceChildren();
+    const covered = data.day >= data.first && data.day <= journalDay.max;
+    status.textContent = (covered ? data.rows.length + ' ดีล · สุทธิ ' + data.net.toFixed(2) + ' ' + data.currency : 'วันที่อยู่นอกช่วงรายงาน') +
+      ' · อัปเดตตามเวลาโบรกเกอร์ ' + data.last;
+    for (const row of data.rows.slice().reverse()) {
+      const tr = body.insertRow();
+      for (const value of [row.time,row.ticket,row.symbol,row.side + ' / ' + row.entry.replace('DEAL_ENTRY_', ''),row.volume,row.net.toFixed(2)]) {
+        tr.insertCell().textContent = value;
+      }
+    }
+  } catch (error) {
+    if (sequence !== journalRequest) return;
+    body.replaceChildren();
+    status.textContent = error.message;
+  }
+}
+journalDay.addEventListener('change', refreshJournal);
+setInterval(() => { if (!document.hidden) refreshJournal(); }, 30_000);
+refreshJournal();

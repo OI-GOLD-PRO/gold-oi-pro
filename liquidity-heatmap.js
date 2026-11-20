@@ -16,12 +16,40 @@
   } catch (_) {}
   function saveHistory() {
     if (!samples.length) return;
-    try { localStorage.setItem(historyKey, JSON.stringify(samples)); } catch (_) {}
+    try { localStorage.setItem(historyKey, JSON.stringify(samples.filter(s=>!s.remote))); } catch (_) {}
   }
   function setStatus(value) {
     status = value;
     const node = document.getElementById('liqStatus');
     if (node) node.textContent = value;
+  }
+  let loadingHistory = false;
+  async function loadHistory() {
+    if (loadingHistory || document.hidden) return;
+    loadingHistory = true;
+    try {
+      let after = Date.now() - retention;
+      const remote = [];
+      for (let page = 0; page < 15; page++) {
+        const res = await fetch('https://oi-gold-liquidity.oigoldpro.workers.dev/history?after=' + after,
+          {cache:'no-store',signal:AbortSignal.timeout(12000)});
+        if (!res.ok) throw Error('HTTP ' + res.status);
+        const batch = await res.json();
+        for (const book of batch.samples) {
+          if (!Number.isSafeInteger(book.time) || book.time <= after || !Array.isArray(book.rows) || !book.rows.length)
+            throw Error('Invalid book');
+          after = book.time;
+          remote.push({...book,step:row,remote:true,peak:Math.max(...book.rows.map(r=>Math.abs(r[1])))});
+        }
+        if (!batch.more || !batch.samples.length) break;
+      }
+      const merged = new Map(remote.map(s=>[s.time,s]));
+      for (const s of samples) merged.set(s.time,s);
+      samples = [...merged.values()].filter(s=>s.time > Date.now()-retention).sort((a,b)=>a.time-b.time);
+      if (enabled) redraw?.();
+    } catch (error) {
+      console.warn('Liquidity history unavailable',error.message);
+    } finally { loadingHistory = false; }
   }
   function aggregate(entries) {
     const levels = new Map();
@@ -85,9 +113,10 @@
         if (x >= mediaSize.width || x === lastPixel) continue;
         lastPixel = x;
         const step = s.step || 0.10;
+        const offset = s.remote ? O.adj : s.offset;
         for (const [tick, signed] of s.rows) {
-          const y = O.series.priceToCoordinate((tick + 1) * step - s.offset);
-          const bottom = O.series.priceToCoordinate(tick * step - s.offset);
+          const y = O.series.priceToCoordinate((tick + 1) * step - offset);
+          const bottom = O.series.priceToCoordinate(tick * step - offset);
           if (!Number.isFinite(y) || !Number.isFinite(bottom) || y > mediaSize.height || bottom < 0) continue;
           const intensity = Math.abs(signed) / s.peak;
           const alpha = 0.12 + 0.78 * Math.sqrt(intensity);
@@ -105,9 +134,10 @@
       if (age >= 0 && age < 15000 && barAge >= 0 && barAge < duration &&
           Number.isFinite(liveX) && liveX >= 0 && liveX <= mediaSize.width) {
         const step = latest.step || 0.10;
+        const offset = latest.remote ? O.adj : latest.offset;
         const visible = [];
         for (const [tick, qty] of latest.rows) {
-          const price = tick * step - latest.offset;
+          const price = tick * step - offset;
           const top = O.series.priceToCoordinate(price + step);
           const bottom = O.series.priceToCoordinate(price);
           if (!Number.isFinite(top) || !Number.isFinite(bottom)) continue;
@@ -154,7 +184,7 @@
     if (!menu || menu.hidden || document.getElementById('liquidityBookBox')) return;
     const box = document.createElement('div');
     box.id = 'liquidityBookBox'; box.className = 'gsbox';
-    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · 1,000 ระดับต่อฝั่ง · รวมทุก $0.50 · แถบ LIVE แสดง 3 ระดับที่มีปริมาณรอสูงสุดต่อฝั่งในจอ · แถบยิ่งยาวและสว่าง ปริมาณยิ่งมาก · ประวัติแสดงตามเวลาที่เก็บจริง · เก็บข้อมูลแม้ซ่อนอินดี้ ขณะเปิดหน้ากราฟทอง ทุก 5 วินาที สูงสุด 1 ชม.</span><span class="gsinfo" id="liqStatus"></span>';
+    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · 1,000 ระดับต่อฝั่ง · รวมทุก $0.50 · แถบ LIVE แสดง 3 ระดับที่มีปริมาณรอสูงสุดต่อฝั่งในจอ · แถบยิ่งยาวและสว่าง ปริมาณยิ่งมาก · ประวัติส่วนกลางใช้ส่วนต่างราคาปัจจุบันของกราฟ · เก็บข้อมูลแม้ซ่อนอินดี้ ขณะเปิดหน้ากราฟทอง ทุก 5 วินาที สูงสุด 1 ชม.</span><span class="gsinfo" id="liqStatus"></span>';
     const btn = box.querySelector('button');
     function paint() { btn.classList.toggle('on',enabled); btn.setAttribute('aria-pressed',String(enabled)); }
     btn.onclick = () => {
@@ -165,9 +195,11 @@
     paint(); menu.append(box); setStatus(status || 'กำลังอ่านสมุดคำสั่ง');
   }
   if (menu) { new MutationObserver(mount).observe(menu,{childList:true,attributes:true,attributeFilter:['hidden']}); mount(); }
+  setInterval(() => { if (enabled) loadHistory(); }, 300000);
   setInterval(sample, interval);
   setInterval(() => { if (!document.hidden) saveHistory(); },60000);
-  document.addEventListener('visibilitychange',()=>{ if (document.hidden) saveHistory(); else sample(); });
+  document.addEventListener('visibilitychange',()=>{ if (document.hidden) saveHistory(); else { loadHistory(); sample(); } });
   window.addEventListener('pagehide',saveHistory);
+  loadHistory();
   sample();
 })();

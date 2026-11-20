@@ -43,8 +43,17 @@
     document.getElementById('chartTypeIcon').textContent = {candles:'▥',line:'∿',footprint:'☷'}[mode];
     O.markDirty();
   }
-  selector.value = mode;
-  selector.addEventListener('change', () => setMode(selector.value));
+  const preferenceKey = 'oi_chart_type' + (O.psfx || '');
+  function restoreMode() {
+    let saved;
+    try { saved = localStorage.getItem(preferenceKey); } catch (_) {}
+    if (['line', 'footprint', 'candles'].includes(saved)) setMode(saved);
+    selector.value = mode;
+  }
+  selector.addEventListener('change', () => {
+    setMode(selector.value);
+    try { localStorage.setItem(preferenceKey, mode); } catch (_) {}
+  });
 
   function drawCloseLine(ctx, width, height) {
     if (width <= 0 || height <= 0) return;
@@ -173,4 +182,5 @@
   });
 
   window.OI_footprint = { get active() { return previous !== null; }, fit };
+  restoreMode();
 })();

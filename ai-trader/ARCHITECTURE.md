@@ -32,4 +32,4 @@ This is a **separate web application**, not a modification to the existing OI Go
 4. Build MT5 EA bridge, risk-controller parity and reconciliation, demo-only tests.
 5. Paper trading, MT5 demo forward tests, then explicit live enablement.
 
-Status: the local dashboard reads the existing /opt feed through a read-only Node service. See README for live field coverage and pending sources. The new app has no deployment or MT5 connection.
+Status: the local dashboard reads the existing /opt feed through a read-only Node service. See README for live field coverage and pending sources. The demo-only MT5 decision bridge, persistent risk policy and daily execution journal are implemented for local installation. End-to-end broker validation requires a Windows MT5 demo terminal and DeepSeek key.

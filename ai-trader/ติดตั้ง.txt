@@ -1,0 +1,10 @@
+OI Gold AI Trader Demo 1.20
+
+1. แตก ZIP บนเครื่อง Windows ที่ติดตั้ง MT5 และ Node.js 20 ขึ้นไป ให้โฟลเดอร์ scripts อยู่ข้าง ai-trader
+2. เปิด MT5 ด้วยบัญชี Demo แบบ Hedging จาก File > Open Data Folder คัดลอก OI_Trader_Demo.mq5 และ OI_Trader_Journal.mq5 ไปที่ MQL5/Experts แล้วเปิด MetaEditor กด Compile ทั้งสองไฟล์
+3. เปิด PowerShell ในโฟลเดอร์ ai-trader แล้วรัน .\Start-Demo.ps1 กรอก DeepSeek API key, เลขบัญชี Demo, ชื่อเซิร์ฟเวอร์ และชื่อทองที่โบรกเกอร์ใช้ เช่น XAUUSDc ให้ตรงกับ MT5
+4. ไปที่ MT5 > Tools > Options > Expert Advisors เพิ่ม http://127.0.0.1:4173 ใน Allow WebRequest
+5. ติด OI_Trader_Demo บนกราฟทอง M5 เพียงกราฟเดียว ใส่ InpBridgeToken จากไฟล์ที่ PowerShell แจ้ง ตั้ง InpEnableTrading เป็น true แล้วเปิด Algo Trading ติด OI_Trader_Journal บนกราฟที่สองในบัญชีเดียวกัน
+6. เปิด http://127.0.0.1:4173/ เพื่อตั้ง risk ต่อไม้, risk รวม, ขาดทุนรายวัน, จำนวนไม้ และอนุญาตเปิดคนละฝั่งตามต้องการ เปิดเช็กบ็อกซ์เทรด Demo แล้วกดบันทึก
+7. เปิด MT5 และ PowerShell ค้างไว้ เมื่อแท่ง M5 ใหม่เริ่มและสเปรดผ่านเกณฑ์ EA จะขอแผน ออเดอร์เปิดจริงจะเห็นใน MT5 และประวัติแดชบอร์ดจะตามมาหลัง EA รายงานรอบถัดไป
+8. การใช้งานมือถือผ่าน HTTPS ใน Wi-Fi หรือ VPN เดียวกัน ดูหัวข้อ Optional phone dashboard ใน README.md

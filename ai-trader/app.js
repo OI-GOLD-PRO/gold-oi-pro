@@ -1,11 +1,35 @@
 "use strict";
 const form=document.getElementById("riskForm"), message=document.getElementById("riskMessage");
-const key="oi-gold-ai-trader-demo-risk-v1";
-try {const saved=JSON.parse(localStorage.getItem(key)||"null");if(saved){for(const [name,value] of Object.entries(saved)){const field=form.elements.namedItem(name);if(field){if(field.type==="checkbox")field.checked=Boolean(value);else field.value=String(value)}}}}catch(_){}
-document.getElementById("day").value=new Date().toLocaleDateString("en-CA");
-form.addEventListener("submit",event=>{event.preventDefault();const fd=new FormData(form);const policy={perTrade:Number(fd.get("perTrade")),total:Number(fd.get("total")),daily:Number(fd.get("daily")),positions:Number(fd.get("positions")),hedging:fd.has("hedging")};
-if(![policy.perTrade,policy.total,policy.daily,policy.positions].every(Number.isFinite)||policy.perTrade<=0||policy.total<policy.perTrade||policy.daily<=0||!Number.isInteger(policy.positions)||policy.positions<1){message.textContent="Invalid policy: total open risk must be at least per-trade risk.";return;}
-try{localStorage.setItem(key,JSON.stringify(policy));message.textContent="Demo settings saved in this browser only. No EA changes sent.";}catch(_){message.textContent="Browser storage unavailable. Settings were not saved.";}
+async function updateBridge(fill=false) {
+  const r=await fetch('./api/demo/status',{cache:'no-store'});
+  if(!r.ok)throw Error('โหลดสถานะไม่ได้');
+  const data=await r.json();
+  if(fill)for(const [key,value] of Object.entries(data.policy)){
+    const el=form.elements.namedItem(key);
+    if(el.type==='checkbox')el.checked=value;else el.value=value;
+  }
+  const online=data.lastContact && Date.now()-Date.parse(data.lastContact.at)<360000;
+  document.querySelector('#bridgeState').textContent=online?'เชื่อมต่อแล้ว':'รอ MT5 Demo';
+  document.querySelector('#tradeState').textContent=data.policy.enabled?'อนุญาต Demo':'ปิด';
+  document.querySelector('#positionsCount').textContent=online?data.lastContact.count:'—';
+  const feed=document.querySelector('#decisionFeed');
+  feed.replaceChildren(...data.recent.map(d=>{
+    const line=document.createElement('p');
+    line.textContent=new Date(d.at).toLocaleString('th-TH')+' · '+d.action+' · '+d.reason;
+    return line;
+  }));
+}
+updateBridge(true).catch(e=>message.textContent=e.message);
+setInterval(()=>updateBridge().catch(()=>{}),15000);
+form.addEventListener('submit',async event=>{
+  event.preventDefault();
+  const p={};
+  for(const el of form.elements)if(el.name)p[el.name]=el.type==='checkbox'?el.checked:Number(el.value);
+  try{
+    const r=await fetch('./api/demo/policy',{method:'POST',headers:{'X-OI-Dashboard':'1','Content-Type':'application/json'},body:JSON.stringify(p)});
+    if(!r.ok)throw Error('บันทึกไม่สำเร็จ กรุณาตรวจเพดานความเสี่ยง');
+    message.textContent='บันทึกแล้ว';await updateBridge();
+  }catch(e){message.textContent=e.message;}
 });
 const oiRefresh = document.getElementById("oiRefresh");
 const oiState = document.getElementById("oiFeedState");
@@ -100,7 +124,7 @@ async function refreshJournal() {
       ' · อัปเดตตามเวลาโบรกเกอร์ ' + data.last;
     for (const row of data.rows.slice().reverse()) {
       const tr = body.insertRow();
-      for (const value of [row.time,row.ticket,row.symbol,row.side + ' / ' + row.entry.replace('DEAL_ENTRY_', ''),row.volume,row.net.toFixed(2)]) {
+      for (const value of [row.time,row.ticket,row.symbol,row.side + ' / ' + row.entry.replace('DEAL_ENTRY_', ''),row.volume,row.net.toFixed(2),row.reason||"—"]) {
         tr.insertCell().textContent = value;
       }
     }

@@ -25,7 +25,7 @@ void OnTimer()
    string tmp = filename + "." + IntegerToString(ChartID()) + ".tmp";
    int file = FileOpen(tmp, FILE_WRITE | FILE_CSV | FILE_UNICODE | FILE_COMMON, '\t');
    if(file == INVALID_HANDLE) return;
-   bool ok = FileWrite(file, "OIJournal1", AccountInfoString(ACCOUNT_CURRENCY),
+   bool ok = FileWrite(file, "OIJournal2", AccountInfoString(ACCOUNT_CURRENCY),
                        TimeToString(start,TIME_DATE), TimeToString(end,TIME_DATE|TIME_SECONDS)) > 0;
    int count = HistoryDealsTotal();
    for(int i=0; ok && i<count; i++)
@@ -34,12 +34,15 @@ void OnTimer()
       if(!ticket) { ok=false; break; }
       long type = HistoryDealGetInteger(ticket,DEAL_TYPE);
       if(type!=DEAL_TYPE_BUY && type!=DEAL_TYPE_SELL) continue;
+      string note=HistoryDealGetString(ticket,DEAL_COMMENT);
+      string id=(StringFind(note,"OI:")==0 ? StringSubstr(note,3,20) : "-");
+      StringReplace(id,"\t","");StringReplace(id,"\r","");StringReplace(id,"\n","");
       ok = FileWrite(file, TimeToString((datetime)HistoryDealGetInteger(ticket,DEAL_TIME),TIME_DATE|TIME_SECONDS),
          (string)ticket, HistoryDealGetString(ticket,DEAL_SYMBOL), type==DEAL_TYPE_BUY?"BUY":"SELL",
          EnumToString((ENUM_DEAL_ENTRY)HistoryDealGetInteger(ticket,DEAL_ENTRY)),
          HistoryDealGetDouble(ticket,DEAL_VOLUME),HistoryDealGetDouble(ticket,DEAL_PROFIT),
          HistoryDealGetDouble(ticket,DEAL_COMMISSION),HistoryDealGetDouble(ticket,DEAL_SWAP),
-         HistoryDealGetDouble(ticket,DEAL_FEE)) > 0;
+         HistoryDealGetDouble(ticket,DEAL_FEE),(string)HistoryDealGetInteger(ticket,DEAL_POSITION_ID),id) > 0;
    }
    FileClose(file);
    if(ok && FileMove(tmp,FILE_COMMON,filename,FILE_COMMON|FILE_REWRITE)) return;

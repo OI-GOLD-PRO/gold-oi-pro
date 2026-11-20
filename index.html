@@ -381,7 +381,15 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <style>
   #tfs button[data-trend="up"] { background: #135439 !important; color: #e5fff1 !important; border-color: #25865d !important; }
   #tfs button[data-trend="down"] { background: #702b37 !important; color: #fff0f2 !important; border-color: #a64856 !important; }
-  #tfs button[data-trend="inside"] { background: #f4ce52 !important; color: #281f08 !important; border-color: #b88c25 !important; }
+  #tfs button[data-tf][data-trend="inside"] {
+    background: linear-gradient(rgb(255 220 0 / 76%), rgb(255 220 0 / 76%)) #fff !important;
+    color: #281f08 !important;
+    border-color: #b88c25 !important;
+  }
+  #tfs button[data-tf][data-trend="inside"].on {
+    border-color: #fff !important;
+    box-shadow: inset 0 0 0 1px #fff !important;
+  }
   #tfs button[data-trend].on { border-color: #f0d58d !important; box-shadow: inset 0 0 0 1px #f0d58d !important; }
 </style>
 </head>

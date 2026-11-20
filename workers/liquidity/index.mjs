@@ -4,6 +4,21 @@ const HOUR = 3600000;
 const PERIOD = 30000;
 const DEPTH = 'https://fapi.binance.com/fapi/v1/depth?symbol=XAUUSDT&limit=1000';
 
+async function explainRejection(response) {
+  const body = (await response.text()).slice(0,16384);
+  if (/restricted location|block access from your country|not available in your (country|region)/i.test(body))
+    return 'location restricted';
+  if (/request could not be satisfied/i.test(body) && /cloudfront/i.test(body))
+    return 'request denied by CloudFront';
+  if (/access denied|request blocked|forbidden/i.test(body))
+    return 'access denied by upstream';
+  try {
+    const {code,msg} = JSON.parse(body);
+    if (Number.isInteger(code) && typeof msg === 'string') return 'API ' + code + ': ' + msg.slice(0,160);
+  } catch (_) {}
+  return 'reason unspecified';
+}
+
 export class LiquidityBook {
   constructor(state) {
     this.storage = state.storage;
@@ -33,10 +48,12 @@ export class LiquidityBook {
     let outcome = 'ok';
     try {
       this.sql.exec('DELETE FROM ranked_books WHERE time <= ?',start-HOUR);
-      const response = await fetch(DEPTH,{cache:'no-store',signal:AbortSignal.timeout(7000)});
+      const response = await fetch(DEPTH,{headers:{Accept:'application/json'},cache:'no-store',signal:AbortSignal.timeout(7000)});
       if (!response.ok) {
         delay = response.status === 451 ? 3600000 : Math.max(60000,(Number(response.headers.get('Retry-After'))||0)*1000);
-        throw Error('Binance HTTP ' + response.status);
+        const reason = await explainRejection(response);
+        if (reason === 'location restricted') delay = Math.max(delay,HOUR);
+        throw Error('Binance HTTP ' + response.status + ' · ' + reason);
       }
       const book = await response.json();
       const time = Number(book.E || book.T);

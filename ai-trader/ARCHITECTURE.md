@@ -32,4 +32,4 @@ This is a **separate web application**, not a modification to the existing OI Go
 4. Build MT5 EA bridge, risk-controller parity and reconciliation, demo-only tests.
 5. Paper trading, MT5 demo forward tests, then explicit live enablement.
 
-Status: architecture only. No deployed application, trading connection or verified OI feed yet.
+Status: the local dashboard reads the existing /opt feed through a read-only Node service. See README for live field coverage and pending sources. The new app has no deployment or MT5 connection.

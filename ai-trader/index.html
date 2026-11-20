@@ -2,7 +2,19 @@
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OI Gold AI Trader</title><link rel="stylesheet" href="./style.css"></head>
 <body><main class="shell">
 <header><div><small>OI GOLD PRO / SEPARATE APP</small><h1>AI Trader Dashboard</h1><p>DeepSeek · MT5 · XAUUSD M5</p></div><span class="pill">DEMO / NOT CONNECTED</span></header>
-<section class="stats"><article><small>MT5 Connection</small><strong>Offline</strong></article><article><small>OI Feed</small><strong>Not configured</strong></article><article><small>Trading</small><strong>Disabled</strong></article><article><small>Open positions</small><strong>—</strong></article></section>
+<section class="stats"><article><small>MT5 Connection</small><strong>Offline</strong></article><article><small>OI Feed</small><strong id="oiFeedState">กำลังตรวจสอบ</strong></article><article><small>Trading</small><strong>Disabled</strong></article><article><small>Open positions</small><strong>—</strong></article></section>
+<section class="panel oi-snapshot" aria-labelledby="oiSnapshotTitle">
+  <div class="heading"><h2 id="oiSnapshotTitle">ข้อมูลออปชัน OI Gold Pro</h2><button id="oiRefresh" type="button">โหลดข้อมูลใหม่</button></div>
+  <p id="oiFeedMessage" role="status">กำลังอ่านข้อมูลจาก Worker</p>
+  <dl id="oiMetrics" hidden>
+    <div><dt>สัญญา</dt><dd id="oiContract"></dd></div>
+    <div><dt>เวลาราคาออปชัน</dt><dd id="oiQuotesTime"></dd></div>
+    <div><dt>เวลา OI</dt><dd id="oiTime"></dd></div>
+    <div><dt>ATM IV</dt><dd id="oiAtmIv"></dd></div>
+    <div><dt>Expected Move</dt><dd id="oiExpectedMove"></dd></div>
+    <div><dt>Gamma Flip ระหว่างวัน</dt><dd id="oiGammaFlip"></dd></div>
+  </dl>
+</section>
 <div class="columns"><section class="panel"><h2>Risk Policy <span class="muted">Local demo only</span></h2><form id="riskForm">
 <label>Risk per trade (%)<input name="perTrade" type="number" min="0.01" max="5" step=".01" required value=".5"></label>
 <label>Maximum total open risk (%)<input name="total" type="number" min=".01" max="20" step=".01" required value="2"></label>

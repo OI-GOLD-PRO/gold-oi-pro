@@ -104,36 +104,44 @@
       const barAge = latest.time / 1000 + O.tzShift - bars.at(-1).time;
       if (age >= 0 && age < 15000 && barAge >= 0 && barAge < duration &&
           Number.isFinite(liveX) && liveX >= 0 && liveX <= mediaSize.width) {
-        const width = Math.min(140, mediaSize.width * 0.42);
         const step = latest.step || 0.10;
-        const strongest = [null,null];
-        const left = Math.max(0, Math.min(mediaSize.width - width, liveX + spacing / 2));
-        for (const [tick, signed] of latest.rows) {
-          const top = O.series.priceToCoordinate((tick + 1) * step - latest.offset);
-          const bottom = O.series.priceToCoordinate(tick * step - latest.offset);
+        const visible = [];
+        for (const [tick, qty] of latest.rows) {
+          const price = tick * step - latest.offset;
+          const top = O.series.priceToCoordinate(price + step);
+          const bottom = O.series.priceToCoordinate(price);
           if (!Number.isFinite(top) || !Number.isFinite(bottom)) continue;
-          ctx.fillStyle = signed > 0 ? '#37e073' : '#ff6937';
-          const side = signed > 0 ? 0 : 1;
-          if (!strongest[side] || Math.abs(signed) > Math.abs(strongest[side].qty))
-            strongest[side] = {qty:signed, price:tick*step-latest.offset, y:(top+bottom)/2};
-          ctx.globalAlpha = 0.65;
-          ctx.fillRect(left, top, Math.max(2,width * Math.abs(signed) / latest.peak), Math.max(2,bottom-top));
-          ctx.globalAlpha = 1;
+          const y = (top + bottom) / 2;
+          if (y < 0 || y >= mediaSize.height) continue;
+          visible.push({price, qty, y, height:Math.max(4, Math.abs(bottom-top))});
         }
-        const walls = strongest.filter(w => w && w.y >= 0 && w.y < mediaSize.height).sort((a,b)=>a.y-b.y);
-        let labelBottom = -2;
+        visible.sort((a,b) => Math.abs(b.qty) - Math.abs(a.qty));
+        const walls = [1,-1].flatMap(sign => visible.filter(w => Math.sign(w.qty) === sign).slice(0,3));
+        const peak = Math.abs(visible[0]?.qty || 1);
         ctx.save();
+        const right = mediaSize.width;
+        const usedLabels = [];
         ctx.font = 'bold 11px sans-serif';
-        for (const wall of walls) {
-          const color = wall.qty > 0 ? '#67fa8c' : '#ff9956';
-          ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([6,4]);
-          ctx.beginPath(); ctx.moveTo(0,wall.y); ctx.lineTo(mediaSize.width,wall.y); ctx.stroke();
-          const name = (wall.qty > 0 ? 'BID ' : 'ASK ') + wall.price.toFixed(2) + ' · ' +
-            Math.abs(wall.qty).toLocaleString('en-US',{maximumFractionDigits:1});
-          const y = Math.min(mediaSize.height-17, Math.max(0,wall.y-8,labelBottom+2));
-          ctx.fillStyle = '#0a1424'; ctx.fillRect(3,y,ctx.measureText(name).width+10,17);
-          ctx.fillStyle = color; ctx.textBaseline = 'middle'; ctx.fillText(name,8,y+8.5);
-          labelBottom = y+17;
+        ctx.textBaseline = 'middle';
+        for (const wall of walls.sort((a,b) => Math.abs(b.qty)-Math.abs(a.qty))) {
+          const strength = Math.sqrt(Math.abs(wall.qty) / peak);
+          const width = right * (0.46 + 0.50 * strength);
+          const left = right - width;
+          const rgb = wall.qty > 0 ? '65,238,99' : '255,130,44';
+          const top = wall.y - wall.height / 2;
+          ctx.fillStyle = 'rgba(' + rgb + ',' + (0.14 + 0.34 * strength) + ')';
+          ctx.fillRect(left, top, width, wall.height);
+          ctx.fillStyle = 'rgba(' + rgb + ',0.9)';
+          ctx.fillRect(left, top, width, 1);
+          const labelY = Math.max(8, Math.min(mediaSize.height-8, wall.y));
+          if (usedLabels.some(y => Math.abs(y-labelY) < 16)) continue;
+          usedLabels.push(labelY);
+          const label = (wall.qty > 0 ? 'BID ' : 'ASK ') + wall.price.toFixed(2) +
+            ' · ' + Math.abs(wall.qty).toLocaleString('en-US',{maximumFractionDigits:1}) + ' LIVE';
+          ctx.fillStyle = '#101927';
+          ctx.fillRect(left, labelY-7, ctx.measureText(label).width+8, 14);
+          ctx.fillStyle = wall.qty > 0 ? '#98ff93' : '#ffb371';
+          ctx.fillText(label,left+4,labelY);
         }
         ctx.restore();
       }
@@ -146,7 +154,7 @@
     if (!menu || menu.hidden || document.getElementById('liquidityBookBox')) return;
     const box = document.createElement('div');
     box.id = 'liquidityBookBox'; box.className = 'gsbox';
-    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · 1,000 ระดับต่อฝั่ง · รวมทุก $0.50 · เส้นประแสดงแนวรอซื้อและรอขายสูงสุดล่าสุด · สะสมประวัติทุก 5 วินาที สูงสุด 1 ชม.</span><span class="gsinfo" id="liqStatus"></span>';
+    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · 1,000 ระดับต่อฝั่ง · รวมทุก $0.50 · แถบ LIVE แสดง 3 ระดับที่มีปริมาณรอสูงสุดต่อฝั่งในจอ · แถบยิ่งยาวและสว่าง ปริมาณยิ่งมาก · ประวัติแสดงตามเวลาที่เก็บจริง · สะสมประวัติทุก 5 วินาที สูงสุด 1 ชม.</span><span class="gsinfo" id="liqStatus"></span>';
     const btn = box.querySelector('button');
     function paint() { btn.classList.toggle('on',enabled); btn.setAttribute('aria-pressed',String(enabled)); }
     btn.onclick = () => {

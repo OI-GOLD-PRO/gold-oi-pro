@@ -1,83 +1,63 @@
-import { rankBook } from '../../liquidity-levels.mjs';
-
 const HOUR = 3600000;
 const PERIOD = 30000;
-const DEPTH = 'https://fapi.binance.com/fapi/v1/depth?symbol=XAUUSDT&limit=1000';
+const HEADERS = {'Access-Control-Allow-Origin':'*','Cache-Control':'no-store'};
+const reply = (data,status=200) => Response.json(data,{status,headers:HEADERS});
 
-async function explainRejection(response) {
-  const body = (await response.text()).slice(0,16384);
-  if (/restricted location|block access from your country|not available in your (country|region)/i.test(body))
-    return 'location restricted';
-  if (/request could not be satisfied/i.test(body) && /cloudfront/i.test(body))
-    return 'request denied by CloudFront';
-  if (/access denied|request blocked|forbidden/i.test(body))
-    return 'access denied by upstream';
-  try {
-    const {code,msg} = JSON.parse(body);
-    if (Number.isInteger(code) && typeof msg === 'string') return 'API ' + code + ': ' + msg.slice(0,160);
-  } catch (_) {}
-  return 'reason unspecified';
+function valid(s, now) {
+  if (!s || !Number.isSafeInteger(s.time) || s.time < now-HOUR || s.time > now+5000 ||
+      !Number.isFinite(s.offset) || s.step !== 1 || !Array.isArray(s.rows) ||
+      !s.rows.length || s.rows.length > 20) return false;
+  const bids = new Set(), asks = new Set();
+  for (const entry of s.rows) {
+    if (!Array.isArray(entry) || entry.length !== 2) return false;
+    const [p,q] = entry, side = q>0 ? bids : asks;
+    if (!Number.isSafeInteger(p) || p<=0 || !Number.isFinite(q) || q===0 || side.has(p)) return false;
+    side.add(p);
+  }
+  return bids.size>0 && bids.size<=10 && asks.size>0 && asks.size<=10;
 }
 
 export class LiquidityBook {
   constructor(state) {
     this.storage = state.storage;
-    this.sql = this.storage.sql;
-    this.sql.exec('CREATE TABLE IF NOT EXISTS ranked_books (time INTEGER PRIMARY KEY, rows TEXT NOT NULL)');
+    this.sql = state.storage.sql;
+    this.sql.exec('CREATE TABLE IF NOT EXISTS captures (slot INTEGER PRIMARY KEY,time INTEGER NOT NULL,body TEXT NOT NULL)');
   }
-
-  async fetch(request) {
-    const url = new URL(request.url);
-    let nextAttempt = await this.storage.getAlarm();
-    if (nextAttempt === null) {
-      nextAttempt = Date.now()+1;
-      await this.storage.setAlarm(nextAttempt);
-    }
-    if (url.pathname === '/wake') {
-      return new Response(null,{status:204});
-    }
-    const cutoff = Math.max(Date.now()-HOUR, Number(url.searchParams.get('after')) || 0);
-    const batch = this.sql.exec('SELECT time,rows FROM ranked_books WHERE time > ? ORDER BY time LIMIT 60',cutoff).toArray();
-    return Response.json({samples:batch.map(b=>({time:b.time,...JSON.parse(b.rows)})),more:batch.length===60,nextAttempt,lastAttempt:await this.storage.get('lastAttempt') ?? null},
-      {headers:{'Access-Control-Allow-Origin':'*','Cache-Control':'no-store'}});
-  }
-
+  prune() { this.sql.exec('DELETE FROM captures WHERE time <= ?',Date.now()-HOUR); }
   async alarm() {
-    const start = Date.now();
-    let delay = PERIOD;
-    let outcome = 'ok';
-    try {
-      this.sql.exec('DELETE FROM ranked_books WHERE time <= ?',start-HOUR);
-      const response = await fetch(DEPTH,{headers:{Accept:'application/json'},cache:'no-store',signal:AbortSignal.timeout(7000)});
-      if (!response.ok) {
-        delay = response.status === 451 ? 3600000 : Math.max(60000,(Number(response.headers.get('Retry-After'))||0)*1000);
-        const reason = await explainRejection(response);
-        if (reason === 'location restricted') delay = Math.max(delay,HOUR);
-        throw Error('Binance HTTP ' + response.status + ' · ' + reason);
+    this.prune();
+    if (this.sql.exec('SELECT slot FROM captures LIMIT 1').toArray().length)
+      await this.storage.setAlarm(Date.now()+HOUR);
+  }
+  async fetch(request) {
+    this.prune();
+    if (request.method === 'POST') {
+      let batch;
+      try { batch = await request.json(); } catch { return reply({error:'Invalid JSON'},400); }
+      const now = Date.now();
+      if (!Array.isArray(batch) || batch.length>20 || !batch.every(s=>valid(s,now))) return reply({error:'Invalid snapshot'},400);
+      for (const {time,step,rows,offset} of batch) {
+        this.sql.exec('INSERT INTO captures VALUES (?,?,?) ON CONFLICT(slot) DO UPDATE SET time=excluded.time,body=excluded.body WHERE excluded.time>captures.time',
+          Math.floor(time/PERIOD),time,JSON.stringify({time,step,rows,offset}));
       }
-      const book = await response.json();
-      const time = Number(book.E || book.T);
-      if (!Number.isSafeInteger(time) || Math.abs(time-Date.now()) > 30000) throw Error('Stale book');
-      const snapshot = rankBook(book);
-      this.sql.exec('INSERT OR IGNORE INTO ranked_books VALUES (?,?)',time,JSON.stringify(snapshot));
-    } catch (error) {
-      outcome = error.message;
-      console.warn('Liquidity capture',outcome);
-      delay = Math.max(delay,15000);
-    } finally {
-      await this.storage.setAlarm(Math.max(Date.now()+250,start+delay));
-      await this.storage.put('lastAttempt',{time:start,outcome});
+      if (batch.length && await this.storage.getAlarm()===null) await this.storage.setAlarm(now+HOUR);
+      return reply({saved:true});
     }
+    const after=Number(new URL(request.url).searchParams.get('after'))||0;
+    const samples=this.sql.exec('SELECT body FROM captures WHERE time>? ORDER BY slot',after).toArray().map(r=>JSON.parse(r.body));
+    return reply({samples});
   }
 }
 
-const singleton = env => env.BOOK.getByName('binance-xauusdt');
 export default {
-  async scheduled(event,env,ctx) {
-    ctx.waitUntil(singleton(env).fetch('https://internal/wake'));
-  },
-  fetch(request,env) {
-    if (request.method !== 'GET' || new URL(request.url).pathname !== '/history') return new Response(null,{status:404});
-    return singleton(env).fetch(request);
+  async fetch(request,env) {
+    if (new URL(request.url).pathname!=='/history') return reply({},404);
+    if (request.method==='OPTIONS') return new Response(null,{status:204,headers:{...HEADERS,'Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Authorization,Content-Type','Access-Control-Max-Age':'86400'}});
+    if (!['GET','POST'].includes(request.method)) return reply({},405);
+    const key=/^Bearer ([0-9a-f]{64})$/.exec(request.headers.get('Authorization')||'');
+    if (!key) return reply({error:'App sync key required'},401);
+    if (request.method==='POST' && (!request.headers.has('Content-Length') || Number(request.headers.get('Content-Length'))>64000))
+      return reply({error:'Invalid batch size'},413);
+    return env.BOOK.getByName('browser-history:'+key[1]).fetch(request);
   }
 };

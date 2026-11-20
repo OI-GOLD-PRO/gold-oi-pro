@@ -4,7 +4,7 @@ compatibility_date = "2026-07-01"
 workers_dev = true
 
 [triggers]
-crons = ["*/5 * * * *"]
+crons = []
 
 [[durable_objects.bindings]]
 name = "BOOK"

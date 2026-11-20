@@ -62,3 +62,19 @@ oiRefresh.addEventListener("click", loadOiSnapshot);
 document.addEventListener("visibilitychange", loadOiSnapshot);
 setInterval(loadOiSnapshot, 60_000);
 loadOiSnapshot();
+
+const analyzeButton = document.getElementById('analyze');
+analyzeButton.addEventListener('click', async () => {
+  const output = document.getElementById('analysis');
+  analyzeButton.disabled = true;
+  output.textContent = 'กำลังวิเคราะห์…';
+  try {
+    const response = await fetch('./api/analyze', { method: 'POST', headers: { 'X-OI-Dashboard': '1' } });
+    const data = await response.json();
+    output.textContent = response.ok ? oiTimeLabel(data.quotes_as_of_utc) + '\n' + data.answer : data.error;
+  } catch {
+    output.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+  } finally {
+    analyzeButton.disabled = false;
+  }
+});

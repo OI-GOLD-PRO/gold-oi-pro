@@ -6,7 +6,7 @@ Run with Node.js 20+ from the repository root.
 node ai-trader/server.mjs
 ```
 
-Open http://127.0.0.1:4173/. The dashboard reads `GET /api/oi-snapshot` from the same local server and refreshes once per minute while visible. The server listens on loopback and accepts only GET requests. Risk settings remain local to the browser. DeepSeek, MT5, executions and the daily journal still await integration.
+Open http://127.0.0.1:4173/. The dashboard reads `GET /api/oi-snapshot` from the same local server and refreshes once per minute while visible. The server listens on loopback and serves the options feed via GET. Risk settings remain local to the browser. Set DEEPSEEK_API_KEY in the server environment to enable on-demand Thai analysis. DEEPSEEK_MODEL optionally selects the model. Open the numeric loopback URL above. MT5, execution and the daily journal still await integration.
 
 ## OI Gold Pro data
 

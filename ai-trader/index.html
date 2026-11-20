@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OI Gold AI Trader</title><link rel="stylesheet" href="./style.css"></head>
+<body><main class="shell">
+<header><div><small>OI GOLD PRO / SEPARATE APP</small><h1>AI Trader Dashboard</h1><p>DeepSeek · MT5 · XAUUSD M5</p></div><span class="pill">DEMO / NOT CONNECTED</span></header>
+<section class="stats"><article><small>MT5 Connection</small><strong>Offline</strong></article><article><small>OI Feed</small><strong>Not configured</strong></article><article><small>Trading</small><strong>Disabled</strong></article><article><small>Open positions</small><strong>—</strong></article></section>
+<div class="columns"><section class="panel"><h2>Risk Policy <span class="muted">Local demo only</span></h2><form id="riskForm">
+<label>Risk per trade (%)<input name="perTrade" type="number" min="0.01" max="5" step=".01" required value=".5"></label>
+<label>Maximum total open risk (%)<input name="total" type="number" min=".01" max="20" step=".01" required value="2"></label>
+<label>Daily loss limit (%)<input name="daily" type="number" min=".01" max="20" step=".01" required value="2"></label>
+<label>Maximum positions<input name="positions" type="number" min="1" max="50" step="1" required value="5"></label>
+<label class="check"><input name="hedging" type="checkbox"> Allow opposite directions (hedging accounts only)</label>
+<button type="submit">Save demo settings</button><p id="riskMessage" role="status"></p></form><p class="note">These settings are saved only in this browser. They do not change any live EA.</p></section>
+<section class="panel"><h2>AI Decision Feed</h2><div class="empty">No decisions yet. A validated DeepSeek service must be connected before decisions can appear.</div><h2>Open positions</h2><div class="empty">No MT5 connection. Positions cannot be displayed.</div></section></div>
+<section class="panel"><div class="heading"><h2>Daily Trading Journal</h2><label>Day <input id="day" type="date"></label></div><table><thead><tr><th>Time</th><th>Ticket</th><th>Action</th><th>Volume</th><th>Realized P/L</th><th>AI rationale</th></tr></thead><tbody><tr><td colspan="6" class="empty">No broker execution history connected.</td></tr></tbody></table></section>
+<footer>Safety mode: live trading disabled. Do not use this demo for trading decisions.</footer>
+</main><script src="./app.js"></script></body></html>

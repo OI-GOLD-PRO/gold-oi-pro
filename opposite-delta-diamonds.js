@@ -20,16 +20,18 @@
   const valid = values => Array.isArray(values) && values.length === 4 &&
     values.every((v, j) => Number.isFinite(v) && v >= 0 && v <= 100 && (!j || v > values[j - 1]));
   const validHours = value => Number.isInteger(value) && value >= 1 && value <= 720;
+  let heatmap = true;
   let enabled = true, thresholds = defaults.slice(), workerURL = "", hours = 4;
   try {
     const saved = JSON.parse(localStorage.getItem(key));
     if (typeof saved?.enabled === 'boolean') enabled = saved.enabled;
+    if (typeof saved?.heatmap === 'boolean') heatmap = saved.heatmap;
     if (valid(saved?.thresholds)) thresholds = saved.thresholds;
     if (validHours(saved?.hours)) hours = saved.hours;
     if (typeof saved?.workerURL === "string") workerURL = workerOrigin(saved.workerURL);
   } catch (_) {}
   const save = () => {
-    try { localStorage.setItem(key, JSON.stringify({ enabled, thresholds, workerURL, hours })); } catch (_) {}
+    try { localStorage.setItem(key, JSON.stringify({ enabled, thresholds, workerURL, hours, heatmap })); } catch (_) {}
   };
   const frames = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   function workerOrigin(value) {
@@ -76,6 +78,36 @@
   const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
   const signed = value => (value > 0 ? '+' : '') + number.format(value);
   let hits = [], selected = null, summary = null, drawnStream = '';
+  // Keep price cells on the chart's bottom layer so candle bodies stay legible.
+  let heatCells = [], heatRevision = '', redrawHeat = null;
+  const heatRenderer = {
+    draw(target) {
+      target.useMediaCoordinateSpace(({ context }) => {
+        const spacing = scale.options().barSpacing;
+        for (const cell of heatCells) {
+          const x = scale.timeToCoordinate(cell.time);
+          const top = O.series.priceToCoordinate(cell.level + 1);
+          const bottom = O.series.priceToCoordinate(cell.level);
+          if (![x, top, bottom].every(Number.isFinite)) continue;
+          context.fillStyle = cell.below ? 'rgba(67,229,142,' + cell.alpha + ')' :
+            'rgba(255,121,0,' + cell.alpha + ')';
+          context.fillRect(x - spacing / 2, top, spacing, bottom - top);
+        }
+      });
+    }
+  };
+  const heatView = { zOrder: () => 'bottom', renderer: () => heatRenderer };
+  O.series.attachPrimitive({
+    attached({ requestUpdate }) { redrawHeat = requestUpdate; },
+    paneViews: () => [heatView]
+  });
+  function publishHeat(cells) {
+    const revision = JSON.stringify(cells);
+    if (revision === heatRevision) return;
+    heatCells = cells;
+    heatRevision = revision;
+    redrawHeat?.();
+  }
   function signalFor(bar, from, duration, until) {
     if (workerURL) {
       const shared = sharedKey === streamKey() && sharedBars.get(from / 1000);
@@ -140,7 +172,7 @@
     const width = scale.width(), height = h - scale.height();
     const stream = streamKey();
     if (drawnStream !== stream) { drawnStream = stream; summary = selected = null; }
-    if (!enabled || !duration || O.tf !== O.displayedTF || width <= 0 || height <= 0) return;
+    if (!enabled || !duration || O.tf !== O.displayedTF || width <= 0 || height <= 0) { publishHeat([]); return; }
     const now = Date.now(), bars = O.series.data();
     const { end } = volume.footprintWindow();
     const start = now - 30 * 86400e3;
@@ -148,13 +180,29 @@
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
     ctx.globalAlpha = 1;
+    const cells = [], clusters = new Map();
+    const showHeat = heatmap && (O.tf === '1m' || O.tf === '5m');
+    const firstVisible = scale.getVisibleRange()?.from ?? Infinity;
     for (const bar of bars) {
       const from = bar.time * 1000 - shift;
       if (from < start) continue;
       const x = scale.timeToCoordinate(bar.time);
-      if (!Number.isFinite(x) || x < 0 || x > width) continue;
+      const visible = Number.isFinite(x) && x >= 0 && x <= width;
+      if (!visible && !(showHeat && bar.time < firstVisible &&
+          bar.time >= firstVisible - hours * 3600)) continue;
       const signal = signalFor(bar, from, duration, until);
       if (!signal) continue;
+      if (showHeat && from + duration <= now && Number.isFinite(bar.close)) {
+        const level = Math.floor(bar.close);
+        const key = level + '/' + signal.below;
+        const recent = clusters.get(key) || [];
+        while (recent.length && recent[0] < bar.time - hours * 3600) recent.shift();
+        recent.push(bar.time);
+        clusters.set(key, recent);
+        if (visible) cells.push({ time: bar.time, level, below: signal.below,
+          alpha: Math.min(0.52, 0.12 + 0.08 * (recent.length - 1)) });
+      }
+      if (!visible) continue;
       const anchor = O.series.priceToCoordinate(signal.below ? bar.low : bar.high);
       if (!Number.isFinite(anchor)) continue;
       const radius = radii[signal.tier];
@@ -169,6 +217,7 @@
       ctx.fillStyle = color;
       ctx.fill();
     }
+    publishHeat(cells);
     const { positive, negative } = totals(bars, now, duration, shift, until);
     label(ctx, [['รวม Δ ' + hours + ' ชม.  ', '#c7d7ef'], ['◆ ' + signed(positive), green],
       ['   ', '#c7d7ef'], ['◆ ' + signed(negative), orange]], width / 2, 5, width);
@@ -186,7 +235,7 @@
     panel.id = 'deltaDiamondsBox'; panel.className = 'gsbox';
     const levels = ['เล็กมาก', 'เล็ก', 'กลาง', 'ใหญ่'];
     const fields = thresholds.map((n, j) => `<label>${levels[j]} (%)<input data-odd-tier="${j}" type="number" inputmode="decimal" min="0" max="100" step="any" value="${n}" style="width:54px"></label>`).join('');
-    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps">${fields}</div><div class="row ps"><label>รวมเดลต้าย้อนหลัง (ชม.) <input data-odd-hours type="number" inputmode="numeric" min="1" max="720" step="1" value="${hours}" style="width:64px"></label></div><span class="gsinfo">ยอดรวมนับข้าวหลามตัดจากแท่งที่ปิดแล้วใน TF ปัจจุบัน · แตะข้าวหลามตัดเพื่อดูค่า Δ</span><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span><details><summary>สัญญาณส่วนกลางสำหรับ EA</summary><form data-odd-shared><label>Worker URL <input name="endpoint" type="url" required placeholder="https://…workers.dev"></label><button type="submit">ใช้สัญญาณส่วนกลาง</button><button type="button" data-odd-local>ใช้ข้อมูลในแอป</button></form><span class="gsinfo">เมื่อใช้สัญญาณส่วนกลาง ค่า % ปรับขนาดข้าวหลามตัด</span><span class="gsinfo" data-odd-shared-status></span></details>`;
+    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps"><label><input data-odd-heat type="checkbox" ${heatmap ? 'checked' : ''}> ฮีตแมปข้าวหลาม M1 / M5</label></div><span class="gsinfo">นับสีเดียวกันตามราคาปิดทุก $1 ในช่วงย้อนหลังที่ตั้งไว้ · สีเข้มเมื่อเกิดซ้ำ · ดูเทรน Envelope 50 ที่ปุ่ม M15</span><div class="row ps">${fields}</div><div class="row ps"><label>รวมเดลต้าย้อนหลัง (ชม.) <input data-odd-hours type="number" inputmode="numeric" min="1" max="720" step="1" value="${hours}" style="width:64px"></label></div><span class="gsinfo">ยอดรวมนับข้าวหลามตัดจากแท่งที่ปิดแล้วใน TF ปัจจุบัน · แตะข้าวหลามตัดเพื่อดูค่า Δ</span><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span><details><summary>สัญญาณส่วนกลางสำหรับ EA</summary><form data-odd-shared><label>Worker URL <input name="endpoint" type="url" required placeholder="https://…workers.dev"></label><button type="submit">ใช้สัญญาณส่วนกลาง</button><button type="button" data-odd-local>ใช้ข้อมูลในแอป</button></form><span class="gsinfo">เมื่อใช้สัญญาณส่วนกลาง ค่า % ปรับขนาดข้าวหลามตัด</span><span class="gsinfo" data-odd-shared-status></span></details>`;
     const form = panel.querySelector('[data-odd-shared]');
     form.elements.endpoint.value = workerURL;
     panel.querySelector('[data-odd-shared-status]').textContent = workerURL ? 'ใช้สัญญาณส่วนกลาง' : 'ใช้ข้อมูลในแอป';
@@ -222,6 +271,10 @@
       if (enabled) pollShared();
     });
     menu.addEventListener('change', e => {
+      if (e.target.matches('[data-odd-heat]')) {
+        heatmap = e.target.checked;
+        save(); O.markDirty(); return;
+      }
       const hoursInput = e.target.closest('[data-odd-hours]');
       if (hoursInput) {
         const value = hoursInput.valueAsNumber;

@@ -195,35 +195,44 @@
       return bars[Math.max(0, lo - 1)].time;
     }
     const showHeat = heatmap && (O.tf === '1m' || O.tf === '5m');
-    const firstVisible = scale.getVisibleRange()?.from ?? Infinity;
     for (const bar of bars) {
       const from = bar.time * 1000 - shift;
       if (from < start) continue;
       const x = scale.timeToCoordinate(bar.time);
       const visible = Number.isFinite(x) && x >= 0 && x <= width;
-      if (!visible && !(showHeat && bar.time < firstVisible &&
-          bar.time >= firstVisible - 2 * hours * 3600)) continue;
+      const closed = from + duration <= now && Number.isFinite(bar.close);
+      if (showHeat && closed) {
+        for (const [key, zone] of lastZone) {
+          // Positive delta on a red candle is resistance; negative on green is support.
+          const broken = zone.below ? bar.close > zone.level + 1 + 2 : bar.close < zone.level - 2;
+          if (broken) {
+            zone.endTime = bar.time;
+            zone.open = false;
+            lastZone.delete(key);
+            clusters.delete(key);
+          }
+        }
+      }
+      if (!visible && !(showHeat && closed)) continue;
       const signal = signalFor(bar, from, duration, until);
       if (!signal) continue;
-      if (showHeat && from + duration <= now && Number.isFinite(bar.close)) {
+      if (showHeat && closed) {
         const level = Math.floor(bar.close);
         const key = level + '/' + signal.below;
         const recent = clusters.get(key) || [];
         while (recent.length && recent[0] < bar.time - hours * 3600) recent.shift();
         recent.push(bar.time);
         clusters.set(key, recent);
-        const clustered = recent.length >= 2;
-        const expires = bar.time + hours * 3600;
         const prior = lastZone.get(key);
-        if (prior && prior.endTime >= bar.time) {
+        const clustered = Boolean(prior) || recent.length >= 2;
+        if (prior) {
           prior.endTime = lastBarBefore(bar.time - 1);
           prior.open = false;
         }
-        if (visible || (clustered && expires >= firstVisible)) {
+        if (visible || clustered) {
           const cell = { time: bar.time, level, below: signal.below,
-            alpha: Math.min(0.67, 0.23 + 0.10 * (recent.length - 1)),
-            endTime: clustered ? lastBarBefore(expires) : bar.time,
-            open: clustered && expires >= lastTime };
+            alpha: Math.min(0.67, 0.23 + 0.10 * (Math.max(clustered ? 2 : 1, recent.length) - 1)),
+            endTime: clustered ? lastTime : bar.time, open: clustered };
           cells.push(cell);
           if (clustered) lastZone.set(key, cell);
         }
@@ -261,7 +270,7 @@
     panel.id = 'deltaDiamondsBox'; panel.className = 'gsbox';
     const levels = ['เล็กมาก', 'เล็ก', 'กลาง', 'ใหญ่'];
     const fields = thresholds.map((n, j) => `<label>${levels[j]} (%)<input data-odd-tier="${j}" type="number" inputmode="decimal" min="0" max="100" step="any" value="${n}" style="width:54px"></label>`).join('');
-    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps"><label><input data-odd-heat type="checkbox" ${heatmap ? 'checked' : ''}> ฮีตแมปข้าวหลาม M1 / M5</label></div><span class="gsinfo">นับสีเดียวกันตามราคาปิดทุก $1 ในช่วงย้อนหลังที่ตั้งไว้ · ซ้ำตั้งแต่ 2 ครั้งลากโซนไปขวา ขณะโซนยังอยู่ในช่วงย้อนหลังจะแสดงเลยแท่งล่าสุด 3 แท่ง · ดูเทรน Envelope 50 ที่ปุ่ม M15</span><div class="row ps">${fields}</div><div class="row ps"><label>รวมเดลต้าย้อนหลัง (ชม.) <input data-odd-hours type="number" inputmode="numeric" min="1" max="720" step="1" value="${hours}" style="width:64px"></label></div><span class="gsinfo">ยอดรวมนับข้าวหลามตัดจากแท่งที่ปิดแล้วใน TF ปัจจุบัน · แตะข้าวหลามตัดเพื่อดูค่า Δ</span><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span><details><summary>สัญญาณส่วนกลางสำหรับ EA</summary><form data-odd-shared><label>Worker URL <input name="endpoint" type="url" required placeholder="https://…workers.dev"></label><button type="submit">ใช้สัญญาณส่วนกลาง</button><button type="button" data-odd-local>ใช้ข้อมูลในแอป</button></form><span class="gsinfo">เมื่อใช้สัญญาณส่วนกลาง ค่า % ปรับขนาดข้าวหลามตัด</span><span class="gsinfo" data-odd-shared-status></span></details>`;
+    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps"><label><input data-odd-heat type="checkbox" ${heatmap ? 'checked' : ''}> ฮีตแมปข้าวหลาม M1 / M5</label></div><span class="gsinfo">นับสีเดียวกันตามราคาปิดทุก $1 ในช่วงย้อนหลังที่ตั้งไว้ · ซ้ำตั้งแต่ 2 ครั้งลากโซนไปขวา หยุดเมื่อแท่งปิดเหนือขอบบนโซนเขียว หรือต่ำกว่าขอบล่างโซนส้มเกิน $2 · ดูเทรน Envelope 50 ที่ปุ่ม M15</span><div class="row ps">${fields}</div><div class="row ps"><label>รวมเดลต้าย้อนหลัง (ชม.) <input data-odd-hours type="number" inputmode="numeric" min="1" max="720" step="1" value="${hours}" style="width:64px"></label></div><span class="gsinfo">ยอดรวมนับข้าวหลามตัดจากแท่งที่ปิดแล้วใน TF ปัจจุบัน · แตะข้าวหลามตัดเพื่อดูค่า Δ</span><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span><details><summary>สัญญาณส่วนกลางสำหรับ EA</summary><form data-odd-shared><label>Worker URL <input name="endpoint" type="url" required placeholder="https://…workers.dev"></label><button type="submit">ใช้สัญญาณส่วนกลาง</button><button type="button" data-odd-local>ใช้ข้อมูลในแอป</button></form><span class="gsinfo">เมื่อใช้สัญญาณส่วนกลาง ค่า % ปรับขนาดข้าวหลามตัด</span><span class="gsinfo" data-odd-shared-status></span></details>`;
     const form = panel.querySelector('[data-odd-shared]');
     form.elements.endpoint.value = workerURL;
     panel.querySelector('[data-odd-shared-status]').textContent = workerURL ? 'ใช้สัญญาณส่วนกลาง' : 'ใช้ข้อมูลในแอป';

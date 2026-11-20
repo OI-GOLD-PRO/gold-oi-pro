@@ -1,11 +1,12 @@
+import { rankBook } from './liquidity-levels.mjs';
 // Sample displayed Binance limit orders. Each column is one book, not traded volume.
 (() => {
   'use strict';
   const O = window.OI;
   if (!O || O.sym !== 'gold') return;
   const pref = 'oi_liquidity_enabled' + (O.psfx || '');
-  const historyKey = 'oi_liquidity_xau_depth_v1' + (O.psfx || '');
-  const interval = 5000, retention = 3600000, row = 0.50;
+  const historyKey = 'oi_liquidity_xau_depth_ranked_v2' + (O.psfx || '');
+  const interval = 30000, retention = 3600000, row = 1;
   const periods = {'1m':60,'5m':300,'15m':900,'30m':1800,'1h':3600,'4h':14400,'1d':86400};
   const scale = O.chart.timeScale();
   let enabled = false, samples = [], status = '', busy = false, retryAt = 0, redraw;
@@ -51,16 +52,6 @@
       console.warn('Liquidity history unavailable',error.message);
     } finally { loadingHistory = false; }
   }
-  function aggregate(entries) {
-    const levels = new Map();
-    for (const [price, size] of entries) {
-      const tick = Math.floor(Math.round(Number(price) * 100) / (row * 100));
-      const qty = Number(size);
-      if (Number.isFinite(tick) && tick > 0 && Number.isFinite(qty) && qty > 0)
-        levels.set(tick, (levels.get(tick) || 0) + qty);
-    }
-    return [...levels];
-  }
   async function sample() {
     if (busy || document.hidden || Date.now() < retryAt) return;
     busy = true;
@@ -77,12 +68,12 @@
       if (document.hidden) return;
       if (!Number.isFinite(time) || Math.abs(time - Date.now()) > 30000) throw Error('ข้อมูลล่าช้า');
       if (time <= (samples.at(-1)?.time || 0)) { setStatus('รอสมุดคำสั่งชุดใหม่'); return; }
-      const bids = aggregate(book.bids), asks = aggregate(book.asks);
-      if (!bids.length || !asks.length || !Number.isFinite(O.adj)) throw Error('รอข้อมูลระดับราคา');
-      const rows = [...bids, ...asks.map(([p,q]) => [p,-q])];
+      if (!Number.isFinite(O.adj)) throw Error('รอข้อมูลระดับราคา');
+      const snapshot = rankBook(book);
+      const rows = snapshot.rows;
       samples = samples.filter(s => s.time > time - retention);
-      samples.push({time, rows, step:row, offset:O.adj, peak:Math.max(...rows.map(r => Math.abs(r[1])))});
-      setStatus('รับข้อมูลล่าสุด ' + new Date(time).toLocaleTimeString('th-TH'));
+      samples.push({time, ...snapshot, step:row, offset:O.adj, peak:Math.max(...rows.map(r => Math.abs(r[1])))});
+      setStatus('ข้อมูลล่าสุด ' + new Date(time).toLocaleTimeString('th-TH') + ' · ระยะที่เห็นจริง Bid −$' + snapshot.coverage[0].toFixed(2) + ' / Ask +$' + snapshot.coverage[1].toFixed(2));
       if (enabled) redraw?.();
     } catch (err) {
       setStatus('อ่านสมุดคำสั่ง Binance ไม่ได้ · ' + err.message + ' · จะลองใหม่อัตโนมัติ');
@@ -131,7 +122,7 @@
       const liveX = scale.timeToCoordinate(bars.at(-1).time);
       const age = Date.now() - latest.time;
       const barAge = latest.time / 1000 + O.tzShift - bars.at(-1).time;
-      if (age >= 0 && age < 15000 && barAge >= 0 && barAge < duration &&
+      if (age >= 0 && age < interval * 1.5 && barAge >= 0 && barAge < duration &&
           Number.isFinite(liveX) && liveX >= 0 && liveX <= mediaSize.width) {
         const step = latest.step || 0.10;
         const offset = latest.remote ? O.adj : latest.offset;
@@ -146,7 +137,7 @@
           visible.push({price, qty, y, height:Math.max(4, Math.abs(bottom-top))});
         }
         visible.sort((a,b) => Math.abs(b.qty) - Math.abs(a.qty));
-        const walls = [1,-1].flatMap(sign => visible.filter(w => Math.sign(w.qty) === sign).slice(0,3));
+        const walls = [1,-1].flatMap(sign => visible.filter(w => Math.sign(w.qty) === sign).slice(0,10));
         const peak = Math.abs(visible[0]?.qty || 1);
         ctx.save();
         const right = mediaSize.width;
@@ -184,7 +175,7 @@
     if (!menu || menu.hidden || document.getElementById('liquidityBookBox')) return;
     const box = document.createElement('div');
     box.id = 'liquidityBookBox'; box.className = 'gsbox';
-    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · 1,000 ระดับต่อฝั่ง · รวมทุก $0.50 · แถบ LIVE แสดง 3 ระดับที่มีปริมาณรอสูงสุดต่อฝั่งในจอ · แถบยิ่งยาวและสว่าง ปริมาณยิ่งมาก · ประวัติส่วนกลางใช้ส่วนต่างราคาปัจจุบันของกราฟ · เก็บข้อมูลแม้ซ่อนอินดี้ ขณะเปิดหน้ากราฟทอง ทุก 5 วินาที สูงสุด 1 ชม.</span><span class="gsinfo" id="liqStatus"></span>';
+    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · ช่วง ±$100 จากราคากลาง Binance · รวมช่องละ $1 · สูงสุด 10 แนวต่อฝั่ง เรียงตามปริมาณ · เก็บทุก 30 วินาที ย้อนหลัง 1 ชม. · ประวัติส่วนกลางใช้ส่วนต่างราคาปัจจุบันของกราฟ</span><span class="gsinfo" id="liqStatus"></span>';
     const btn = box.querySelector('button');
     function paint() { btn.classList.toggle('on',enabled); btn.setAttribute('aria-pressed',String(enabled)); }
     btn.onclick = () => {

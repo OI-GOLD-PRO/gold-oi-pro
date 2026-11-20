@@ -63,7 +63,9 @@
       "i": "M",
       "title": "Revised UoM Consumer Sentiment",
       "forecast": "51.7",
-      "previous": "51.0"
+      "previous": "51.0",
+      "actual": "51.5",
+      "better": null
     },
     {
       "date": "2026-11-20T10:00:00-05:00",
@@ -71,10 +73,245 @@
       "i": "M",
       "title": "Revised UoM Inflation Expectations",
       "forecast": "",
-      "previous": "4.3%"
+      "previous": "4.3%",
+      "actual": "3.7%",
+      "better": false
+    },
+    {
+      "date": "2026-11-20T12:00:00-05:00",
+      "c": "USD",
+      "i": "M",
+      "title": "President Trump Speaks",
+      "forecast": "",
+      "previous": ""
+    },
+    {
+      "date": "2026-11-20T17:15:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Fed's Cook speech",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-23T14:45:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "S&P Global Composite PMI",
+      "forecast": "",
+      "previous": "55.9",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-23T14:45:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "S&P Global Manufacturing PMI",
+      "forecast": "",
+      "previous": "54.9",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-23T14:45:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "S&P Global Services PMI",
+      "forecast": "",
+      "previous": "56.1",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-23T21:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Fed's Williams speech",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-24T13:15:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ADP Employment Change 4-week average",
+      "forecast": "",
+      "previous": "23.75",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-24T14:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Housing Price Index (MoM)",
+      "forecast": "0.2%",
+      "previous": "0.3%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-24T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Consumer Confidence",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "Core Personal Consumption Expenditures - Price Index (MoM)",
+      "forecast": "0.3%",
+      "previous": "0.3%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "Core Personal Consumption Expenditures - Price Index (YoY)",
+      "forecast": "3.2%",
+      "previous": "3.1%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Core Personal Consumption Expenditures (QoQ)",
+      "forecast": "2.5%",
+      "previous": "2.5%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Durable Goods Orders",
+      "forecast": "0.5%",
+      "previous": "1.8%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Durable Goods Orders ex Defense",
+      "forecast": "",
+      "previous": "2.2%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Durable Goods Orders ex Transportation",
+      "forecast": "0.5%",
+      "previous": "0.5%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Gross Domestic Product Annualized",
+      "forecast": "3.5%",
+      "previous": "3.4%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Gross Domestic Product Price Index",
+      "forecast": "",
+      "previous": "2.2%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Initial Jobless Claims",
+      "forecast": "200",
+      "previous": "203",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Nondefense Capital Goods Orders ex Aircraft",
+      "forecast": "",
+      "previous": "0.5%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Personal Consumption Expenditures - Price Index (MoM)",
+      "forecast": "0.3%",
+      "previous": "0.5%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Personal Consumption Expenditures - Price Index (YoY)",
+      "forecast": "",
+      "previous": "3.6%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Personal Consumption Expenditures Prices (QoQ)",
+      "forecast": "2.1%",
+      "previous": "2.1%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Personal Income (MoM)",
+      "forecast": "0.3%",
+      "previous": "0.2%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Personal Spending",
+      "forecast": "0.4%",
+      "previous": "0.5%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "New Home Sales Change (MoM)",
+      "forecast": "",
+      "previous": "-0.6%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-25T19:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Fed's Beige Book",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
     }
   ],
-  "checked_at": 1795163616,
+  "checked_at": 1795194820,
   "coverage": {
     "from": 1794718800,
     "to": 1795323600,

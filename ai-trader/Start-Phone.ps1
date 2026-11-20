@@ -10,6 +10,11 @@ New-Item -ItemType Directory -Force $dir | Out-Null
 $file = Join-Path $dir "phone-password.txt"
 if (-not (Test-Path $file)) { [guid]::NewGuid().ToString("N") | Set-Content -NoNewline $file }
 $env:OI_VIEW_PASSWORD = (Get-Content -Raw $file).Trim()
+$ownerFile = Join-Path $dir "phone-owner-password.txt"
+if (-not (Test-Path $ownerFile)) { [guid]::NewGuid().ToString("N") | Set-Content -NoNewline $ownerFile }
+$env:OI_PHONE_OWNER_PASSWORD = (Get-Content -Raw $ownerFile).Trim()
+Write-Host "Phone settings login: owner"
+Write-Host "Owner password file: $ownerFile"
 Write-Host "Phone login: viewer"
 Write-Host "Phone password file: $file"
 Write-Host "Open the https://....trycloudflare.com URL shown in the tunnel window."

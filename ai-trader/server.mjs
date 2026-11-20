@@ -122,3 +122,8 @@ if (process.env.OI_MOBILE_ORIGIN) {
 server.listen(Number(process.env.OI_TRADER_PORT ?? 4173), '127.0.0.1', () => {
   console.log('OI Gold AI Trader dashboard at http://127.0.0.1:' + server.address().port);
 });
+
+if(process.env.OI_VIEW_PASSWORD){
+  const {startViewer}=await import('./viewer.mjs');
+  startViewer(dashboard,process.env.OI_VIEW_PASSWORD);
+}

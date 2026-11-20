@@ -34,7 +34,7 @@
     return [...levels];
   }
   async function sample() {
-    if (!enabled || busy || document.hidden || Date.now() < retryAt) return;
+    if (busy || document.hidden || Date.now() < retryAt) return;
     busy = true;
     try {
       const res = await fetch('https://fapi.binance.com/fapi/v1/depth?symbol=XAUUSDT&limit=1000',
@@ -46,7 +46,7 @@
       }
       const book = await res.json();
       const time = Number(book.E || book.T);
-      if (!enabled || document.hidden) return;
+      if (document.hidden) return;
       if (!Number.isFinite(time) || Math.abs(time - Date.now()) > 30000) throw Error('ข้อมูลล่าช้า');
       if (time <= (samples.at(-1)?.time || 0)) { setStatus('รอสมุดคำสั่งชุดใหม่'); return; }
       const bids = aggregate(book.bids), asks = aggregate(book.asks);
@@ -55,10 +55,10 @@
       samples = samples.filter(s => s.time > time - retention);
       samples.push({time, rows, step:row, offset:O.adj, peak:Math.max(...rows.map(r => Math.abs(r[1])))});
       setStatus('รับข้อมูลล่าสุด ' + new Date(time).toLocaleTimeString('th-TH'));
-      redraw?.();
+      if (enabled) redraw?.();
     } catch (err) {
       setStatus('อ่านสมุดคำสั่ง Binance ไม่ได้ · ' + err.message + ' · จะลองใหม่อัตโนมัติ');
-      redraw?.();
+      if (enabled) redraw?.();
       retryAt = Math.max(retryAt, Date.now() + 10000);
     } finally { busy = false; }
   }
@@ -154,20 +154,19 @@
     if (!menu || menu.hidden || document.getElementById('liquidityBookBox')) return;
     const box = document.createElement('div');
     box.id = 'liquidityBookBox'; box.className = 'gsbox';
-    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · 1,000 ระดับต่อฝั่ง · รวมทุก $0.50 · แถบ LIVE แสดง 3 ระดับที่มีปริมาณรอสูงสุดต่อฝั่งในจอ · แถบยิ่งยาวและสว่าง ปริมาณยิ่งมาก · ประวัติแสดงตามเวลาที่เก็บจริง · สะสมประวัติทุก 5 วินาที สูงสุด 1 ชม.</span><span class="gsinfo" id="liqStatus"></span>';
+    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · 1,000 ระดับต่อฝั่ง · รวมทุก $0.50 · แถบ LIVE แสดง 3 ระดับที่มีปริมาณรอสูงสุดต่อฝั่งในจอ · แถบยิ่งยาวและสว่าง ปริมาณยิ่งมาก · ประวัติแสดงตามเวลาที่เก็บจริง · เก็บข้อมูลแม้ซ่อนอินดี้ ขณะเปิดหน้ากราฟทอง ทุก 5 วินาที สูงสุด 1 ชม.</span><span class="gsinfo" id="liqStatus"></span>';
     const btn = box.querySelector('button');
     function paint() { btn.classList.toggle('on',enabled); btn.setAttribute('aria-pressed',String(enabled)); }
     btn.onclick = () => {
       enabled = !enabled;
       try { localStorage.setItem(pref,enabled?'1':'0'); } catch (_) {}
-      paint(); setStatus(enabled ? 'กำลังอ่านสมุดคำสั่ง' : 'ปิด');
-      redraw?.(); if (enabled) sample(); else saveHistory();
+      paint(); redraw?.();
     };
-    paint(); menu.append(box); setStatus(status || (enabled ? 'กำลังอ่านสมุดคำสั่ง' : 'ปิด'));
+    paint(); menu.append(box); setStatus(status || 'กำลังอ่านสมุดคำสั่ง');
   }
   if (menu) { new MutationObserver(mount).observe(menu,{childList:true,attributes:true,attributeFilter:['hidden']}); mount(); }
   setInterval(sample, interval);
-  setInterval(() => { if (enabled && !document.hidden) saveHistory(); },60000);
+  setInterval(() => { if (!document.hidden) saveHistory(); },60000);
   document.addEventListener('visibilitychange',()=>{ if (document.hidden) saveHistory(); else sample(); });
   window.addEventListener('pagehide',saveHistory);
   sample();

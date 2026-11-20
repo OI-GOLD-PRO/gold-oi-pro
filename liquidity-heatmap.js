@@ -34,7 +34,7 @@
     return [...levels];
   }
   async function sample() {
-    if (!enabled || busy || document.hidden || O.paused || Date.now() < retryAt) return;
+    if (!enabled || busy || document.hidden || Date.now() < retryAt) return;
     busy = true;
     try {
       const res = await fetch('https://fapi.binance.com/fapi/v1/depth?symbol=XAUUSDT&limit=100',
@@ -48,7 +48,7 @@
       const time = Number(book.E || book.T);
       if (!enabled || document.hidden) return;
       if (!Number.isFinite(time) || Math.abs(time - Date.now()) > 30000) throw Error('ข้อมูลล่าช้า');
-      if (time <= (samples.at(-1)?.time || 0)) return;
+      if (time <= (samples.at(-1)?.time || 0)) { setStatus('รอสมุดคำสั่งชุดใหม่'); return; }
       const bids = aggregate(book.bids), asks = aggregate(book.asks);
       if (!bids.length || !asks.length || !Number.isFinite(O.adj)) throw Error('รอข้อมูลระดับราคา');
       const rows = [...bids, ...asks.map(([p,q]) => [p,-q])];
@@ -57,7 +57,8 @@
       setStatus('รับข้อมูลล่าสุด ' + new Date(time).toLocaleTimeString('th-TH'));
       redraw?.();
     } catch (err) {
-      setStatus('อ่านสมุดคำสั่งไม่ได้ · ' + err.message);
+      setStatus('อ่านสมุดคำสั่ง Binance ไม่ได้ · ' + err.message + ' · จะลองใหม่อัตโนมัติ');
+      redraw?.();
       retryAt = Math.max(retryAt, Date.now() + 10000);
     } finally { busy = false; }
   }
@@ -67,6 +68,23 @@
     if (!duration || !bars.length) return;
     const spacing = scale.options().barSpacing;
     target.useMediaCoordinateSpace(({context:ctx,mediaSize}) => {
+      // Show the current book at the live edge while the time history accumulates.
+      const latest = samples.at(-1);
+      const liveX = scale.timeToCoordinate(bars.at(-1).time);
+      const age = Date.now() - latest.time;
+      const barAge = latest.time / 1000 + O.tzShift - bars.at(-1).time;
+      if (age >= 0 && age < 15000 && barAge >= 0 && barAge < duration &&
+          Number.isFinite(liveX) && liveX >= 0 && liveX <= mediaSize.width) {
+        const width = Math.min(24, mediaSize.width);
+        const left = Math.max(0, Math.min(mediaSize.width - width, liveX + spacing / 2));
+        for (const [tick, signed] of latest.rows) {
+          const top = O.series.priceToCoordinate((tick + 1) * row - latest.offset);
+          const bottom = O.series.priceToCoordinate(tick * row - latest.offset);
+          if (!Number.isFinite(top) || !Number.isFinite(bottom)) continue;
+          ctx.fillStyle = signed > 0 ? '#37e073' : '#ff6937';
+          ctx.fillRect(left, top, Math.max(2,width * Math.sqrt(Math.abs(signed) / latest.peak)), Math.max(1,bottom-top));
+        }
+      }
       let i = bars.length - 1, lastPixel = Infinity;
       for (let j = samples.length - 1; j >= 0; j--) {
         const s = samples[j], time = s.time / 1000 + O.tzShift;
@@ -102,7 +120,7 @@
     if (!menu || menu.hidden || document.getElementById('liquidityBookBox')) return;
     const box = document.createElement('div');
     box.id = 'liquidityBookBox'; box.className = 'gsbox';
-    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · 100 ระดับต่อฝั่ง · เก็บตัวอย่างทุก 5 วินาที ย้อนหลัง 1 ชม.</span><span class="gsinfo" id="liqStatus"></span>';
+    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · 100 ระดับต่อฝั่ง · แถบสดข้างแท่งล่าสุด · สะสมประวัติทุก 5 วินาที สูงสุด 1 ชม.</span><span class="gsinfo" id="liqStatus"></span>';
     const btn = box.querySelector('button');
     function paint() { btn.classList.toggle('on',enabled); btn.setAttribute('aria-pressed',String(enabled)); }
     btn.onclick = () => {

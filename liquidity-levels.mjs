@@ -1,3 +1,5 @@
+export const liquidityRange = 500;
+
 export function rankBook(book) {
   const bid = Number(book.bids?.[0]?.[0]), ask = Number(book.asks?.[0]?.[0]);
   if (!(bid > 0 && ask >= bid && Number.isFinite(ask))) throw Error('Invalid book');
@@ -13,14 +15,14 @@ export function rankBook(book) {
       const distance = (mid-p)*sign;
       if (distance < 0) continue;
       reach = Math.max(reach,distance);
-      if (distance > 100) continue;
+      if (distance > liquidityRange) continue;
       const key = Math.floor(p);
       bins.set(key,(bins.get(key) || 0) + q);
     }
     const ranked = [...bins].sort((a,b)=>b[1]-a[1] || sign*(b[0]-a[0])).slice(0,10);
     if (!ranked.length) throw Error('Incomplete book');
     rows.push(...ranked.map(([price,qty])=>[price,qty*sign]));
-    coverage.push(Math.min(100,reach));
+    coverage.push(Math.min(liquidityRange,reach));
   }
   return {rows,coverage,mid,step:1};
 }

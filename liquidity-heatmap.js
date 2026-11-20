@@ -1,4 +1,4 @@
-import { rankBook } from './liquidity-levels.mjs';
+import { liquidityRange, rankBook } from './liquidity-levels.mjs?v=409160';
 // Sample displayed Binance limit orders. Each column is one book, not traded volume.
 (() => {
   'use strict';
@@ -160,55 +160,6 @@ import { rankBook } from './liquidity-levels.mjs';
           ctx.fillRect(x,y,Math.ceil(width),Math.max(2,bottom-y));
         }
       }
-      // Show the current book at the live edge while the time history accumulates.
-      const latest = samples.at(-1);
-      const liveX = scale.timeToCoordinate(bars.at(-1).time);
-      const age = Date.now() - latest.time;
-      const barAge = latest.time / 1000 + O.tzShift - bars.at(-1).time;
-      if (age >= 0 && age < interval * 1.5 && barAge >= 0 && barAge < duration &&
-          Number.isFinite(liveX) && liveX >= 0 && liveX <= mediaSize.width) {
-        const step = latest.step || 0.10;
-        const offset = latest.offset;
-        const visible = [];
-        for (const [tick, qty] of latest.rows) {
-          const price = tick * step - offset;
-          const top = O.series.priceToCoordinate(price + step);
-          const bottom = O.series.priceToCoordinate(price);
-          if (!Number.isFinite(top) || !Number.isFinite(bottom)) continue;
-          const y = (top + bottom) / 2;
-          if (y < 0 || y >= mediaSize.height) continue;
-          visible.push({price, qty, y, height:Math.max(4, Math.abs(bottom-top))});
-        }
-        visible.sort((a,b) => Math.abs(b.qty) - Math.abs(a.qty));
-        const walls = [1,-1].flatMap(sign => visible.filter(w => Math.sign(w.qty) === sign).slice(0,10));
-        const peak = Math.abs(visible[0]?.qty || 1);
-        ctx.save();
-        const right = mediaSize.width;
-        const usedLabels = [];
-        ctx.font = 'bold 11px sans-serif';
-        ctx.textBaseline = 'middle';
-        for (const wall of walls.sort((a,b) => Math.abs(b.qty)-Math.abs(a.qty))) {
-          const strength = Math.sqrt(Math.abs(wall.qty) / peak);
-          const width = right * (0.46 + 0.50 * strength);
-          const left = right - width;
-          const rgb = wall.qty > 0 ? '65,238,99' : '255,130,44';
-          const top = wall.y - wall.height / 2;
-          ctx.fillStyle = 'rgba(' + rgb + ',' + (0.14 + 0.34 * strength) + ')';
-          ctx.fillRect(left, top, width, wall.height);
-          ctx.fillStyle = 'rgba(' + rgb + ',0.9)';
-          ctx.fillRect(left, top, width, 1);
-          const labelY = Math.max(8, Math.min(mediaSize.height-8, wall.y));
-          if (usedLabels.some(y => Math.abs(y-labelY) < 16)) continue;
-          usedLabels.push(labelY);
-          const label = (wall.qty > 0 ? 'BID ' : 'ASK ') + wall.price.toFixed(2) +
-            ' · ' + Math.abs(wall.qty).toLocaleString('en-US',{maximumFractionDigits:1}) + ' LIVE';
-          ctx.fillStyle = '#101927';
-          ctx.fillRect(left, labelY-7, ctx.measureText(label).width+8, 14);
-          ctx.fillStyle = wall.qty > 0 ? '#98ff93' : '#ffb371';
-          ctx.fillText(label,left+4,labelY);
-        }
-        ctx.restore();
-      }
     });
   }
   const view = {zOrder:()=>'bottom', renderer:()=>({draw:render})};
@@ -218,7 +169,7 @@ import { rankBook } from './liquidity-levels.mjs';
     if (!menu || menu.hidden || document.getElementById('liquidityBookBox')) return;
     const box = document.createElement('div');
     box.id = 'liquidityBookBox'; box.className = 'gsbox';
-    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · ช่วง ±$100 จากราคากลาง Binance · รวมช่องละ $1 · สูงสุด 10 แนวต่อฝั่ง เรียงตามปริมาณ · เก็บทุก 30 วินาที ย้อนหลัง 1 ชม. · ซิงก์ประวัติข้ามเครื่องที่ใช้รหัสแอปเดียวกัน</span><span class="gsinfo" id="liqStatus"></span>';
+    box.innerHTML = '<div class="row"><button type="button" class="gsb">Liquidity Heatmap</button></div><span class="gsinfo">Binance Futures · XAUUSDT · Bid เขียว / Ask ส้ม · ช่วง ±$' + liquidityRange + ' จากราคากลาง Binance · รวมช่องละ $1 · สูงสุด 10 แนวต่อฝั่ง เรียงตามปริมาณ · เก็บทุก 30 วินาที ย้อนหลัง 1 ชม. · ซิงก์ประวัติข้ามเครื่องที่ใช้รหัสแอปเดียวกัน</span><span class="gsinfo" id="liqStatus"></span>';
     const btn = box.querySelector('button');
     function paint() { btn.classList.toggle('on',enabled); btn.setAttribute('aria-pressed',String(enabled)); }
     btn.onclick = () => {

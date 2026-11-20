@@ -86,15 +86,6 @@
       "previous": ""
     },
     {
-      "date": "2026-11-20T17:15:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Cook speech",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
       "date": "2026-11-23T14:45:00+00:00",
       "c": "USD",
       "i": "M",
@@ -311,7 +302,7 @@
       "src": "fxstreet"
     }
   ],
-  "checked_at": 1795194820,
+  "checked_at": 1795216036,
   "coverage": {
     "from": 1794718800,
     "to": 1795323600,

@@ -91,7 +91,10 @@
           if (![x, top, bottom].every(Number.isFinite)) continue;
           context.fillStyle = cell.below ? 'rgba(67,229,142,' + cell.alpha + ')' :
             'rgba(255,121,0,' + cell.alpha + ')';
-          context.fillRect(x - spacing / 2, top, spacing, bottom - top);
+          const endX = scale.timeToCoordinate(cell.endTime ?? cell.time);
+          if (!Number.isFinite(endX)) continue;
+          const right = endX + spacing * (cell.open ? 3.5 : 0.5);
+          context.fillRect(x - spacing / 2, top, right - x + spacing / 2, bottom - top);
         }
       });
     }
@@ -180,7 +183,17 @@
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
     ctx.globalAlpha = 1;
-    const cells = [], clusters = new Map();
+    const cells = [], clusters = new Map(), lastZone = new Map();
+    const lastTime = bars.at(-1)?.time;
+    function lastBarBefore(time) {
+      let lo = 0, hi = bars.length;
+      while (lo < hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (bars[mid].time <= time) lo = mid + 1;
+        else hi = mid;
+      }
+      return bars[Math.max(0, lo - 1)].time;
+    }
     const showHeat = heatmap && (O.tf === '1m' || O.tf === '5m');
     const firstVisible = scale.getVisibleRange()?.from ?? Infinity;
     for (const bar of bars) {
@@ -189,7 +202,7 @@
       const x = scale.timeToCoordinate(bar.time);
       const visible = Number.isFinite(x) && x >= 0 && x <= width;
       if (!visible && !(showHeat && bar.time < firstVisible &&
-          bar.time >= firstVisible - hours * 3600)) continue;
+          bar.time >= firstVisible - 2 * hours * 3600)) continue;
       const signal = signalFor(bar, from, duration, until);
       if (!signal) continue;
       if (showHeat && from + duration <= now && Number.isFinite(bar.close)) {
@@ -199,8 +212,21 @@
         while (recent.length && recent[0] < bar.time - hours * 3600) recent.shift();
         recent.push(bar.time);
         clusters.set(key, recent);
-        if (visible) cells.push({ time: bar.time, level, below: signal.below,
-          alpha: Math.min(0.52, 0.12 + 0.08 * (recent.length - 1)) });
+        const clustered = recent.length >= 2;
+        const expires = bar.time + hours * 3600;
+        const prior = lastZone.get(key);
+        if (prior && prior.endTime >= bar.time) {
+          prior.endTime = lastBarBefore(bar.time - 1);
+          prior.open = false;
+        }
+        if (visible || (clustered && expires >= firstVisible)) {
+          const cell = { time: bar.time, level, below: signal.below,
+            alpha: Math.min(0.67, 0.23 + 0.10 * (recent.length - 1)),
+            endTime: clustered ? lastBarBefore(expires) : bar.time,
+            open: clustered && expires >= lastTime };
+          cells.push(cell);
+          if (clustered) lastZone.set(key, cell);
+        }
       }
       if (!visible) continue;
       const anchor = O.series.priceToCoordinate(signal.below ? bar.low : bar.high);
@@ -235,7 +261,7 @@
     panel.id = 'deltaDiamondsBox'; panel.className = 'gsbox';
     const levels = ['เล็กมาก', 'เล็ก', 'กลาง', 'ใหญ่'];
     const fields = thresholds.map((n, j) => `<label>${levels[j]} (%)<input data-odd-tier="${j}" type="number" inputmode="decimal" min="0" max="100" step="any" value="${n}" style="width:54px"></label>`).join('');
-    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps"><label><input data-odd-heat type="checkbox" ${heatmap ? 'checked' : ''}> ฮีตแมปข้าวหลาม M1 / M5</label></div><span class="gsinfo">นับสีเดียวกันตามราคาปิดทุก $1 ในช่วงย้อนหลังที่ตั้งไว้ · สีเข้มเมื่อเกิดซ้ำ · ดูเทรน Envelope 50 ที่ปุ่ม M15</span><div class="row ps">${fields}</div><div class="row ps"><label>รวมเดลต้าย้อนหลัง (ชม.) <input data-odd-hours type="number" inputmode="numeric" min="1" max="720" step="1" value="${hours}" style="width:64px"></label></div><span class="gsinfo">ยอดรวมนับข้าวหลามตัดจากแท่งที่ปิดแล้วใน TF ปัจจุบัน · แตะข้าวหลามตัดเพื่อดูค่า Δ</span><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span><details><summary>สัญญาณส่วนกลางสำหรับ EA</summary><form data-odd-shared><label>Worker URL <input name="endpoint" type="url" required placeholder="https://…workers.dev"></label><button type="submit">ใช้สัญญาณส่วนกลาง</button><button type="button" data-odd-local>ใช้ข้อมูลในแอป</button></form><span class="gsinfo">เมื่อใช้สัญญาณส่วนกลาง ค่า % ปรับขนาดข้าวหลามตัด</span><span class="gsinfo" data-odd-shared-status></span></details>`;
+    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps"><label><input data-odd-heat type="checkbox" ${heatmap ? 'checked' : ''}> ฮีตแมปข้าวหลาม M1 / M5</label></div><span class="gsinfo">นับสีเดียวกันตามราคาปิดทุก $1 ในช่วงย้อนหลังที่ตั้งไว้ · ซ้ำตั้งแต่ 2 ครั้งลากโซนไปขวา ขณะโซนยังอยู่ในช่วงย้อนหลังจะแสดงเลยแท่งล่าสุด 3 แท่ง · ดูเทรน Envelope 50 ที่ปุ่ม M15</span><div class="row ps">${fields}</div><div class="row ps"><label>รวมเดลต้าย้อนหลัง (ชม.) <input data-odd-hours type="number" inputmode="numeric" min="1" max="720" step="1" value="${hours}" style="width:64px"></label></div><span class="gsinfo">ยอดรวมนับข้าวหลามตัดจากแท่งที่ปิดแล้วใน TF ปัจจุบัน · แตะข้าวหลามตัดเพื่อดูค่า Δ</span><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span><details><summary>สัญญาณส่วนกลางสำหรับ EA</summary><form data-odd-shared><label>Worker URL <input name="endpoint" type="url" required placeholder="https://…workers.dev"></label><button type="submit">ใช้สัญญาณส่วนกลาง</button><button type="button" data-odd-local>ใช้ข้อมูลในแอป</button></form><span class="gsinfo">เมื่อใช้สัญญาณส่วนกลาง ค่า % ปรับขนาดข้าวหลามตัด</span><span class="gsinfo" data-odd-shared-status></span></details>`;
     const form = panel.querySelector('[data-odd-shared]');
     form.elements.endpoint.value = workerURL;
     panel.querySelector('[data-odd-shared-status]').textContent = workerURL ? 'ใช้สัญญาณส่วนกลาง' : 'ใช้ข้อมูลในแอป';

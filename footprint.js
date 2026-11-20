@@ -2,8 +2,8 @@
 (() => {
   'use strict';
   const O = window.OI, volume = window.OI_volumeProfile;
-  const button = document.getElementById('footprintBtn');
-  if (!O || !volume || !button) return;
+  const selector = document.getElementById('chartType');
+  if (!O || !volume || !selector) return;
 
   const TFS = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
   const BUY = '#38bdf8', SELL = '#f97316', NEUTRAL = '#a8b6c8', SPACING = 96;
@@ -16,29 +16,57 @@
     scale.applyOptions({ barSpacing: SPACING, rightOffset: 1 });
     scale.scrollToRealTime();
   }
-  button.hidden = false;
-  button.addEventListener('click', () => {
-    if (previous) {
-      const { candleColors, barSpacing, rightOffset, scroll, tf } = previous;
-      O.series.applyOptions(candleColors);
+  let mode = 'candles', originalColors = null;
+  function setMode(next) {
+    if (next === mode) return;
+    if (mode === 'footprint') {
+      const { barSpacing, rightOffset, scroll, tf } = previous;
       scale.applyOptions({ barSpacing, rightOffset });
       if (tf === O.tf) scale.scrollToPosition(scroll, false);
       else scale.scrollToRealTime();
       previous = null;
-    } else {
+      volume.setFootprint(false);
+    }
+    if (mode === 'candles') {
       const options = O.series.options();
-      const { barSpacing, rightOffset } = scale.options();
-      const candleColors = Object.fromEntries(candleFields.map(key => [key, options[key]]));
-      previous = { candleColors, barSpacing, rightOffset, scroll: scale.scrollPosition(), tf: O.tf };
+      originalColors = Object.fromEntries(candleFields.map(key => [key, options[key]]));
       O.series.applyOptions(Object.fromEntries(candleFields.map(key => [key, 'transparent'])));
+    }
+    if (next === 'candles') O.series.applyOptions(originalColors);
+    if (next === 'footprint') {
+      const { barSpacing, rightOffset } = scale.options();
+      previous = { candleColors: originalColors, barSpacing, rightOffset, scroll: scale.scrollPosition(), tf: O.tf };
+      volume.setFootprint(true);
       fit();
     }
-    const active = previous !== null;
-    button.classList.toggle('on', active);
-    button.setAttribute('aria-pressed', String(active));
-    volume.setFootprint(active);
+    mode = next;
+    document.getElementById('chartTypeIcon').textContent = {candles:'▥',line:'∿',footprint:'☷'}[mode];
     O.markDirty();
-  });
+  }
+  selector.value = mode;
+  selector.addEventListener('change', () => setMode(selector.value));
+
+  function drawCloseLine(ctx, width, height) {
+    if (width <= 0 || height <= 0) return;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
+    ctx.beginPath();
+    let started = false;
+    const spacing = scale.options().barSpacing;
+    for (const bar of O.series.data()) {
+      const x = scale.timeToCoordinate(bar.time);
+      if (!Number.isFinite(x) || x < -spacing || x > width + spacing) continue;
+      const y = O.series.priceToCoordinate(bar.close);
+      if (!Number.isFinite(y)) { started = false; continue; }
+      if (started) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      started = true;
+    }
+    ctx.strokeStyle = '#71d7f5';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   function drawCandle(ctx, bar, x, colors) {
     const [open, high, low, close] = ['open', 'high', 'low', 'close'].map(key => O.series.priceToCoordinate(bar[key]));
@@ -105,6 +133,7 @@
   }
 
   O.hooks.push((ctx, w, h) => {
+    if (mode === 'line') return drawCloseLine(ctx, scale.width(), h - scale.height());
     if (!previous) return;
     const width = scale.width(), height = h - scale.height();
     if (width <= 0 || height <= 0) return;

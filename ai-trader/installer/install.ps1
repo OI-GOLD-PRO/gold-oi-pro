@@ -3,8 +3,10 @@ $app = Join-Path $PSScriptRoot 'ai-trader'
 Write-Host 'Installing OI Gold AI Trader Demo'
 function HasNode {
   if (Get-Command node -ErrorAction SilentlyContinue) {
-    $major = & node -p 'process.versions.node.split(".")[0]'
-    return ($LASTEXITCODE -eq 0 -and [int]$major -ge 20)
+    $version = & node --version
+    if ($LASTEXITCODE -eq 0 -and "$version".Trim() -match '^v?(\d+)\.') {
+      return ([int]$Matches[1] -ge 20)
+    }
   }
   return $false
 }

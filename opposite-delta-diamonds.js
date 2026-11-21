@@ -111,9 +111,9 @@
     heatRevision = revision;
     redrawHeat?.();
   }
-  function signalFor(bar, from, duration, until) {
+  function signalFor(bar, from, duration, until, feed) {
     if (workerURL) {
-      const shared = sharedKey === streamKey() && sharedBars.get(from / 1000);
+      const shared = (feed || (sharedKey === streamKey() && sharedBars))?.get?.(from / 1000);
       if (!shared || !['BUY', 'SELL'].includes(shared.side) ||
           !Number.isFinite(shared.delta) || !Number.isFinite(shared.total) || shared.total <= 0) return null;
       const percent = Math.min(100, Math.abs(shared.delta) / shared.total * 100);
@@ -124,6 +124,99 @@
     const { delta, total } = volume.footprintTotals(from, Math.min(until, from + duration));
     const signal = marker(bar.open, bar.close, delta, total, thresholds);
     return signal && { ...signal, delta };
+  }
+  // Compute each zone and its break using the candles of its source timeframe.
+  function zones(bars, tf, feed, singles) {
+    const duration=frames[tf]*1000, shift=O.tzShift*1000, now=Date.now();
+    const until=Math.min(volume.footprintWindow().end,now+1);
+    const lastTime=bars.at(-1)?.time;
+    const cells=[], clusters=new Map(), lastZone=new Map();
+    for (let i=0;i<bars.length;i++) {
+      const bar=bars[i], from=bar.time*1000-shift;
+      if (from<now-30*86400e3 || from+duration>now || !Number.isFinite(bar.close)) continue;
+      for (const [key, zone] of lastZone) {
+        // Green zones break below their lower edge; orange zones break above their upper edge.
+        const broken = zone.below ? bar.close < zone.level - 2 : bar.close > zone.level + 1 + 2;
+        if (broken) {
+          zone.endTime = bar.time;
+          zone.open = false;
+          lastZone.delete(key);
+          clusters.delete(key);
+        }
+      }
+
+      const signal=signalFor(bar,from,duration,until,feed);
+      if (!signal) continue;
+      const level = Math.floor(bar.close);
+      const key = level + '/' + signal.below;
+      const recent = clusters.get(key) || [];
+      while (recent.length && recent[0] < bar.time - hours * 3600) recent.shift();
+      recent.push(bar.time);
+      clusters.set(key, recent);
+      const prior = lastZone.get(key);
+      const clustered = Boolean(prior) || recent.length >= 2;
+      if (prior) {
+        prior.endTime = bars[i-1].time;
+        prior.open = false;
+      }
+      if (singles || clustered) {
+        const cell = { time: bar.time, level, below: signal.below,
+          alpha: Math.min(0.67, 0.23 + 0.10 * (Math.max(clustered ? 2 : 1, recent.length) - 1)),
+          endTime: clustered ? lastTime : bar.time, open: clustered };
+        cell.extended = clustered;
+        cells.push(cell);
+        if (clustered) lastZone.set(key, cell);
+      }
+
+    }
+    return cells;
+  }
+  const otherZones=new Map();
+  let settingsKey='', refreshAfter=new Map(), pending=new Set();
+  function refreshOthers() {
+    const key=JSON.stringify([O.sym,O.src,workerURL,hours,thresholds]);
+    if (key!==settingsKey) {
+      settingsKey=key; otherZones.clear(); refreshAfter=new Map(); pending=new Set();
+    }
+    for (const tf of Object.keys(frames)) {
+      if (tf===O.tf || pending.has(tf) || Date.now()<(refreshAfter.get(tf)||0)) continue;
+      const busy=pending;
+      busy.add(tf);
+      (async()=>{
+        try {
+          let bars=await O.fetchTF(tf,800);
+          if (!bars?.length && tf==='1m' && !workerURL && O.sym==='gold') {
+            bars=await O.fetchHist(tf,Date.now()-3.5*86400e3,Date.now());
+          }
+          if (!bars?.length || key!==settingsKey) return;
+          let feed;
+          if (workerURL) {
+            const r=await fetch(workerURL+'/odd/v1/'+O.sym+'/'+tf+'?format=json',{signal:AbortSignal.timeout(6000)});
+            if (!r.ok) return;
+            feed=new Map((await r.json()).bars.map(b=>[b.opened,b]));
+          }
+          if (key!==settingsKey || tf===O.tf) return;
+          otherZones.set(tf,zones(bars,tf,feed,false));
+          const nextClose=(Math.floor(Date.now()/(frames[tf]*1000))+1)*frames[tf]*1000;
+          refreshAfter.set(tf,Math.min(nextClose+3000, Date.now()+300000));
+          O.markDirty();
+        } catch (_) {} finally {
+          busy.delete(tf);
+          if (key===settingsKey) refreshAfter.set(tf,Math.max(refreshAfter.get(tf)||0,Date.now()+30000));
+        }
+      })();
+    }
+  }
+  function project(cells,tf,bars) {
+    if (!bars.length) return [];
+    const first=bars[0].time, last=bars.at(-1).time, step=frames[O.tf];
+    function at(time) {
+      let lo=0,hi=bars.length;
+      while(lo<hi) { const m=(lo+hi)>>>1; if(bars[m].time<=time) lo=m+1; else hi=m; }
+      return bars[Math.max(0,lo-1)].time;
+    }
+    return cells.filter(c=>c.extended && c.time<last+step && (c.open || c.endTime+frames[tf]>first))
+      .map(c=>({...c,time:at(c.time),endTime:c.open?last:at(c.endTime+frames[tf]-1)}));
   }
   function totals(bars, now, duration, shift, until) {
     if (summary && now - summary.at < 1000) return summary;
@@ -183,61 +276,20 @@
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
     ctx.globalAlpha = 1;
-    const cells = [], clusters = new Map(), lastZone = new Map();
-    const lastTime = bars.at(-1)?.time;
-    function lastBarBefore(time) {
-      let lo = 0, hi = bars.length;
-      while (lo < hi) {
-        const mid = Math.floor((lo + hi) / 2);
-        if (bars[mid].time <= time) lo = mid + 1;
-        else hi = mid;
-      }
-      return bars[Math.max(0, lo - 1)].time;
+    if (heatmap) refreshOthers();
+    const cells=heatmap ? zones(bars,O.tf,undefined,true) : [];
+    if (heatmap) {
+      otherZones.set(O.tf,cells.filter(c=>c.extended));
+      for (const [tf,foreign] of otherZones) if (tf!==O.tf) cells.push(...project(foreign,tf,bars));
     }
-    const showHeat = heatmap;
     for (const bar of bars) {
-      const from = bar.time * 1000 - shift;
-      if (from < start) continue;
-      const x = scale.timeToCoordinate(bar.time);
-      const visible = Number.isFinite(x) && x >= 0 && x <= width;
-      const closed = from + duration <= now && Number.isFinite(bar.close);
-      if (showHeat && closed) {
-        for (const [key, zone] of lastZone) {
-          // Green zones break below their lower edge; orange zones break above their upper edge.
-          const broken = zone.below ? bar.close < zone.level - 2 : bar.close > zone.level + 1 + 2;
-          if (broken) {
-            zone.endTime = bar.time;
-            zone.open = false;
-            lastZone.delete(key);
-            clusters.delete(key);
-          }
-        }
-      }
-      if (!visible && !(showHeat && closed)) continue;
-      const signal = signalFor(bar, from, duration, until);
-      if (!signal) continue;
-      if (showHeat && closed) {
-        const level = Math.floor(bar.close);
-        const key = level + '/' + signal.below;
-        const recent = clusters.get(key) || [];
-        while (recent.length && recent[0] < bar.time - hours * 3600) recent.shift();
-        recent.push(bar.time);
-        clusters.set(key, recent);
-        const prior = lastZone.get(key);
-        const clustered = Boolean(prior) || recent.length >= 2;
-        if (prior) {
-          prior.endTime = lastBarBefore(bar.time - 1);
-          prior.open = false;
-        }
-        if (visible || clustered) {
-          const cell = { time: bar.time, level, below: signal.below,
-            alpha: Math.min(0.67, 0.23 + 0.10 * (Math.max(clustered ? 2 : 1, recent.length) - 1)),
-            endTime: clustered ? lastTime : bar.time, open: clustered };
-          cells.push(cell);
-          if (clustered) lastZone.set(key, cell);
-        }
-      }
+      const from=bar.time*1000-shift;
+      if (from<start) continue;
+      const x=scale.timeToCoordinate(bar.time);
+      const visible=Number.isFinite(x) && x>=0 && x<=width;
       if (!visible) continue;
+      const signal=signalFor(bar,from,duration,until);
+      if (!signal) continue;
       const anchor = O.series.priceToCoordinate(signal.below ? bar.low : bar.high);
       if (!Number.isFinite(anchor)) continue;
       const radius = radii[signal.tier];
@@ -270,7 +322,7 @@
     panel.id = 'deltaDiamondsBox'; panel.className = 'gsbox';
     const levels = ['เล็กมาก', 'เล็ก', 'กลาง', 'ใหญ่'];
     const fields = thresholds.map((n, j) => `<label>${levels[j]} (%)<input data-odd-tier="${j}" type="number" inputmode="decimal" min="0" max="100" step="any" value="${n}" style="width:54px"></label>`).join('');
-    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps"><label><input data-odd-heat type="checkbox" ${heatmap ? 'checked' : ''}> ฮีตแมปข้าวหลามทุก TF</label></div><span class="gsinfo">นับข้าวหลามสีเดียวกันเฉพาะ TF ที่เปิด ตามราคาปิดทุก $1 ในช่วงย้อนหลังที่ตั้งไว้ · ซ้ำตั้งแต่ 2 ครั้งลากโซนไปขวา หยุดเมื่อแท่งปิดต่ำกว่าขอบล่างโซนเขียว หรือเหนือขอบบนโซนส้มเกิน $2 · ดูเทรน Envelope 50 ที่ปุ่ม M15</span><div class="row ps">${fields}</div><div class="row ps"><label>รวมเดลต้าย้อนหลัง (ชม.) <input data-odd-hours type="number" inputmode="numeric" min="1" max="720" step="1" value="${hours}" style="width:64px"></label></div><span class="gsinfo">ยอดรวมนับข้าวหลามตัดจากแท่งที่ปิดแล้วใน TF ปัจจุบัน · แตะข้าวหลามตัดเพื่อดูค่า Δ</span><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span><details><summary>สัญญาณส่วนกลางสำหรับ EA</summary><form data-odd-shared><label>Worker URL <input name="endpoint" type="url" required placeholder="https://…workers.dev"></label><button type="submit">ใช้สัญญาณส่วนกลาง</button><button type="button" data-odd-local>ใช้ข้อมูลในแอป</button></form><span class="gsinfo">เมื่อใช้สัญญาณส่วนกลาง ค่า % ปรับขนาดข้าวหลามตัด</span><span class="gsinfo" data-odd-shared-status></span></details>`;
+    panel.innerHTML = `<div class="row"><button type="button" class="gsb${enabled ? ' on' : ''}" data-odd-toggle>Opposite Delta Diamonds</button></div><div class="row ps"><label><input data-odd-heat type="checkbox" ${heatmap ? 'checked' : ''}> ฮีตแมปข้าวหลามทุก TF</label></div><span class="gsinfo">แสดงแถบที่ยื่นจาก M1–D1 บนทุก TF · นับข้าวหลามสีเดียวกันแยกตาม TF ต้นทาง ตามราคาปิดทุก $1 ในช่วงย้อนหลังที่ตั้งไว้ · ซ้ำตั้งแต่ 2 ครั้งลากโซนไปขวา หยุดเมื่อแท่งของ TF ต้นทางปิดต่ำกว่าขอบล่างโซนเขียว หรือเหนือขอบบนโซนส้มเกิน $2 · ดูเทรน Envelope 50 ที่ปุ่ม M15</span><div class="row ps">${fields}</div><div class="row ps"><label>รวมเดลต้าย้อนหลัง (ชม.) <input data-odd-hours type="number" inputmode="numeric" min="1" max="720" step="1" value="${hours}" style="width:64px"></label></div><span class="gsinfo">ยอดรวมนับข้าวหลามตัดจากแท่งที่ปิดแล้วใน TF ปัจจุบัน · แตะข้าวหลามตัดเพื่อดูค่า Δ</span><span class="gsinfo">ขั้นต่ำ |Delta| ÷ Volume (%) เรียงจากน้อยไปมาก · เก็บ Delta และ Volume ของแท่งปิดไว้บนเครื่องสูงสุด 30 วัน</span><span class="gsinfo" data-odd-error hidden>ใส่ค่า 0–100 โดยแต่ละขนาดต้องมากกว่าขนาดก่อนหน้า</span><details><summary>สัญญาณส่วนกลางสำหรับ EA</summary><form data-odd-shared><label>Worker URL <input name="endpoint" type="url" required placeholder="https://…workers.dev"></label><button type="submit">ใช้สัญญาณส่วนกลาง</button><button type="button" data-odd-local>ใช้ข้อมูลในแอป</button></form><span class="gsinfo">เมื่อใช้สัญญาณส่วนกลาง ค่า % ปรับขนาดข้าวหลามตัด</span><span class="gsinfo" data-odd-shared-status></span></details>`;
     const form = panel.querySelector('[data-odd-shared]');
     form.elements.endpoint.value = workerURL;
     panel.querySelector('[data-odd-shared-status]').textContent = workerURL ? 'ใช้สัญญาณส่วนกลาง' : 'ใช้ข้อมูลในแอป';

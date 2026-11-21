@@ -1,0 +1,21 @@
+<!doctype html><html lang="th"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>OI AI Trader</title>
+<style>body{color:#ecf0fa;background:#09111f;font:18px system-ui;max-width:30rem;margin:12vh auto;padding:24px}label,input,button{display:block}input,button{box-sizing:border-box;width:100%;padding:14px;margin:10px 0 20px;border-radius:10px;font:inherit}button{background:#d3ae63;color:#181309;border:0}</style>
+<h1>OI AI Trader</h1><form><label>รหัสเชื่อมเครื่องจาก Start-Phone<input id="pair" required pattern="[0-9a-f]{20,64}" autocapitalize="none" spellcheck="false"></label><button>เปิดแดชบอร์ด MT5</button></form><p role="status" id="msg"></p>
+<script>
+const pair=document.querySelector('#pair'),msg=document.querySelector('#msg');
+pair.value=location.hash.slice(1)||localStorage.getItem('oi-ai-pair')||'';
+document.querySelector('form').onsubmit=async event=>{
+ event.preventDefault();
+ const id=pair.value.trim();
+ if(!/^[0-9a-f]{20,64}$/.test(id))return;
+ msg.textContent='กำลังค้นหาแดชบอร์ดของเครื่องนี้…';
+ try{
+  const response=await fetch('https://api.github.com/gists/'+id,{cache:'no-store'});
+  if(!response.ok)throw Error();
+  const gist=await response.json(),url=gist.files['oi-ai-phone.txt'].content.trim();
+  if(!/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url))throw Error();
+  localStorage.setItem('oi-ai-pair',id);
+  location.assign(url);
+ }catch{msg.textContent='อ่านลิงก์ไม่ได้ ตรวจรหัสเชื่อมเครื่องและเปิด Start-Phone บนคอมอีกครั้ง';}
+};
+</script></html>

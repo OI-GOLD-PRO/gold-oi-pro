@@ -7,7 +7,9 @@
       "i": "M",
       "title": "Flash Manufacturing PMI",
       "forecast": "54.5",
-      "previous": "56.0"
+      "previous": "56.0",
+      "actual": "54.5",
+      "better": false
     },
     {
       "date": "2026-11-23T09:45:00-05:00",
@@ -15,7 +17,9 @@
       "i": "M",
       "title": "Flash Services PMI",
       "forecast": "55.6",
-      "previous": "57.9"
+      "previous": "57.9",
+      "actual": "54.7",
+      "better": false
     },
     {
       "date": "2026-11-24T10:00:00-05:00",
@@ -48,17 +52,9 @@
       "title": "Prelim GDP Price Index q/q",
       "forecast": "2.3%",
       "previous": "2.3%"
-    },
-    {
-      "date": "2026-11-25T08:30:00-05:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Unemployment Claims",
-      "forecast": "201K",
-      "previous": "203K"
     }
   ],
-  "checked_at": 1795421441,
+  "checked_at": 1795464826,
   "coverage": {
     "from": 1795323600,
     "to": 1795928400,

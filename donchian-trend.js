@@ -21,7 +21,7 @@
   const line = O.chart.addLineSeries({lineType:1,lineWidth:3,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
   const avg = a => a.reduce((x,y)=>x+y,0)/a.length;
   const fmt = x => Number.isFinite(x) ? x.toFixed(2) : '—';
-  const green = '#20ca88', red = '#ed5e69';
+  const green = '#20ca88', orange = '#ff7900';
   const bounds = a => [Math.max(...a.map(b=>b.high)), Math.min(...a.map(b=>b.low))];
   function calculate(bars) {
     let ema=bars[0].close, fast=ema, slow=ema, signal=0, atr=0, gain=0, loss=0, plus=0, minus=0, adx=0;
@@ -54,7 +54,7 @@
       if(next){
         const band=(b.high+b.low)/2-next*width;
         trail=next!==direction?band:next>0?Math.max(trail,band):Math.min(trail,band);
-        points.push({time:b.time,value:trail,color:next>0?green:red});
+        points.push({time:b.time,value:trail,color:next>0?green:orange});
       }
       direction=next;
       if(i!==bars.length-1) continue;
@@ -101,7 +101,7 @@
       if(sign>0)up++;if(sign<0)down++;
       tr.insertCell().textContent=label;
       const status=tr.insertCell();status.textContent=value===null?'—':sign>0?'UP':sign<0?'DOWN':'MID';
-      status.style.color=sign>0?green:sign<0?red:'silver';
+      status.style.color=sign>0?green:sign<0?orange:'silver';
       tr.insertCell().textContent=label==='MTF'?frames.map(x=>x===null?'—':x>0?'↑':x<0?'↓':'·').join(' '):fmt(metric);
     }
     dialog.querySelector('.summary').textContent=used?O.tf+' · '+(up>used/2?'UP':down>used/2?'DOWN':'MID')+' · ขึ้น '+up+' / ลง '+down+' จาก '+used+' · Breakout '+entry:'รอข้อมูลแท่งปิด';

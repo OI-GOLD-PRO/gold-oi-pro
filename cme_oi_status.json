@@ -1,1 +1,1 @@
-{"at":"2026-11-24T10:59:36.577Z","ok":true,"root":"OG","exp":20261124,"tradeDate":"20261123","strikes":1061,"settle":1816,"log":["20261124 no American Options/DEC 2026 g={\"label\":\"American Options\",\"optionType\":\"AME\",\"name\":\"Gold Option\",\"daily\":false,\"weekly\":false,\"sto\":false,\"productId\":192}"],"page":200}
+{"at":"2026-11-24T21:17:26.036Z","ok":true,"root":"G4W","exp":20261125,"tradeDate":"20261123","strikes":201,"settle":444,"log":["20261124 empty","20261124 settle empty"],"page":200}

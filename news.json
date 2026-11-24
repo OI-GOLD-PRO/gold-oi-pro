@@ -26,7 +26,7 @@
       "c": "USD",
       "i": "M",
       "title": "CB Consumer Confidence",
-      "forecast": "92.1",
+      "forecast": "92.4",
       "previous": "91.7"
     },
     {
@@ -54,7 +54,7 @@
       "previous": "2.3%"
     }
   ],
-  "checked_at": 1795464826,
+  "checked_at": 1795495763,
   "coverage": {
     "from": 1795323600,
     "to": 1795928400,

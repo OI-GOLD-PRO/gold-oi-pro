@@ -35,7 +35,9 @@
       "i": "H",
       "title": "Core PCE Price Index m/m",
       "forecast": "0.3%",
-      "previous": "0.3%"
+      "previous": "0.3%",
+      "actual": "0.3%",
+      "better": null
     },
     {
       "date": "2026-11-25T08:30:00-05:00",
@@ -43,7 +45,9 @@
       "i": "H",
       "title": "Prelim GDP q/q",
       "forecast": "3.5%",
-      "previous": "3.4%"
+      "previous": "3.4%",
+      "actual": "4.3%",
+      "better": true
     },
     {
       "date": "2026-11-25T08:30:00-05:00",
@@ -52,9 +56,81 @@
       "title": "Prelim GDP Price Index q/q",
       "forecast": "2.3%",
       "previous": "2.3%"
+    },
+    {
+      "date": "2026-11-25T19:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Fed's Beige Book",
+      "forecast": "",
+      "previous": "",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-11-30T14:45:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Chicago PMI",
+      "forecast": "",
+      "previous": "55.3",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-01T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Manufacturing Employment Index",
+      "forecast": "",
+      "previous": "52.4",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-01T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Manufacturing New Orders Index",
+      "forecast": "",
+      "previous": "55.5",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-01T15:00:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "ISM Manufacturing PMI",
+      "forecast": "",
+      "previous": "55.5",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-01T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Manufacturing Prices Paid",
+      "forecast": "",
+      "previous": "75.2",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-01T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "JOLTS Job Openings",
+      "forecast": "",
+      "previous": "7.523",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-02T13:15:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "ADP Employment Change",
+      "forecast": "",
+      "previous": "86",
+      "src": "fxstreet"
     }
   ],
-  "checked_at": 1795593729,
+  "checked_at": 1795631801,
   "coverage": {
     "from": 1795323600,
     "to": 1795928400,

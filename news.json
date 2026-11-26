@@ -89,7 +89,7 @@
       "c": "USD",
       "i": "H",
       "title": "ISM Manufacturing PMI",
-      "forecast": "",
+      "forecast": "55.2",
       "previous": "55.5",
       "src": "fxstreet"
     },
@@ -179,7 +179,7 @@
       "c": "USD",
       "i": "H",
       "title": "ISM Services PMI",
-      "forecast": "",
+      "forecast": "54.5",
       "previous": "54.5",
       "src": "fxstreet"
     },
@@ -193,7 +193,7 @@
       "src": "fxstreet"
     }
   ],
-  "checked_at": 1795689391,
+  "checked_at": 1795722547,
   "coverage": {
     "from": 1795323600,
     "to": 1795928400,

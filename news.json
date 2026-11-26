@@ -58,15 +58,6 @@
       "previous": "2.3%"
     },
     {
-      "date": "2026-11-25T19:00:00+00:00",
-      "c": "USD",
-      "i": "M",
-      "title": "Fed's Beige Book",
-      "forecast": "",
-      "previous": "",
-      "src": "fxstreet"
-    },
-    {
       "date": "2026-11-30T14:45:00+00:00",
       "c": "USD",
       "i": "M",
@@ -128,9 +119,81 @@
       "forecast": "",
       "previous": "86",
       "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-03T10:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Challenger Job Cuts",
+      "forecast": "",
+      "previous": "43.994",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-03T13:30:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Initial Jobless Claims",
+      "forecast": "",
+      "previous": "189",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-03T14:45:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "S&P Global Composite PMI",
+      "forecast": "",
+      "previous": "54.6",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-03T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "Factory Orders (MoM)",
+      "forecast": "",
+      "previous": "1.8%",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-03T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Services Employment Index",
+      "forecast": "",
+      "previous": "51.4",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-03T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Services New Orders Index",
+      "forecast": "",
+      "previous": "55.9",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-03T15:00:00+00:00",
+      "c": "USD",
+      "i": "H",
+      "title": "ISM Services PMI",
+      "forecast": "",
+      "previous": "54.5",
+      "src": "fxstreet"
+    },
+    {
+      "date": "2026-12-03T15:00:00+00:00",
+      "c": "USD",
+      "i": "M",
+      "title": "ISM Services Prices Paid",
+      "forecast": "",
+      "previous": "73",
+      "src": "fxstreet"
     }
   ],
-  "checked_at": 1795631801,
+  "checked_at": 1795658225,
   "coverage": {
     "from": 1795323600,
     "to": 1795928400,

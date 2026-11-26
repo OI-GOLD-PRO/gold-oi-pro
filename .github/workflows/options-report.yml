@@ -1,0 +1,29 @@
+name: COMEX options dashboard reports
+on:
+  schedule:
+    - cron: '35 0,12 * * 1-6'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: options-report
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - run: git fetch --shallow-since="$(date -u -d '24 days ago' +%F)" origin main
+      - run: python3 scripts/options_report.py
+      - name: Publish dated reports
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add reports
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Refresh dated COMEX options reports'
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+          done
+          exit 1

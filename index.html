@@ -376,6 +376,15 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   #sfDetails p#sfDetailsReason { margin-top: 4px; }
   #sfDetailsZone, #sfDetailsStatus { color: var(--muted); }
   #sfDetailsRisk { color: #7fd0ff; font-family: var(--mono); }
+#weeklyOptions {background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:14px;padding:16px;width:min(92vw,780px);max-height:84vh;overflow:auto;box-sizing:border-box;font:14px/1.5 system-ui}
+#weeklyOptions::backdrop {background:#030711bb}
+#weeklyOptions header,#weeklyOptions nav {position:static;display:flex;align-items:center;gap:8px;flex-wrap:wrap;height:auto;margin-bottom:10px}
+#weeklyOptions header {justify-content:space-between;color:var(--gold)}
+#weeklyOptions select,#weeklyOptions button {background:#19243a;color:#fff;border:1px solid #485575;border-radius:6px;padding:6px;max-width:100%}
+#weeklyOptions .opt-scroll {overflow-x:auto}
+#weeklyOptions table {border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+#weeklyOptions th,#weeklyOptions td {padding:5px;text-align:right;white-space:nowrap;border-bottom:1px solid #39425b}
+#weeklyOptions a {color:#e0b44c;margin-right:6px}
 </style>
 <link rel="stylesheet" href="v3-premium.css?v=30201">
 <link rel="stylesheet" href="v33-luxury.css?v=41010">
@@ -633,6 +642,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
       </select>
     </label>
     <button id="oiBtn" class="has" aria-label="เปิด/ปิดข้อมูล OI บนกราฟ">OI</button>
+    <button id="optionsReportBtn" aria-label="สรุปผล COMEX Gold Options" aria-haspopup="dialog" title="สรุปผล OI">📊</button>
     <button id="trendPanelBtn" aria-label="ตาราง Donchian Trend" title="Donchian Trend" aria-haspopup="dialog">▦</button>
     <button id="indBtn" aria-label="เลือกอินดิเคเตอร์">ƒx</button>
     <button id="drawBtn" aria-label="เครื่องมือวาดกราฟ">✏️</button>
@@ -732,7 +742,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
   const IS_GOLD = SYM === 'gold' || SYM === 'gcy';
   const SYMBOL = SC.perp || (SC.yahoo === 'GC' ? 'XAUTUSDT' : null); // GC(Yahoo): ใช้ perp ทองต่อปลายกราฟ
   // เวอร์ชันแอป: แก้เล็กเพิ่มเลขท้าย (2 หลัก), เพิ่มฟีเจอร์ใหญ่เพิ่มเลขกลาง
-  const APP_VER = '4.9.164';
+  const APP_VER = '4.9.165';
   { const sv = document.getElementById('spVer'); if (sv) sv.textContent = 'V' + APP_VER; }
   // ตรวจเวอร์ชันเมื่อเปิดแอป กลับจากพื้นหลัง หรือกลับมาออนไลน์
   (() => {
@@ -3134,6 +3144,7 @@ header{min-height:54px;padding:6px 12px 5px;gap:8px!important;background:linear-
 <script src="quant.js?v=20031"></script>
 <script src="aitray.js?v=41018"></script>
 <script src="v33-luxury.js?v=41018"></script>
+<script src="weekly-options.js?v=1"></script>
 <script src="historical-oi.js?v=41018"></script>
 </body>
 </html>

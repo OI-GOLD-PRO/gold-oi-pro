@@ -2,20 +2,45 @@
 <style>body{color:#ecf0fa;background:#09111f;font:18px system-ui;max-width:30rem;margin:12vh auto;padding:24px}label,input,button{display:block}input,button{box-sizing:border-box;width:100%;padding:14px;margin:10px 0 20px;border-radius:10px;font:inherit}button{background:#d3ae63;color:#181309;border:0}</style>
 <h1>OI AI Trader</h1><form><label>รหัสเชื่อมเครื่องจาก Start-Phone<input id="pair" required pattern="[0-9a-f]{20,64}" autocapitalize="none" spellcheck="false"></label><button>เปิดแดชบอร์ด MT5</button></form><p role="status" id="msg"></p>
 <script>
-const pair=document.querySelector('#pair'),msg=document.querySelector('#msg');
-pair.value=location.hash.slice(1)||localStorage.getItem('oi-ai-pair')||'';
-document.querySelector('form').onsubmit=async event=>{
- event.preventDefault();
- const id=pair.value.trim();
- if(!/^[0-9a-f]{20,64}$/.test(id))return;
- msg.textContent='กำลังค้นหาแดชบอร์ดของเครื่องนี้…';
- try{
-  const response=await fetch('https://api.github.com/gists/'+id,{cache:'no-store'});
-  if(!response.ok)throw Error();
-  const gist=await response.json(),url=gist.files['oi-ai-phone.txt'].content.trim();
-  if(!/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url))throw Error();
-  localStorage.setItem('oi-ai-pair',id);
-  location.assign(url);
- }catch{msg.textContent='อ่านลิงก์ไม่ได้ ตรวจรหัสเชื่อมเครื่องและเปิด Start-Phone บนคอมอีกครั้ง';}
-};
+const form = document.querySelector('form');
+const pair = document.querySelector('#pair');
+const msg = document.querySelector('#msg');
+const button = form.querySelector('button');
+const validPair = /^[0-9a-f]{20,64}$/;
+const key = 'oi-ai-pair';
+let saved = '';
+try { saved = localStorage.getItem(key) || ''; } catch {}
+pair.value = location.hash.slice(1) || saved;
+
+async function openDashboard() {
+  const id = pair.value.trim();
+  if (button.disabled || !validPair.test(id)) return;
+  button.disabled = true;
+  pair.readOnly = true;
+  msg.textContent = 'กำลังเปิดแดชบอร์ดของเครื่องนี้…';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch('https://api.github.com/gists/' + id, {
+      cache: 'no-store', signal: controller.signal
+    });
+    if (!response.ok) throw Error();
+    const gist = await response.json();
+    const url = gist.files['oi-ai-phone.txt'].content.trim();
+    if (!/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(url)) throw Error();
+    try { localStorage.setItem(key, id); } catch {}
+    location.replace(url);
+  } catch {
+    msg.textContent = 'เปิดแดชบอร์ดไม่ได้ ตรวจว่า Start-Phone บนคอมเปิดอยู่ แล้วกดเปิดแดชบอร์ดอีกครั้ง';
+  } finally {
+    clearTimeout(timeout);
+    button.disabled = false;
+    pair.readOnly = false;
+  }
+}
+form.addEventListener('submit', event => {
+  event.preventDefault();
+  openDashboard();
+});
+if (validPair.test(pair.value)) openDashboard();
 </script></html>

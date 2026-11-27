@@ -62,7 +62,7 @@
       "c": "USD",
       "i": "M",
       "title": "Chicago PMI",
-      "forecast": "",
+      "forecast": "54.6",
       "previous": "55.3",
       "src": "fxstreet"
     },
@@ -98,7 +98,7 @@
       "c": "USD",
       "i": "H",
       "title": "ISM Manufacturing PMI",
-      "forecast": "55.2",
+      "forecast": "55",
       "previous": "55.5",
       "src": "fxstreet"
     },
@@ -107,7 +107,7 @@
       "c": "USD",
       "i": "M",
       "title": "ISM Manufacturing Prices Paid",
-      "forecast": "",
+      "forecast": "71",
       "previous": "75.2",
       "src": "fxstreet"
     },
@@ -116,7 +116,7 @@
       "c": "USD",
       "i": "M",
       "title": "JOLTS Job Openings",
-      "forecast": "7.45",
+      "forecast": "7.46",
       "previous": "7.523",
       "src": "fxstreet"
     },
@@ -143,7 +143,7 @@
       "c": "USD",
       "i": "M",
       "title": "Initial Jobless Claims",
-      "forecast": "193",
+      "forecast": "195",
       "previous": "189",
       "src": "fxstreet"
     },
@@ -161,7 +161,7 @@
       "c": "USD",
       "i": "M",
       "title": "Factory Orders (MoM)",
-      "forecast": "0.4%",
+      "forecast": "0.5%",
       "previous": "1.8%",
       "src": "fxstreet"
     },
@@ -206,7 +206,7 @@
       "c": "USD",
       "i": "H",
       "title": "Average Hourly Earnings (MoM)",
-      "forecast": "",
+      "forecast": "0.3%",
       "previous": "0.4%",
       "src": "fxstreet"
     },
@@ -233,7 +233,7 @@
       "c": "USD",
       "i": "H",
       "title": "Nonfarm Payrolls",
-      "forecast": "",
+      "forecast": "90",
       "previous": "165",
       "src": "fxstreet"
     },
@@ -251,7 +251,7 @@
       "c": "USD",
       "i": "M",
       "title": "Unemployment Rate",
-      "forecast": "",
+      "forecast": "4.1%",
       "previous": "4.1%",
       "src": "fxstreet"
     },
@@ -269,7 +269,7 @@
       "c": "USD",
       "i": "H",
       "title": "Michigan Consumer Sentiment Index",
-      "forecast": "",
+      "forecast": "52.6",
       "previous": "51.5",
       "src": "fxstreet"
     },
@@ -292,7 +292,7 @@
       "src": "fxstreet"
     }
   ],
-  "checked_at": 1795778130,
+  "checked_at": 1795809697,
   "coverage": {
     "from": 1795323600,
     "to": 1795928400,

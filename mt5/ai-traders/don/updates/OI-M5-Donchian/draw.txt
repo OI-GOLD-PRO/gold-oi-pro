@@ -1,0 +1,7 @@
+  const don = contact.donchian || [];
+  const box = contact.sidewaysRange;
+  const last = don.at(-1);
+  el('chartTitle').textContent += (last ? ' · DON20 บน/กลาง/ล่าง '+[last.upper,last.middle,last.lower].map(v=>v.toFixed(2)).join(' / ') : '') +
+    (box ? ' · กรอบไซด์เวย์ '+box.low+'–'+box.high : '');
+  const levels = don.filter(Boolean).flatMap(d=>[d.upper,d.lower]);
+  if (box) levels.push(box.low,box.high);

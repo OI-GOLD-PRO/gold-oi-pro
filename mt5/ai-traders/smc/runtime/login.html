@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="th">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>เข้าสู่ SMC AI Trader</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:24px;min-height:100dvh;display:grid;place-items:center;background:#11191e;color:#eee6d9;font:16px/1.55 system-ui,sans-serif}
+main{max-width:400px;width:100%;padding:26px;background:#1b262d;border:1px solid #344149;border-radius:14px}
+h1{margin:0 0 20px;color:#f0c481;font-size:24px}
+label{display:block;margin:12px 0 4px}
+input:not([type=checkbox]){display:block;width:100%;padding:11px;background:#10181e;border:1px solid #52616a;border-radius:7px;color:inherit;font:inherit}
+.check{display:flex;align-items:center;gap:8px;margin-top:18px}
+button{width:100%;margin-top:16px;padding:10px;background:#edbf7b;color:#1f160d;border:0;border-radius:7px;font:inherit;font-weight:700}
+.error{color:#ffaaa0}
+</style>
+<main>
+<h1>OI Gold · SMC 1.15</h1>
+<p class="error" role="alert"><!--LOGIN_ERROR--></p>
+<form data-login="/session" method="post" autocomplete="on">
+  <label for="username">ชื่อผู้ใช้</label>
+  <input id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="16" placeholder="owner หรือ viewer">
+  <label for="password">รหัสผ่าน</label>
+  <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128">
+  <label class="check"><input type="checkbox" name="remember" value="1"> จำการเข้าสู่ระบบบนเครื่องนี้</label>
+  <button type="submit" disabled>เข้าสู่แดชบอร์ด</button>
+</form><script src="/mobile-signin.js" defer></script>
+</main>
+</html>

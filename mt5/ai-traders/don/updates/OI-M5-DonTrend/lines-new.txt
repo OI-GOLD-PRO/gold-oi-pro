@@ -1,0 +1,21 @@
+  ctx.save();
+  if(box){
+    const first = rows.findIndex(r=>r[0]>=box.start);
+    const x=Math.max(0,first)*step, width=rows.length*step-x;
+    ctx.fillStyle='rgba(245,191,73,0.10)';
+    ctx.strokeStyle='#e7b84a';
+    ctx.fillRect(x,y(box.high),width,y(box.low)-y(box.high));
+    ctx.strokeRect(x,y(box.high),width,y(box.low)-y(box.high));
+  }
+  ctx.lineWidth=2*scale;
+  don.forEach((point,i)=>{
+    if(!point || !Number.isFinite(point.trail))return;
+    ctx.strokeStyle=point.direction>0?'#20ca88':'#ed5e69';
+    const x=(i+.5)*step, prev=don[i-1];
+    ctx.beginPath();
+    if(prev && Number.isFinite(prev.trail)){
+      ctx.moveTo(x-step,y(prev.trail));ctx.lineTo(x,y(prev.trail));
+    }else ctx.moveTo(x-step/2,y(point.trail));
+    ctx.lineTo(x,y(point.trail));ctx.stroke();
+  });
+  ctx.restore();

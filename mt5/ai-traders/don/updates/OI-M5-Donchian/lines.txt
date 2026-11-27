@@ -1,0 +1,24 @@
+  ctx.save();
+  if(box){
+    const first = rows.findIndex(r=>r[0]>=box.start);
+    const x=Math.max(0,first)*step, width=rows.length*step-x;
+    ctx.fillStyle='rgba(245,191,73,0.10)';
+    ctx.strokeStyle='#e7b84a';
+    ctx.fillRect(x,y(box.high),width,y(box.low)-y(box.high));
+    ctx.strokeRect(x,y(box.high),width,y(box.low)-y(box.high));
+  }
+  for(const [field,color] of [['upper','#62bdff'],['lower','#62bdff'],['middle','#d2acff']]){
+    ctx.strokeStyle=color;
+    ctx.setLineDash(field==='middle'?[3*scale,3*scale]:[]);
+    ctx.beginPath();
+    let previous=null;
+    don.forEach((point,i)=>{
+      if(!point){previous=null;return;}
+      const x=(i+.5)*step;
+      if(previous){ctx.lineTo(x,y(previous[field]));ctx.lineTo(x,y(point[field]));}
+      else ctx.moveTo(x,y(point[field]));
+      previous=point;
+    });
+    ctx.stroke();
+  }
+  ctx.restore();

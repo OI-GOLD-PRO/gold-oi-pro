@@ -1,0 +1,21 @@
+OI Gold AI Trader Demo 1.20
+
+1. แตก ZIP บนเครื่อง Windows ที่ติดตั้ง MT5 และ Node.js 20 ขึ้นไป ให้โฟลเดอร์ scripts อยู่ข้าง ai-trader
+2. เปิด MT5 ด้วยบัญชี Demo แบบ Hedging จาก File > Open Data Folder คัดลอก OI_Trader_Demo.mq5 และ OI_Trader_Journal.mq5 ไปที่ MQL5/Experts แล้วเปิด MetaEditor กด Compile ทั้งสองไฟล์
+3. เปิด PowerShell ในโฟลเดอร์ ai-trader แล้วรัน .\Start-Demo.ps1 กรอก DeepSeek API key, เลขบัญชี Demo, ชื่อเซิร์ฟเวอร์ และชื่อทองที่โบรกเกอร์ใช้ เช่น XAUUSDc ให้ตรงกับ MT5
+4. ไปที่ MT5 > Tools > Options > Expert Advisors เพิ่ม http://127.0.0.1:4173 ใน Allow WebRequest
+5. ติด OI_Trader_Demo บนกราฟทอง M5 เพียงกราฟเดียว ใส่ InpBridgeToken จากไฟล์ที่ PowerShell แจ้ง ตั้ง InpEnableTrading เป็น true แล้วเปิด Algo Trading ติด OI_Trader_Journal บนกราฟที่สองในบัญชีเดียวกัน
+6. เปิด http://127.0.0.1:4173/ เพื่อตั้ง risk ต่อไม้, risk รวม, ขาดทุนรายวัน, จำนวนไม้ และอนุญาตเปิดคนละฝั่งตามต้องการ เปิดเช็กบ็อกซ์เทรด Demo แล้วกดบันทึก
+7. เปิด MT5 และ PowerShell ค้างไว้ เมื่อแท่ง M5 ใหม่เริ่มและสเปรดผ่านเกณฑ์ EA จะขอแผน ออเดอร์เปิดจริงจะเห็นใน MT5 และประวัติแดชบอร์ดจะตามมาหลัง EA รายงานรอบถัดไป
+8. การใช้งานมือถือผ่าน HTTPS ใน Wi-Fi หรือ VPN เดียวกัน ดูหัวข้อ Optional phone dashboard ใน README.md
+
+ดูจากมือถือนอกบ้าน (Wi-Fi หรือ 4G/5G)
+หลังติดตั้งตามข้อ 1–5 ให้ปิดหน้าต่าง Start-Demo เดิม แล้วรัน .\Start-Phone.ps1 แทน เปิดลิงก์ https://...trycloudflare.com ที่เห็นในหน้าต่าง Cloudflare บน Safari ใส่ชื่อ viewer และรหัสในไฟล์ phone-password.txt ตามตำแหน่งที่โปรแกรมแสดง ลิงก์เปลี่ยนเมื่อเริ่ม Tunnel ใหม่ ให้เปิดคอมและ MT5 ค้างไว้ หน้ามือถือช่องทางนี้ดูข้อมูลอย่างเดียว
+
+หน้ามือถือสำหรับเจ้าของ: เปิดลิงก์ Tunnel จาก Start-Phone.ps1 ใช้ชื่อ owner และรหัสใน phone-owner-password.txt กราฟใช้หน้า OI Trade เดิม ส่วนปุ่ม “ตั้งค่า AI” บันทึกเพดานความเสี่ยงของ AI Trader Demo บนเครื่อง MT5 บัญชี viewer ยังดูข้อมูลได้อย่างเดียว
+
+MCP สำหรับแอป AI ที่รองรับ local stdio (รันบนคอมเดียวกับแดชบอร์ด)
+เปิดแดชบอร์ดตามปกติ เพิ่ม MCP server ในไคลเอนต์โดยตั้ง command = node และ args เป็นรายการที่มีพาธเต็มของ mcp.mjs หนึ่งรายการ เช่น C:\OI-Trader\ai-trader\mcp.mjs จากนั้นเชื่อมต่อใหม่ ตัวอย่าง JSON:
+{"mcpServers":{"oi-gold":{"command":"node","args":["C:\\OI-Trader\\ai-trader\\mcp.mjs"]}}}
+ปรับพาธให้ตรงจุดที่แตก ZIP หากเปลี่ยนพอร์ตแดชบอร์ดให้ตั้ง OI_TRADER_PORT ในไคลเอนต์ให้ตรงกัน
+เครื่องมือ get_oi_snapshot อ่านภาพตลาดปัจจุบัน, get_daily_journal อ่านดีลและเหตุผลในวันที่โบรกเกอร์, get_risk_policy อ่านความเสี่ยงที่บันทึกบนแดชบอร์ด

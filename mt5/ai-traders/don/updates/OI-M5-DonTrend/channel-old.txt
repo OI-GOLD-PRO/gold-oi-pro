@@ -1,0 +1,14 @@
+function donchianSeries(rows) {
+  const period = 20;
+  return rows.map((row,i) => {
+    if (i < period) return null;
+    const window = rows.slice(i-period,i);
+    const upper = Math.max(...window.map(r=>r[2]));
+    const lower = Math.min(...window.map(r=>r[3]));
+    const middle = (upper+lower)/2;
+    const close = row[4];
+    const signal = close > upper ? 'breakout_up' : close < lower ? 'breakout_down' :
+      close > middle ? 'inside_upper_half' : close < middle ? 'inside_lower_half' : 'at_middle';
+    return {upper,lower,middle,signal};
+  });
+}

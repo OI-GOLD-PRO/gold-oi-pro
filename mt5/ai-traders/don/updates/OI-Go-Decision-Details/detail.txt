@@ -1,0 +1,21 @@
+function describe(state,result){
+  const {market:m,options:o,order_flow:f}=state;
+  const don=m.donTrend;
+  const fmt=v=>v.toFixed(2);
+  const parts=[result.reason];
+  const close=m.candles?.at(-1)?.[4];
+  if(Number.isFinite(close)){
+    let line='M5 ปิด '+fmt(close);
+    if(Number.isFinite(don?.middle)) line+=' '+(close>don.middle?'เหนือ':close<don.middle?'ใต้':'เท่ากับ')+'เส้นกลาง DON '+fmt(don.middle);
+    if(Number.isFinite(don?.lower)&&Number.isFinite(don?.upper)) line+=' กรอบ '+fmt(don.lower)+'–'+fmt(don.upper);
+    parts.push(line);
+  }
+  parts.push(m.allowedEntrySide?'DON อนุญาตเปิด '+m.allowedEntrySide:'DON ยังไม่ยืนยันฝั่งเข้า');
+  if(Number.isFinite(f?.delta)) parts.push('Order flow Δ '+fmt(f.delta)+(f.delta>0?' ซื้อสุทธิมากกว่า':f.delta<0?' ขายสุทธิมากกว่า':' สมดุล'));
+  else parts.push('ไม่มีข้อมูล order flow รอบนี้');
+  if(Number.isFinite(o?.gamma_flip_intraday)) parts.push('Gamma flip (GC) '+fmt(o.gamma_flip_intraday));
+  if(Number.isFinite(o?.atm_iv_pct)) parts.push('ATM IV '+fmt(o.atm_iv_pct)+'%');
+  if(Number.isFinite(result.risk_pct)) parts.push('แผนเข้าเสี่ยง '+result.risk_pct+'% · SL '+result.sl_atr+' ATR · เป้า '+result.rr+'R');
+  if(Number.isFinite(result.reduce_pct)) parts.push('เสนอให้ลดขนาดไม้ '+result.reduce_pct+'%');
+  return {...result,reason:parts.join(' | ')};
+}

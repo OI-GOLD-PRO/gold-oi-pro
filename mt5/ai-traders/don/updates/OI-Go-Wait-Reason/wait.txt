@@ -1,0 +1,16 @@
+function waitConditions(state){
+  const {market:m,order_flow:f}=state;
+  const side=m.allowedEntrySide;
+  if(!['BUY','SELL'].includes(side)) return {trend:'DON ยังไม่ยืนยันฝั่งเข้า รอ DON ระบุ BUY หรือ SELL บนแท่ง M5 ที่ปิดแล้ว'};
+  const buy=side==='BUY', word=buy?'เหนือ':'ใต้';
+  const close=m.candles?.at(-1)?.[4], mid=m.donTrend?.middle, edge=buy?m.donTrend?.upper:m.donTrend?.lower;
+  const items={};
+  if(Number.isFinite(close)&&Number.isFinite(mid)&&(buy?close<=mid:close>=mid))
+    items.middle='M5 ปิด '+close.toFixed(2)+' ยังไม่ปิด'+word+'เส้นกลาง DON '+mid.toFixed(2)+' รอแท่ง M5 ปิด'+word+'ระดับนี้แล้วประเมิน '+side+' อีกครั้ง';
+  if(Number.isFinite(close)&&Number.isFinite(edge)&&(buy?close<=edge:close>=edge))
+    items.breakout='ราคาปิดยังไม่ผ่านขอบกรอบฝั่ง '+side+' รอ M5 ปิด'+word+'ขอบกรอบรอบนี้ที่ '+edge.toFixed(2);
+  if(!Number.isFinite(f?.delta)) items.flow='รอบนี้ไม่มีค่าเดลต้า รอข้อมูลแรงซื้อขายของแท่งถัดไป';
+  else if(buy?f.delta<=0:f.delta>=0) items.flow='เดลต้า '+f.delta.toFixed(2)+' ยังไม่หนุน '+side+' รอเดลต้ากลับเป็น'+(buy?'บวก':'ลบ')+' ในรอบ M5 ถัดไป';
+  items.review='หลักฐานรอบนี้ยังไม่พอระบุจุดเข้า รอแท่ง M5 ถัดไปเพื่อประเมินราคา แรงซื้อขาย และ OI พร้อมกันอีกครั้ง';
+  return items;
+}

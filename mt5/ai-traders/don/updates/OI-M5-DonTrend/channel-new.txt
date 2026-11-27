@@ -1,0 +1,27 @@
+const donHistory=new Map();
+function donchianSeries(rows,id){
+  const history=donHistory.get(id)||[];
+  const bars=history.filter(r=>r[0]<rows[0][0]).concat(rows).slice(-1500);
+  donHistory.set(id,bars);
+  let atr=0, direction=0, trail=null;
+  const ranges=[];
+  const points=bars.map((b,i)=>{
+    if(!i)return null;
+    const c=b[4], prev=bars[i-1][4];
+    atr+=(Math.max(b[2]-b[3],Math.abs(b[2]-prev),Math.abs(b[3]-prev))-atr)/14;
+    ranges.push(atr);
+    if(i<20 || bars.length<51)return null;
+    const prior=bars.slice(i-20,i);
+    const upper=Math.max(...prior.map(r=>r[2])), lower=Math.min(...prior.map(r=>r[3]));
+    const recent=ranges.slice(-50);
+    const ratio=atr/(recent.reduce((s,v)=>s+v,0)/recent.length||1);
+    const next=c>upper?1:c<lower?-1:direction;
+    if(next){
+      const band=(b[2]+b[3])/2-next*atr*(ratio>1.2?3.2:ratio<0.8?1.8:2.5);
+      trail=next!==direction?band:next>0?Math.max(trail,band):Math.min(trail,band);
+    }
+    direction=next;
+    return {upper,lower,middle:(upper+lower)/2,trail,direction,signal:c>upper?'breakout_up':c<lower?'breakout_down':'inside'};
+  });
+  return points.slice(-rows.length);
+}

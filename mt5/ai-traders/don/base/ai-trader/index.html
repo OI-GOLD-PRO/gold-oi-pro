@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OI Gold AI Trader</title><link rel="stylesheet" href="./style.css"></head>
+<body><main class="shell">
+<header><div><small>OI GOLD PRO / SEPARATE APP</small><h1>AI Trader Dashboard</h1><p>DeepSeek · MT5 · XAUUSD M5</p></div><span class="pill">MT5 DEMO</span></header>
+<section class="stats"><article><small>MT5 Connection</small><strong id="bridgeState">Offline</strong></article><article><small>OI Feed</small><strong id="oiFeedState">กำลังตรวจสอบ</strong></article><article><small>Trading</small><strong id="tradeState">Disabled</strong></article><article><small>Open positions</small><strong id="positionsCount">—</strong></article></section>
+<section class="panel oi-snapshot" aria-labelledby="oiSnapshotTitle">
+  <div class="heading"><h2 id="oiSnapshotTitle">ข้อมูลออปชัน OI Gold Pro</h2><button id="oiRefresh" type="button">โหลดข้อมูลใหม่</button></div>
+  <p id="oiFeedMessage" role="status">กำลังอ่านข้อมูลจาก Worker</p>
+  <dl id="oiMetrics" hidden>
+    <div><dt>สัญญา</dt><dd id="oiContract"></dd></div>
+    <div><dt>เวลาราคาออปชัน</dt><dd id="oiQuotesTime"></dd></div>
+    <div><dt>เวลา OI</dt><dd id="oiTime"></dd></div>
+    <div><dt>ATM IV</dt><dd id="oiAtmIv"></dd></div>
+    <div><dt>Expected Move</dt><dd id="oiExpectedMove"></dd></div>
+    <div><dt>Gamma Flip ระหว่างวัน</dt><dd id="oiGammaFlip"></dd></div>
+  </dl>
+</section>
+<div class="columns"><section class="panel"><h2>Risk Policy <span class="muted">Local demo only</span></h2><form id="riskForm">
+<label>Risk per trade (%)<input name="perTrade" type="number" min="0.01" max="5" step=".01" required value=".5"></label>
+<label>Maximum total open risk (%)<input name="total" type="number" min=".01" max="20" step=".01" required value="2"></label>
+<label>Daily loss limit (%)<input name="daily" type="number" min=".01" max="20" step=".01" required value="2"></label>
+<label>Maximum positions<input name="positions" type="number" min="1" max="50" step="1" required value="5"></label>
+<label class="check"><input name="hedging" type="checkbox"> Allow opposite directions (hedging accounts only)</label>
+<label class="check"><input name="enabled" type="checkbox"> เปิดให้ AI เทรดบัญชี Demo</label><button type="submit">บันทึกความเสี่ยง</button><p id="riskMessage" role="status"></p></form><p class="note">EA ตรวจเพดานความเสี่ยงอีกครั้งก่อนเปิดไม้</p></section>
+<section class="panel"><h2>บทวิเคราะห์ DeepSeek</h2><button type="button" id="analyze">วิเคราะห์ OI ล่าสุด</button><p id="analysis" role="status" style="white-space:pre-wrap"></p><h2>เหตุผลรายคำสั่ง</h2><div id="decisionFeed"></div></section></div>
+<section class="panel"><div class="heading"><h2>Daily Trading Journal</h2><label>Day <input id="day" type="date"></label></div><p id="journalStatus" role="status"></p><table><thead><tr><th>เวลาโบรกเกอร์</th><th>Deal</th><th>Symbol</th><th>ฝั่ง / เข้าออก</th><th>Lot</th><th>กำไรสุทธิ</th><th>เหตุผลตอนเข้า</th></tr></thead><tbody id="journalRows"></tbody></table></section>
+<footer>Safety mode: live trading disabled. Do not use this demo for trading decisions.</footer>
+</main><script src="./app.js"></script></body></html>

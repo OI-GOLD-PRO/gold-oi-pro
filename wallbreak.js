@@ -34,6 +34,7 @@
     try {
       const d = await window.OIHistoryZonesAPI();
       hist = new Map((d.days || []).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x.date) && Array.isArray(x.rows)).map(x => [x.date, x.rows]));
+      if (!hist.size) histAt = Date.now() - 29 * 60e3; // ยังไม่มีข้อมูล (เช่นโหลดตอน OI ยังไม่พร้อม) → รอบถัดไปลองใหม่เร็วขึ้น
     } catch (e) { histAt = Date.now() - 25 * 60e3; }
   }
 

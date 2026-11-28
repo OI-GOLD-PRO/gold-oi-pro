@@ -18,7 +18,7 @@
   const isOn = () => cfg.on === null ? (!!O.unlimited && !window.OI_NEWDEV) : !!cfg.on;
 
   const ARM = 3, SLB = 3, RRS = [1, 1.6, 5], RANGE = 60, BO_BUF = 2, BO = { id: 'NYB', lab: 'NY เบรก', a: 1170, b: 1380, half: 1.5, real: 1 } /* V4.9.94 NY เบรกเอาท์ 19:30–23:00 */, MOM_N = 5, ATR_N = 60, MOM_MAX = 3, NB = 30 * 60, NA = 90 * 60, NCLOSE = 5 * 60;
-  const SDEF_RR = { AM: 5, LDN: 1.6, NYB: 1 }, DED_TOL = 0.5, DED_WIN = 3600; // V4.9.166: RR เริ่มต้นต่อช่วง + พารามิเตอร์ dedupe
+  const SDEF_RR = { AM: 1, LDN: 1, NYB: 1 }, DED_TOL = 0.5, DED_WIN = 3600; // V4.9.168: RR1 ทุกช่วง (แบ็กเทส 26 วัน 23 ต.ค.–27 พ.ย.: RR1 กำไรทุกช่วง DD 0 · RR5 แพ้ทั้ง AM/LDN)
   // นาทีของวัน (เวลาไทย) · NY ข้ามเที่ยงคืนถึง 01:30
   const SESS = [
     { id: 'AM', lab: 'Asia เช้า', a: 360, b: 600, half: 2, real: 2, realA: 3, mom: 3 },

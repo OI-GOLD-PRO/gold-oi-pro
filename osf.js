@@ -161,7 +161,7 @@
 
   // ---------- OI ย้อนหลังรายวัน (API เดียวกับ Historical OI Zones: oi_backup + oi_recovered) ----------
   let hist = new Map(), histAt = 0, histMsg = '';
-  const m1Cache = new Map(), HIST_DAYS = 20, TRACK = 36 * 3600, m1At = new Map(); // วันที่ยังติดตามผลไม่ครบ 36 ชม. ดึงใหม่ทุก 10 นาที // แคชแท่ง M1 รายวันที่จบแล้ว (ไม่ต้องดึงซ้ำ) · แบ็กเทสย้อนหลังสูงสุด 10 วัน
+  const m1Cache = new Map(), HIST_DAYS = 30, TRACK = 36 * 3600, m1At = new Map(); // V4.9.167: 20 → 30 วัน (ครบทุกวันที่มี OI ในชีต ตั้งแต่ 23 ต.ค.) // วันที่ยังติดตามผลไม่ครบ 36 ชม. ดึงใหม่ทุก 10 นาที // แคชแท่ง M1 รายวันที่จบแล้ว (ไม่ต้องดึงซ้ำ) · แบ็กเทสย้อนหลังสูงสุด 10 วัน
   async function loadHist() {
     if (Date.now() - histAt < 30 * 60e3 || !window.OIHistoryZonesAPI) return;
     histAt = Date.now();
